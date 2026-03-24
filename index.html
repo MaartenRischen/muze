@@ -89,13 +89,27 @@
   #start-screen.loading #loading-text { display: block; }
 
   #debug { position: fixed; top: env(safe-area-inset-top, 8px); left: 8px; z-index: 10; pointer-events: none; }
-  #mode-hud {
+  #mode-hud-wrap {
     position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
-    z-index: 10; pointer-events: none; text-align: center;
+    z-index: 10; display: flex; align-items: center; gap: 8px;
+  }
+  #freeze-btn {
+    appearance: none; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(0,0,0,0.5); color: rgba(255,255,255,0.5);
+    font-size: 18px; width: 36px; height: 36px; border-radius: 50%;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    pointer-events: auto;
+  }
+  #freeze-btn:active { background: rgba(255,255,255,0.15); }
+  #freeze-btn.frozen { border-color: rgba(100,200,255,0.6); color: rgba(100,200,255,0.9); }
+  #mode-hud {
+    pointer-events: none; text-align: center;
     font: bold 32px/1.2 monospace; color: #fff;
     background: rgba(0,0,0,0.5); padding: 12px 24px; border-radius: 12px;
     backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   }
+  #mode-hud.frozen { border: 1px solid rgba(100,200,255,0.3); }
   #mode-hud .valence-bar {
     margin-top: 8px; height: 12px; width: 240px; background: rgba(255,255,255,0.15);
     border-radius: 6px; position: relative; overflow: hidden;
@@ -300,7 +314,10 @@
 <div id="riser-overlay"></div>
 <div id="rhythm-indicator">AUTO</div>
 <div id="debug"></div>
-<div id="mode-hud"></div>
+<div id="mode-hud-wrap">
+  <button id="freeze-btn">&#10052;</button>
+  <div id="mode-hud"></div>
+</div>
 
 <canvas id="rec-canvas"></canvas>
 <button id="rec-btn">&#9679;</button>
@@ -459,7 +476,7 @@ MUZE.State = {
   mouthWidth: 0, headPitch: 0, headYaw: 0, headRoll: 0, faceDetected: false,
   handPresent: false, handY: 0.5, handX: 0.5, handOpen: true,
   currentScale: [0,2,3,5,7,9,10], melodyNote: null, chordIndex: 0,
-  autoRhythm: false, riserActive: false,
+  autoRhythm: false, riserActive: false, modeFrozen: false,
   audioReady: false, _browRaw: 0,
 };
 </script>
@@ -1502,8 +1519,10 @@ MUZE.Loop = {
     if(S.faceDetected&&S.audioReady){
       MUZE.Audio.updateParams(S);
 
-      const scale=MUZE.Music.selectScale(S.lipCorner);
-      S.currentScale=scale;
+      if(!S.modeFrozen){
+        const scale=MUZE.Music.selectScale(S.lipCorner);
+        S.currentScale=scale;
+      }
       const octShift=Math.floor(S.browHeight*C.OCTAVE_RANGE)*12;
       const root=C.ROOT_NOTE+octShift;
 
@@ -1603,6 +1622,11 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     MUZE.SynthMenu.init();
     MUZE.Tutorial.init();
     MUZE.Recorder.init();
+    document.getElementById('freeze-btn').addEventListener('click', () => {
+      MUZE.State.modeFrozen = !MUZE.State.modeFrozen;
+      document.getElementById('freeze-btn').classList.toggle('frozen', MUZE.State.modeFrozen);
+      document.getElementById('mode-hud').classList.toggle('frozen', MUZE.State.modeFrozen);
+    });
     MUZE.Loop.init();
 
     // Pause button
