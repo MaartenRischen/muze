@@ -75,7 +75,7 @@
   #debug { position: fixed; top: env(safe-area-inset-top, 8px); left: 8px; z-index: 10; pointer-events: none; }
   #mode-hud {
     position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
-    z-index: 10; pointer-events: none; text-align: center;
+    z-index: 10; pointer-events: auto; cursor: pointer; text-align: center;
     font: bold 32px/1.2 monospace; color: #fff;
     background: rgba(0,0,0,0.5); padding: 12px 24px; border-radius: 12px;
     backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
@@ -504,6 +504,19 @@ MUZE.Audio = {
 
   startRiser(){this._riserGain.gain.rampTo(0.3,2);this._riserFilter.frequency.rampTo(4000,2);},
   stopRiser(){this._riserGain.gain.rampTo(0,0.05);this._riserFilter.frequency.rampTo(200,0.1);this.kickSynth.triggerAttackRelease('C1','4n',Tone.now(),1);},
+  playArpeggio() {
+    const S=MUZE.State, C=MUZE.Config;
+    if(!S.currentScale||!this.padSynth) return;
+    const root=C.ROOT_NOTE;
+    const up=S.currentScale.map(i=>MUZE.Music.midiToNote(root+i));
+    const down=[...up].reverse().slice(1);
+    const notes=[...up,...down];
+    const gap=0.15;
+    const now=Tone.now();
+    notes.forEach((n,i)=>{
+      this.padSynth.triggerAttackRelease(n,0.12,now+i*gap,0.5);
+    });
+  },
   reverbThrow(){const p=this.reverb.wet.value;this.reverb.wet.rampTo(0.95,0.05);setTimeout(()=>this.reverb.wet.rampTo(p,1.5),200);},
   tapeStop(){const o=Tone.Transport.bpm.value;Tone.Transport.bpm.rampTo(20,0.4);setTimeout(()=>Tone.Transport.bpm.rampTo(o,0.15),500);},
 };
@@ -846,6 +859,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     MUZE.Touch.init();
     MUZE.SampleUI.init();
     MUZE.Loop.init();
+    document.getElementById('mode-hud').addEventListener('click', () => MUZE.Audio.playArpeggio());
     ss.remove();
     MUZE.Loop.start();
   } catch (err) {
