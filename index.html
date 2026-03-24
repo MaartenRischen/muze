@@ -321,11 +321,11 @@ MUZE.Music = {
   NN:['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
   selectScale(lc) {
     const C=MUZE.Config;
-    if(lc>0.75) return C.SCALE_LYDIAN;
+    if(lc>0.80) return C.SCALE_LYDIAN;
     if(lc>0.60) return C.SCALE_IONIAN;
-    if(lc>0.35) return C.SCALE_MIXOLYDIAN;
-    if(lc>0.15) return C.SCALE_DORIAN;
-    if(lc>-0.10) return C.SCALE_AEOLIAN;
+    if(lc>0.40) return C.SCALE_MIXOLYDIAN;
+    if(lc>0.20) return C.SCALE_DORIAN;
+    if(lc>0.00) return C.SCALE_AEOLIAN;
     return C.SCALE_PHRYGIAN;
   },
   quantize(v,s,r,o){const t=s.length*o,c=Math.max(0,Math.min(t-1,Math.round(v*(t-1))));return r+Math.floor(c/s.length)*12+s[c%s.length];},
