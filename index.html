@@ -157,43 +157,70 @@
     font-weight: bold;
   }
   #help-btn:active { background: rgba(255,255,255,0.15); }
-  #help-panel {
+
+  /* Tutorial picker */
+  #tut-picker {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    z-index: 25; background: rgba(5,5,5,0.95);
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    overflow-y: auto; -webkit-overflow-scrolling: touch;
-    padding: env(safe-area-inset-top, 16px) 20px 40px 20px;
-    display: none;
+    z-index: 30; background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
   }
-  #help-panel.open { display: block; }
-  #help-panel .close-help {
-    position: sticky; top: 0; text-align: right; padding: 8px 0 12px;
+  #tut-picker.open { display: flex; }
+  #tut-picker h2 {
+    color: #fff; font-size: 22px; font-weight: 300; letter-spacing: 4px;
+    text-transform: uppercase;
   }
-  #help-panel .close-help button {
+  #tut-picker p { color: rgba(255,255,255,0.4); font-size: 13px; max-width: 240px; text-align: center; line-height: 1.5; }
+  .tut-choice {
+    appearance: none; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.05); color: #fff; font-size: 14px;
+    padding: 14px 32px; border-radius: 30px; cursor: pointer;
+    letter-spacing: 1px; width: 220px; text-align: center;
+    transition: background 0.15s;
+  }
+  .tut-choice:active { background: rgba(255,255,255,0.15); }
+  .tut-choice small { display: block; color: rgba(255,255,255,0.4); font-size: 11px; margin-top: 4px; }
+  #tut-close-pick {
     appearance: none; border: none; background: none;
-    color: rgba(255,255,255,0.6); font-size: 28px; cursor: pointer; padding: 4px 8px;
+    color: rgba(255,255,255,0.4); font-size: 13px; cursor: pointer;
+    margin-top: 8px; letter-spacing: 1px;
   }
-  #help-panel h2 {
-    color: #fff; font-size: 20px; font-weight: 300; letter-spacing: 4px;
-    text-transform: uppercase; margin: 0 0 20px;
+
+  /* Tutorial overlay step */
+  #tut-overlay {
+    position: fixed; bottom: 0; left: 0; width: 100%;
+    z-index: 28; pointer-events: none; display: none;
+    padding: 0 16px env(safe-area-inset-bottom, 16px);
   }
-  #help-panel h3 {
-    color: rgba(255,255,255,0.5); font-size: 10px; letter-spacing: 2px;
-    text-transform: uppercase; margin: 24px 0 8px; font-weight: 500;
+  #tut-overlay.active { display: block; }
+  #tut-card {
+    pointer-events: auto; max-width: 360px; margin: 0 auto;
+    background: rgba(10,10,10,0.88); border: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-radius: 16px; padding: 20px; text-align: center;
   }
-  #help-panel table {
-    width: 100%; border-collapse: collapse; margin: 0 0 8px;
+  #tut-card .tut-step-label {
+    color: rgba(255,255,255,0.3); font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase; margin-bottom: 8px;
   }
-  #help-panel td {
-    padding: 6px 0; font-size: 12px; line-height: 1.4;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    vertical-align: top;
+  #tut-card .tut-title {
+    color: #fff; font-size: 18px; font-weight: 500; margin-bottom: 6px;
   }
-  #help-panel td:first-child {
-    color: #fff; font-weight: 500; width: 35%; padding-right: 12px;
-    font-family: monospace; font-size: 11px;
+  #tut-card .tut-desc {
+    color: rgba(255,255,255,0.6); font-size: 13px; line-height: 1.5; margin-bottom: 16px;
   }
-  #help-panel td:last-child { color: rgba(255,255,255,0.6); }
+  #tut-card .tut-nav {
+    display: flex; gap: 10px; justify-content: center;
+  }
+  #tut-card .tut-nav button {
+    appearance: none; border: 1px solid rgba(255,255,255,0.2);
+    background: transparent; color: #fff; font-size: 13px;
+    padding: 8px 20px; border-radius: 20px; cursor: pointer;
+  }
+  #tut-card .tut-nav button:active { background: rgba(255,255,255,0.1); }
+  #tut-card .tut-nav .tut-skip {
+    border-color: transparent; color: rgba(255,255,255,0.4);
+  }
 </style>
 </head>
 <body>
@@ -213,63 +240,24 @@
 <div id="mode-hud"></div>
 
 <button id="help-btn">?</button>
-<div id="help-panel">
-  <div class="close-help"><button id="close-help">&times;</button></div>
-  <h2>How to Play</h2>
-
-  <h3>Face &rarr; Sound</h3>
-  <table>
-    <tr><td>Smile / Frown</td><td>Changes musical mode. Smile for bright (Lydian, Ionian), neutral for Dorian, frown for dark (Aeolian, Phrygian)</td></tr>
-    <tr><td>Open mouth</td><td>Opens the filter — sound gets brighter and more present</td></tr>
-    <tr><td>Close mouth</td><td>Closes the filter — warm, muffled, intimate</td></tr>
-    <tr><td>Raise eyebrows</td><td>Melody shifts to higher octave</td></tr>
-    <tr><td>Quick brow raise</td><td>Advances to the next chord in the progression</td></tr>
-    <tr><td>Wide eyes</td><td>More reverb (spacious, ambient)</td></tr>
-    <tr><td>Squint</td><td>Less reverb (dry, close)</td></tr>
-    <tr><td>Wide grin</td><td>More chorus (shimmery, wide)</td></tr>
-    <tr><td>Turn head L/R</td><td>More delay (echoes)</td></tr>
-  </table>
-
-  <h3>Hand &rarr; Melody</h3>
-  <table>
-    <tr><td>Show hand</td><td>Activates lead melody — hand position controls pitch</td></tr>
-    <tr><td>Hand up/down</td><td>Higher or lower notes in the current scale</td></tr>
-    <tr><td>Open hand</td><td>Legato — notes glide smoothly</td></tr>
-    <tr><td>Closed fist</td><td>Staccato — notes play short and percussive</td></tr>
-  </table>
-
-  <h3>Touch &rarr; Drums & FX</h3>
-  <table>
-    <tr><td>Tap top zone</td><td>Hi-hat</td></tr>
-    <tr><td>Tap middle zone</td><td>Snare</td></tr>
-    <tr><td>Tap bottom zone</td><td>Kick</td></tr>
-    <tr><td>Double tap</td><td>Toggle auto-rhythm on/off</td></tr>
-    <tr><td>Swipe left/right</td><td>Change drum pattern</td></tr>
-    <tr><td>Hold</td><td>Riser — building tension sweep</td></tr>
-    <tr><td>Swipe up</td><td>Reverb throw — big wash of space</td></tr>
-    <tr><td>Swipe down</td><td>Tape stop — pitch slows down</td></tr>
-  </table>
-
-  <h3>Always On</h3>
-  <table>
-    <tr><td>Pad synth</td><td>Sustained chords — follows your expression mode and chord progression</td></tr>
-    <tr><td>Lead arpeggio</td><td>Loops up and down the current scale automatically</td></tr>
-  </table>
-
-  <h3>Synth Controls</h3>
-  <table>
-    <tr><td>Gear icon &#9881;</td><td>Opens synth panel with controls for lead and pad: waveform, envelope (ADSR), harmonicity, modulation, volume</td></tr>
-  </table>
-
-  <h3>Modes (dark &rarr; bright)</h3>
-  <table>
-    <tr><td>Phrygian</td><td>Darkest — Spanish/metal tension</td></tr>
-    <tr><td>Aeolian</td><td>Dark — natural minor</td></tr>
-    <tr><td>Dorian</td><td>Neutral — jazz minor, bittersweet</td></tr>
-    <tr><td>Mixolydian</td><td>Warm — bluesy major</td></tr>
-    <tr><td>Ionian</td><td>Bright — classic major scale</td></tr>
-    <tr><td>Lydian</td><td>Brightest — dreamy, floating</td></tr>
-  </table>
+<div id="tut-picker">
+  <h2>Tutorial</h2>
+  <p>Learn to play Muze step by step while the app is running</p>
+  <button class="tut-choice" id="tut-basic">Basic<small>Face + touch essentials</small></button>
+  <button class="tut-choice" id="tut-advanced">Advanced<small>Every control + sound design</small></button>
+  <button id="tut-close-pick">cancel</button>
+</div>
+<div id="tut-overlay">
+  <div id="tut-card">
+    <div class="tut-step-label" id="tut-step-label"></div>
+    <div class="tut-title" id="tut-title"></div>
+    <div class="tut-desc" id="tut-desc"></div>
+    <div class="tut-nav">
+      <button class="tut-skip" id="tut-exit">exit</button>
+      <button id="tut-prev">&larr; back</button>
+      <button id="tut-next">next &rarr;</button>
+    </div>
+  </div>
 </div>
 <button id="synth-menu-btn">&#9881;</button>
 <div id="synth-panel">
@@ -840,6 +828,91 @@ MUZE.SynthMenu = {
 };
 </script>
 
+<!-- Tutorial -->
+<script>
+MUZE.Tutorial = {
+  _steps: [], _idx: 0, _active: false,
+
+  BASIC: [
+    { title: 'Smile', desc: 'Try smiling. The music shifts to a brighter, happier mode. Watch the mode name change at the bottom of the screen.' },
+    { title: 'Frown', desc: 'Now frown or make a sad face. The music becomes darker and more tense.' },
+    { title: 'Open Your Mouth', desc: 'Open your mouth wide. The sound gets brighter as the filter opens up. Close it for a warm, muffled tone.' },
+    { title: 'Tap the Screen', desc: 'The bottom half of the screen has three drum zones. Tap the top for hi-hat, middle for snare, bottom for kick.' },
+    { title: 'Double Tap', desc: 'Double-tap anywhere in the drum zone to start an auto-rhythm. Double-tap again to stop it.' },
+    { title: 'Show Your Hand', desc: 'Hold your hand up to the camera. A melody synth starts playing — move your hand up and down to change the pitch.' },
+    { title: 'Open & Close Hand', desc: 'With your hand visible: open hand = smooth legato notes, closed fist = short staccato hits.' },
+    { title: 'You\'re Ready', desc: 'That\'s the basics! Combine face expressions, hand gestures, and touch to perform live. Tap ? again for the advanced tutorial.' },
+  ],
+
+  ADVANCED: [
+    { title: 'Six Modes', desc: 'Your smile controls which mode plays. From dark to bright: Phrygian, Aeolian, Dorian, Mixolydian, Ionian, Lydian. Each has a different emotional character.' },
+    { title: 'Filter (Mouth)', desc: 'Mouth openness controls a lowpass filter (400Hz\u201312kHz). Open = bright and present. Closed = warm and muffled.' },
+    { title: 'Reverb (Eyes)', desc: 'Eye openness controls reverb amount. Wide eyes = spacious and ambient. Squinting = dry and intimate.' },
+    { title: 'Chorus (Grin)', desc: 'A wide grin increases chorus depth, making the sound shimmer and widen in stereo.' },
+    { title: 'Delay (Head Turn)', desc: 'Turn your head left or right to add delay/echo. The further you turn, the more echo.' },
+    { title: 'Octave (Brow Height)', desc: 'Raising your eyebrows shifts the melody and arpeggio to a higher octave.' },
+    { title: 'Chord Change (Brow Spike)', desc: 'A quick, sharp eyebrow raise advances the chord progression. There are 6 chords in the cycle.' },
+    { title: 'Hand Melody', desc: 'Hand Y position maps to scale degrees across 2 octaves. Open hand = legato (smooth glide via MonoSynth). Closed fist = staccato.' },
+    { title: 'Swipe Up', desc: 'Swipe up in the drum zone for a reverb throw \u2014 a big wash of space that decays over 1.5 seconds.' },
+    { title: 'Swipe Down', desc: 'Swipe down for a tape stop effect \u2014 the tempo slows to a crawl then snaps back.' },
+    { title: 'Swipe Left/Right', desc: 'Swipe horizontally to cycle through 4 drum patterns while auto-rhythm is running.' },
+    { title: 'Hold for Riser', desc: 'Hold your finger for 400ms+ to trigger a riser \u2014 a noise sweep that builds tension. Release for a kick drop.' },
+    { title: 'Synth Controls', desc: 'Tap the gear icon to open the synth panel. Three synths: Arpeggio, Melody, and Pad \u2014 each with waveform, envelope, volume, and pan controls.' },
+    { title: 'Three Synths', desc: 'Pad: FM chords (center). Arpeggio: loops the current scale (panned right). Melody: hand-controlled MonoSynth (panned left). All follow the active mode.' },
+    { title: 'Go Perform', desc: 'You know everything. Layer your face, hands, and touch together. Every parameter stacks \u2014 there are no wrong moves.' },
+  ],
+
+  init() {
+    document.getElementById('help-btn').addEventListener('click', () => {
+      if (this._active) { this._close(); return; }
+      document.getElementById('tut-picker').classList.add('open');
+    });
+    document.getElementById('tut-close-pick').addEventListener('click', () => {
+      document.getElementById('tut-picker').classList.remove('open');
+    });
+    document.getElementById('tut-basic').addEventListener('click', () => this._start(this.BASIC));
+    document.getElementById('tut-advanced').addEventListener('click', () => this._start(this.ADVANCED));
+    document.getElementById('tut-next').addEventListener('click', () => this._go(1));
+    document.getElementById('tut-prev').addEventListener('click', () => this._go(-1));
+    document.getElementById('tut-exit').addEventListener('click', () => this._close());
+  },
+
+  _start(steps) {
+    this._steps = steps;
+    this._idx = 0;
+    this._active = true;
+    document.getElementById('tut-picker').classList.remove('open');
+    document.getElementById('tut-overlay').classList.add('active');
+    this._render();
+  },
+
+  _go(dir) {
+    this._idx = Math.max(0, Math.min(this._steps.length - 1, this._idx + dir));
+    this._render();
+  },
+
+  _render() {
+    const s = this._steps[this._idx];
+    document.getElementById('tut-step-label').textContent = `Step ${this._idx + 1} of ${this._steps.length}`;
+    document.getElementById('tut-title').textContent = s.title;
+    document.getElementById('tut-desc').textContent = s.desc;
+    document.getElementById('tut-prev').style.visibility = this._idx === 0 ? 'hidden' : 'visible';
+    document.getElementById('tut-next').textContent = this._idx === this._steps.length - 1 ? 'done' : 'next \u2192';
+    if (this._idx === this._steps.length - 1) {
+      document.getElementById('tut-next').onclick = () => this._close();
+    } else {
+      document.getElementById('tut-next').onclick = () => this._go(1);
+    }
+  },
+
+  _close() {
+    this._active = false;
+    document.getElementById('tut-overlay').classList.remove('active');
+    document.getElementById('tut-picker').classList.remove('open');
+  }
+};
+</script>
+
 <!-- Touch -->
 <script>
 MUZE.Touch = {
@@ -1054,8 +1127,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     // Init modules
     MUZE.Touch.init();
     MUZE.SynthMenu.init();
-    document.getElementById('help-btn').addEventListener('click', () => document.getElementById('help-panel').classList.add('open'));
-    document.getElementById('close-help').addEventListener('click', () => document.getElementById('help-panel').classList.remove('open'));
+    MUZE.Tutorial.init();
     MUZE.Loop.init();
     ss.remove();
     MUZE.Loop.start();
