@@ -98,20 +98,55 @@
   }
   #rhythm-indicator.visible { opacity: 1; }
 
-  /* Sample picker UI */
-  #sample-ui {
+  /* Synth menu */
+  #synth-menu-btn {
     position: fixed; top: env(safe-area-inset-top, 8px); right: 8px;
-    z-index: 10; display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
-  }
-  .sample-btn {
-    appearance: none; border: 1px solid rgba(255,255,255,0.2);
+    z-index: 20; appearance: none; border: 1px solid rgba(255,255,255,0.2);
     background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.7);
-    font-size: 10px; padding: 6px 12px; border-radius: 16px;
+    font-size: 18px; width: 40px; height: 40px; border-radius: 50%;
     backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    letter-spacing: 0.5px; cursor: pointer;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
   }
-  .sample-btn:active { background: rgba(255,255,255,0.15); }
-  .sample-btn.recording { border-color: #f44; color: #f66; }
+  #synth-menu-btn:active { background: rgba(255,255,255,0.15); }
+  #synth-panel {
+    position: fixed; top: 0; right: -280px; width: 280px; height: 100%;
+    z-index: 15; background: rgba(10,10,10,0.92);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    transition: right 0.25s ease; overflow-y: auto;
+    padding: env(safe-area-inset-top, 12px) 16px 24px 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+  #synth-panel.open { right: 0; }
+  #synth-panel h3 {
+    color: rgba(255,255,255,0.5); font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase; margin: 20px 0 10px; font-weight: 500;
+  }
+  #synth-panel h3:first-child { margin-top: 48px; }
+  .synth-row {
+    display: flex; align-items: center; gap: 8px; margin: 6px 0;
+  }
+  .synth-row label {
+    color: rgba(255,255,255,0.6); font-size: 11px; width: 60px;
+    flex-shrink: 0; font-family: monospace;
+  }
+  .synth-row input[type=range] {
+    flex: 1; height: 4px; -webkit-appearance: none; appearance: none;
+    background: rgba(255,255,255,0.15); border-radius: 2px; outline: none;
+  }
+  .synth-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px;
+    background: #fff; border-radius: 50%; cursor: pointer;
+  }
+  .synth-row .val {
+    color: rgba(255,255,255,0.4); font-size: 10px; width: 32px;
+    text-align: right; font-family: monospace;
+  }
+  .synth-select {
+    flex: 1; appearance: none; background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15); color: #fff;
+    font-size: 11px; padding: 4px 8px; border-radius: 8px;
+    font-family: monospace;
+  }
 </style>
 </head>
 <body>
@@ -130,9 +165,23 @@
 <div id="debug"></div>
 <div id="mode-hud"></div>
 
-<div id="sample-ui">
-  <button class="sample-btn" id="btn-lead-sample">lead: water drop</button>
-  <button class="sample-btn" id="btn-record">record sample</button>
+<button id="synth-menu-btn">&#9881;</button>
+<div id="synth-panel">
+  <h3>Lead Synth</h3>
+  <div class="synth-row"><label>wave</label><select class="synth-select" id="lead-osc"><option>sawtooth</option><option>triangle</option><option>square</option><option>sine</option></select></div>
+  <div class="synth-row"><label>attack</label><input type="range" id="lead-atk" min="0.001" max="2" step="0.01" value="0.01"><span class="val">0.01</span></div>
+  <div class="synth-row"><label>decay</label><input type="range" id="lead-dec" min="0.01" max="2" step="0.01" value="0.3"><span class="val">0.30</span></div>
+  <div class="synth-row"><label>sustain</label><input type="range" id="lead-sus" min="0" max="1" step="0.01" value="0.6"><span class="val">0.60</span></div>
+  <div class="synth-row"><label>release</label><input type="range" id="lead-rel" min="0.01" max="4" step="0.01" value="0.8"><span class="val">0.80</span></div>
+  <div class="synth-row"><label>volume</label><input type="range" id="lead-vol" min="-30" max="0" step="1" value="-8"><span class="val">-8</span></div>
+
+  <h3>Pad Synth</h3>
+  <div class="synth-row"><label>wave</label><select class="synth-select" id="pad-osc"><option>sine</option><option>triangle</option><option>sawtooth</option><option>square</option></select></div>
+  <div class="synth-row"><label>harm</label><input type="range" id="pad-harm" min="0.5" max="8" step="0.1" value="2"><span class="val">2.0</span></div>
+  <div class="synth-row"><label>mod idx</label><input type="range" id="pad-mod" min="0" max="10" step="0.1" value="1.2"><span class="val">1.2</span></div>
+  <div class="synth-row"><label>attack</label><input type="range" id="pad-atk" min="0.01" max="4" step="0.01" value="1.0"><span class="val">1.00</span></div>
+  <div class="synth-row"><label>release</label><input type="range" id="pad-rel" min="0.1" max="8" step="0.1" value="2.5"><span class="val">2.5</span></div>
+  <div class="synth-row"><label>volume</label><input type="range" id="pad-vol" min="-30" max="0" step="1" value="-14"><span class="val">-14</span></div>
 </div>
 
 <div id="start-screen">
@@ -374,9 +423,8 @@ MUZE.SampleLib = {
 MUZE.Audio = {
   // Pad: synthesized FM chords
   padSynth: null,
-  // Lead: sample-based Sampler
-  leadSampler: null,
-  _currentLeadId: null,
+  // Lead: generated synth
+  leadSynth: null,
   // Drums
   kickSynth: null, snareSynth: null, hatSynth: null,
   // Riser
@@ -413,6 +461,17 @@ MUZE.Audio = {
     this.padSynth.volume.value = -14;
     this.padSynth.connect(this.filter);
 
+    // Lead synth — mono for melody, poly for arpeggio
+    this.leadSynth = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 8,
+      voice: {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.8 },
+      }
+    });
+    this.leadSynth.volume.value = -8;
+    this.leadSynth.connect(this.filter);
+
     // Drums — bypass tonal effects
     this.kickSynth = new Tone.MembraneSynth({
       pitchDecay: 0.05, octaves: 6, oscillator: { type: 'sine' },
@@ -445,18 +504,6 @@ MUZE.Audio = {
     MUZE.State.audioReady = true;
   },
 
-  // Load a sample as the lead sound (Sampler)
-  setLeadSample(sampleId) {
-    const buf = MUZE.SampleLib.get(sampleId);
-    if (!buf) return;
-    if (this.leadSampler) { this.leadSampler.dispose(); }
-    this.leadSampler = new Tone.Sampler({ urls: { C4: buf }, attack: 0, release: 0.8 });
-    this.leadSampler.volume.value = -6;
-    this.leadSampler.connect(this.filter);
-    this._currentLeadId = sampleId;
-    this._melodyPlaying = false;
-  },
-
   // Continuous effect updates
   updateParams(state) {
     const C = MUZE.Config;
@@ -471,26 +518,27 @@ MUZE.Audio = {
   triggerPad(notes) { this.padSynth.releaseAll(); this.padSynth.triggerAttack(notes, Tone.now(), 0.4); },
   releasePad() { this.padSynth.releaseAll(); },
 
-  // Lead melody (sample-based)
+  // Lead melody (generated synth)
   startMelody(note) {
-    if (!this.leadSampler) return;
-    this.leadSampler.triggerAttack(MUZE.Music.midiToNote(note), Tone.now(), 0.7);
+    if (!this.leadSynth) return;
+    this.leadSynth.triggerAttack(MUZE.Music.midiToNote(note), Tone.now(), 0.7);
     this._melodyPlaying = true;
   },
   updateMelody(note) {
-    if (!this.leadSampler) return;
+    if (!this.leadSynth) return;
     if (!this._melodyPlaying) { this.startMelody(note); return; }
-    this.leadSampler.triggerAttack(MUZE.Music.midiToNote(note), Tone.now(), 0.7);
+    this.leadSynth.triggerAttack(MUZE.Music.midiToNote(note), Tone.now(), 0.7);
   },
   stopMelody() {
-    if (this._melodyPlaying && this.leadSampler) {
-      this.leadSampler.releaseAll(Tone.now());
+    if (this._melodyPlaying && this.leadSynth) {
+      this.leadSynth.releaseAll(Tone.now());
       this._melodyPlaying = false;
     }
   },
   setArticulation(legato) {
-    if (!this.leadSampler) return;
-    this.leadSampler.release = legato ? 0.8 : 0.05;
+    if (!this.leadSynth) return;
+    // Adjust release on all voices
+    this.leadSynth.set({ envelope: { release: legato ? 0.8 : 0.05 } });
   },
 
   triggerDrum(type) {
@@ -506,9 +554,7 @@ MUZE.Audio = {
   stopRiser(){this._riserGain.gain.rampTo(0,0.05);this._riserFilter.frequency.rampTo(200,0.1);this.kickSynth.triggerAttackRelease('C1','4n',Tone.now(),1);},
   playArpeggio() {
     const S=MUZE.State, C=MUZE.Config;
-    if(!S.currentScale) return;
-    const synth=this.leadSampler||this.padSynth;
-    if(!synth) return;
+    if(!S.currentScale||!this.leadSynth) return;
     const root=C.ROOT_NOTE;
     const up=S.currentScale.map(i=>MUZE.Music.midiToNote(root+i));
     const down=[...up].reverse().slice(1);
@@ -516,7 +562,7 @@ MUZE.Audio = {
     const gap=0.15;
     const now=Tone.now();
     notes.forEach((n,i)=>{
-      synth.triggerAttackRelease(n,0.12,now+i*gap,0.5);
+      this.leadSynth.triggerAttackRelease(n,0.12,now+i*gap,0.5);
     });
   },
   reverbThrow(){const p=this.reverb.wet.value;this.reverb.wet.rampTo(0.95,0.05);setTimeout(()=>this.reverb.wet.rampTo(p,1.5),200);},
@@ -589,58 +635,53 @@ MUZE.AutoRhythm = {
 };
 </script>
 
-<!-- Sample Picker UI -->
+<!-- Synth Menu -->
 <script>
-MUZE.SampleUI = {
-  _leadIdx: 0,
-
+MUZE.SynthMenu = {
   init() {
-    const all = MUZE.SampleLib.getAllSamples();
-    // Default lead: first sample with a loaded buffer
-    for (let i = 0; i < all.length; i++) {
-      if (MUZE.SampleLib.get(all[i].id)) {
-        MUZE.Audio.setLeadSample(all[i].id);
-        this._leadIdx = i;
-        document.getElementById('btn-lead-sample').textContent = 'lead: ' + all[i].name;
-        break;
-      }
-    }
+    const panel = document.getElementById('synth-panel');
+    document.getElementById('synth-menu-btn').addEventListener('click', () => {
+      panel.classList.toggle('open');
+    });
 
-    document.getElementById('btn-lead-sample').addEventListener('click', () => this.cycleLead());
-    document.getElementById('btn-record').addEventListener('click', () => this.recordSample());
+    // Close panel when tapping outside
+    document.addEventListener('touchstart', (e) => {
+      if (panel.classList.contains('open') &&
+          !panel.contains(e.target) &&
+          e.target.id !== 'synth-menu-btn') {
+        panel.classList.remove('open');
+      }
+    });
+
+    // Lead synth controls
+    this._bind('lead-osc', (v) => MUZE.Audio.leadSynth.set({ oscillator: { type: v } }), true);
+    this._bind('lead-atk', (v) => MUZE.Audio.leadSynth.set({ envelope: { attack: +v } }));
+    this._bind('lead-dec', (v) => MUZE.Audio.leadSynth.set({ envelope: { decay: +v } }));
+    this._bind('lead-sus', (v) => MUZE.Audio.leadSynth.set({ envelope: { sustain: +v } }));
+    this._bind('lead-rel', (v) => MUZE.Audio.leadSynth.set({ envelope: { release: +v } }));
+    this._bind('lead-vol', (v) => { MUZE.Audio.leadSynth.volume.value = +v; });
+
+    // Pad synth controls
+    this._bind('pad-osc', (v) => MUZE.Audio.padSynth.set({ oscillator: { type: v } }), true);
+    this._bind('pad-harm', (v) => MUZE.Audio.padSynth.set({ harmonicity: +v }));
+    this._bind('pad-mod', (v) => MUZE.Audio.padSynth.set({ modulationIndex: +v }));
+    this._bind('pad-atk', (v) => MUZE.Audio.padSynth.set({ envelope: { attack: +v } }));
+    this._bind('pad-rel', (v) => MUZE.Audio.padSynth.set({ envelope: { release: +v } }));
+    this._bind('pad-vol', (v) => { MUZE.Audio.padSynth.volume.value = +v; });
   },
 
-  cycleLead() {
-    const all = MUZE.SampleLib.getAllSamples();
-    // Find next sample that has a loaded buffer
-    for (let i = 1; i <= all.length; i++) {
-      const idx = (this._leadIdx + i) % all.length;
-      if (MUZE.SampleLib.get(all[idx].id)) {
-        this._leadIdx = idx;
-        MUZE.Audio.setLeadSample(all[idx].id);
-        document.getElementById('btn-lead-sample').textContent = 'lead: ' + all[idx].name;
-        return;
-      }
+  _bind(id, fn, isSelect) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const valEl = el.parentElement.querySelector('.val');
+    if (isSelect) {
+      el.addEventListener('change', () => fn(el.value));
+    } else {
+      el.addEventListener('input', () => {
+        fn(el.value);
+        if (valEl) valEl.textContent = parseFloat(el.value).toFixed(el.step.includes('.') ? el.step.split('.')[1].length : 0);
+      });
     }
-  },
-
-  async recordSample() {
-    const btn = document.getElementById('btn-record');
-    if (MUZE.MicRecorder.isRecording()) return;
-
-    btn.textContent = 'recording...';
-    btn.classList.add('recording');
-
-    const buffer = await MUZE.MicRecorder.record(2000);
-    if (buffer) {
-      const name = 'rec ' + (MUZE.SampleLib._custom.length + 1);
-      const id = MUZE.SampleLib.addCustom(name, buffer);
-      MUZE.Audio.setLeadSample(id);
-      document.getElementById('btn-lead-sample').textContent = 'lead: ' + name;
-    }
-
-    btn.textContent = 'record sample';
-    btn.classList.remove('recording');
   }
 };
 </script>
@@ -802,7 +843,6 @@ MUZE.Loop = {
   _drawDebug(S){
     const n=S.melodyNote?MUZE.Music.midiToNote(S.melodyNote):'-';
     const sc=MUZE.Music.getScaleName(S.currentScale);
-    const leadId=MUZE.Audio._currentLeadId||'-';
     this._debugEl.innerHTML=
       '<div style="font:10px/1.5 monospace;color:rgba(255,255,255,0.6);'+
       'background:rgba(0,0,0,0.35);padding:5px 8px;border-radius:6px;'+
@@ -811,7 +851,7 @@ MUZE.Loop = {
       `mouth:${S.mouthOpenness.toFixed(2)} smile:${S.lipCorner.toFixed(2)} brow:${S.browHeight.toFixed(2)}<br>`+
       `eyes:${S.eyeOpenness.toFixed(2)} grin:${S.mouthWidth.toFixed(2)}<br>`+
       `hand:${S.handPresent?(S.handOpen?'LEGATO':'STACCATO'):'—'} note:${n}<br>`+
-      `lead:${leadId} auto:${S.autoRhythm?'ON':'—'}`+
+      `auto:${S.autoRhythm?'ON':'—'}`+
       '</div>';
 
     // Big mode + valence HUD
@@ -843,10 +883,6 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     await MUZE.Audio.init();
     await MUZE.Camera.init();
 
-    // Load samples
-    document.getElementById('loading-text').textContent = 'Loading samples...';
-    await MUZE.SampleLib.loadAll();
-
     // MediaPipe
     document.getElementById('loading-text').textContent = 'Loading face + hand models...';
     const vision = await FilesetResolver.forVisionTasks(
@@ -859,7 +895,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
 
     // Init modules
     MUZE.Touch.init();
-    MUZE.SampleUI.init();
+    MUZE.SynthMenu.init();
     MUZE.Loop.init();
     document.getElementById('mode-hud').addEventListener('click', () => MUZE.Audio.playArpeggio());
     ss.remove();
