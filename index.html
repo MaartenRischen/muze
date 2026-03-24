@@ -586,7 +586,8 @@ MUZE.HandFeatures = {
     const l=lm[0], hX=(l[0].x+l[9].x)/2, hY=(l[0].y+l[9].y)/2;
     const pS=this._d(l[0],l[9]);
     const aT=(this._d(l[8],l[0])+this._d(l[12],l[0])+this._d(l[16],l[0])+this._d(l[20],l[0]))/4;
-    return {handPresent:true, handX:1-hX, handY:hY, handOpen:(aT/pS)>1.7};
+    const openness=Math.max(0,Math.min(1,(aT/pS-1.2)/1.0)); // 0=fist, 1=open
+    return {handPresent:true, handX:1-hX, handY:hY, handOpen:openness};
   },
   _d(a,b){return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2+((a.z||0)-(b.z||0))**2);}
 };
@@ -813,9 +814,10 @@ MUZE.Audio = {
       this._melodyPlaying = false;
     }
   },
-  setArticulation(portamento) {
+  // openness: 0=fist(full portamento sweep), 1=open(staccato stepped)
+  setArticulation(openness) {
     if (!this.melodySynth) return;
-    this.melodySynth.portamento = portamento ? 0.15 : 0;
+    this.melodySynth.portamento = (1 - openness) * 0.3;
   },
 
   triggerDrum(type) {
@@ -1277,7 +1279,7 @@ MUZE.Recorder = {
       `${S.faceDetected?'face':'...'} | ${sc} | chord ${S.chordIndex}`,
       `smile:${S.lipCorner.toFixed(2)} brow:${S.browHeight.toFixed(2)} eyes:${S.eyeOpenness.toFixed(2)}`,
       `pitch:${S.headPitch.toFixed(2)} yaw:${S.headYaw.toFixed(2)} roll:${S.headRoll.toFixed(2)}`,
-      `hand:${S.handPresent?(S.handOpen?'PORTA':'JUMP'):'\u2014'} note:${n} auto:${S.autoRhythm?'ON':'\u2014'}`,
+      `hand:${S.handPresent?S.handOpen.toFixed(2):'\u2014'} note:${n} auto:${S.autoRhythm?'ON':'\u2014'}`,
     ];
     dbg.forEach((line, i) => ctx.fillText(line, 12*s, (18 + i*15)*s));
 
@@ -1395,7 +1397,7 @@ MUZE.Tutorial = {
     { title: 'Chords & Drums', desc: 'The bottom bar has 6 chord buttons (I ii iii IV V vi) \u2014 tap any to change the harmony. Above that are 3 drum zones: hi-hat, snare, kick (top to bottom).' },
     { title: 'Double Tap', desc: 'Double-tap anywhere in the drum zone to start an auto-rhythm. Double-tap again to stop it.' },
     { title: 'Show Your Hand', desc: 'Hold your hand up to the camera. A melody synth plays \u2014 move your hand up and down to change pitch.' },
-    { title: 'Open & Close Hand', desc: 'Open hand = portamento (notes glide smoothly between pitches). Closed fist = notes jump instantly.' },
+    { title: 'Open & Close Hand', desc: 'Closed fist = full portamento (stepless pitch sweep). Open hand = staccato stepped notes. Everything in between is a gradient.' },
     { title: 'Eyes = Reverb', desc: 'Open your eyes wide \u2014 the arpeggio and melody get more reverb and delay. Squint to dry them out.' },
     { title: 'You\'re Ready', desc: 'That covers the basics! Use the record button to capture performances. Tap ? again for the advanced tutorial.' },
   ],
@@ -1407,7 +1409,7 @@ MUZE.Tutorial = {
     { title: 'Chorus (Head Roll)', desc: 'Tilting your head sideways increases chorus depth, making the sound shimmer and widen in stereo.' },
     { title: 'Octave (Brow Height)', desc: 'Raising your eyebrows shifts the melody and arpeggio to a higher octave.' },
     { title: 'Chord Bar', desc: 'The bottom bar has 6 chords (I ii iii IV V vi). Tap any chord at any time \u2014 the pad, arpeggio, and binaural beats all follow.' },
-    { title: 'Hand Melody', desc: 'Hand Y position maps to scale degrees across 2 octaves. Open hand = portamento (pitch slides between notes). Closed fist = instant jumps.' },
+    { title: 'Hand Melody', desc: 'Hand Y position maps to scale degrees across 2 octaves. Gradually close your fist for more portamento glide, open for crisp staccato steps.' },
     { title: 'Riser (Hold + Swipe Up)', desc: 'Hold your finger for 400ms+ \u2014 a riser noise sweep builds over 4 seconds while drums and pad duck. Swipe up to drop: big kick hit, reverb wash, everything snaps back. Release without swiping to cancel.' },
     { title: 'Swipe Down', desc: 'Swipe down for a tape stop \u2014 pitch drops 2 octaves and tempo crawls, then snaps back.' },
     { title: 'Swipe Left/Right', desc: 'Swipe horizontally to cycle through 4 drum patterns while auto-rhythm is running.' },
@@ -1599,7 +1601,7 @@ MUZE.Loop = {
         S.handPresent=r.handPresent;
         S.handX=MUZE.Smooth.update('handX',r.handX,C.SMOOTH_HAND);
         S.handY=MUZE.Smooth.update('handY',r.handY,C.SMOOTH_HAND);
-        S.handOpen=r.handOpen;
+        S.handOpen=MUZE.Smooth.update('handOpen',r.handOpen,C.SMOOTH_FAST);
       } else { S.handPresent=false; }
     }
 
@@ -1629,14 +1631,18 @@ MUZE.Loop = {
 
       // Hand → lead melody
       if(S.handPresent){
-        if(S.handOpen!==this._prevArticulation){
-          MUZE.Audio.setArticulation(S.handOpen);
-          this._prevArticulation=S.handOpen;
-        }
+        MUZE.Audio.setArticulation(S.handOpen);
         const note=MUZE.Music.quantize(1-S.handY,scale,root,C.OCTAVE_RANGE);
         S.melodyNote=note;
         if(note!==this._prevMelodyNote){
-          MUZE.Audio.updateMelody(note);
+          if(S.handOpen>0.6){
+            // Staccato: retrigger each note
+            MUZE.Audio.stopMelody();
+            MUZE.Audio.startMelody(note);
+          } else {
+            // Portamento: glide to new note
+            MUZE.Audio.updateMelody(note);
+          }
           this._prevMelodyNote=note;
         }
       } else if(this._prevMelodyNote!==null){
@@ -1660,7 +1666,7 @@ MUZE.Loop = {
       `${S.faceDetected?'face':'...'} | ${sc} | chord ${S.chordIndex}<br>`+
       `smile:${S.lipCorner.toFixed(2)} brow:${S.browHeight.toFixed(2)} eyes:${S.eyeOpenness.toFixed(2)}<br>`+
       `pitch:${S.headPitch.toFixed(2)} yaw:${S.headYaw.toFixed(2)} roll:${S.headRoll.toFixed(2)}<br>`+
-      `hand:${S.handPresent?(S.handOpen?'PORTA':'JUMP'):'—'} note:${n}<br>`+
+      `hand:${S.handPresent?S.handOpen.toFixed(2):'—'} note:${n}<br>`+
       `auto:${S.autoRhythm?'ON':'—'}`+
       '</div>';
 
