@@ -863,8 +863,33 @@ MUZE.Audio = {
     this._updateBinauralFreq(freq);
   },
 
-  reverbThrow(){const p=this.reverb.wet.value;this.reverb.wet.rampTo(0.95,0.05);setTimeout(()=>this.reverb.wet.rampTo(p,1.5),200);},
-  tapeStop(){const o=Tone.Transport.bpm.value;Tone.Transport.bpm.rampTo(20,0.4);setTimeout(()=>Tone.Transport.bpm.rampTo(o,0.15),500);},
+  reverbThrow(){
+    // Throw all reverbs to max then decay back
+    const pr=this.reverb.wet.value, pa=this._arpReverb.wet.value, pm=this._melReverb.wet.value;
+    this.reverb.wet.rampTo(0.95,0.05);
+    this._arpReverb.wet.rampTo(0.95,0.05);
+    this._melReverb.wet.rampTo(0.95,0.05);
+    setTimeout(()=>{
+      this.reverb.wet.rampTo(pr,1.5);
+      this._arpReverb.wet.rampTo(pa,1.5);
+      this._melReverb.wet.rampTo(pm,1.5);
+    },200);
+  },
+  tapeStop(){
+    // BPM drop + pitch drop on all synths
+    const o=Tone.Transport.bpm.value;
+    Tone.Transport.bpm.rampTo(20,0.4);
+    // Detune all synths down 2 octaves then snap back
+    [this.padSynth,this.leadSynth,this.melodySynth].forEach(s=>{
+      if(s){s.set({detune:0});s.set({detune:-2400});}
+    });
+    setTimeout(()=>{
+      Tone.Transport.bpm.rampTo(o,0.15);
+      [this.padSynth,this.leadSynth,this.melodySynth].forEach(s=>{
+        if(s) s.set({detune:0});
+      });
+    },500);
+  },
 };
 </script>
 
