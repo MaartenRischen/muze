@@ -1086,62 +1086,109 @@ MUZE.Recorder = {
     const w = this._w, h = this._h;
     const S = MUZE.State;
 
-    // Camera (mirrored)
+    // Camera (mirrored, object-fit: cover)
     const vid = MUZE.Camera.video;
     if (vid.readyState >= 2) {
+      const vw = vid.videoWidth, vh = vid.videoHeight;
+      const canvasRatio = w / h, vidRatio = vw / vh;
+      let sx = 0, sy = 0, sw = vw, sh = vh;
+      if (vidRatio > canvasRatio) {
+        sw = vh * canvasRatio; sx = (vw - sw) / 2;
+      } else {
+        sh = vw / canvasRatio; sy = (vh - sh) / 2;
+      }
       ctx.save();
       ctx.translate(w, 0);
       ctx.scale(-1, 1);
-      ctx.drawImage(vid, 0, 0, w, h);
+      ctx.drawImage(vid, sx, sy, sw, sh, 0, 0, w, h);
       ctx.restore();
     }
 
-    // Overlay canvas
+    // Overlay canvas (face mesh etc)
     ctx.drawImage(document.getElementById('overlay'), 0, 0, w, h);
 
-    // Mode HUD
-    const sc = MUZE.Music.getScaleName(S.currentScale).toUpperCase();
+    // Scale factor for UI elements (relative to 720w reference)
+    const s = w / 720;
+
+    // Debug panel (top-left)
+    const sc = MUZE.Music.getScaleName(S.currentScale);
+    const n = S.melodyNote ? MUZE.Music.midiToNote(S.melodyNote) : '-';
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.roundRect(6*s, 6*s, 220*s, 72*s, 6*s); ctx.fill();
+    ctx.font = `${10*s}px monospace`;
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.textAlign = 'left';
+    const dbg = [
+      `${S.faceDetected?'face':'...'} | ${sc} | chord ${S.chordIndex}`,
+      `smile:${S.lipCorner.toFixed(2)} brow:${S.browHeight.toFixed(2)} eyes:${S.eyeOpenness.toFixed(2)}`,
+      `pitch:${S.headPitch.toFixed(2)} yaw:${S.headYaw.toFixed(2)} roll:${S.headRoll.toFixed(2)}`,
+      `hand:${S.handPresent?(S.handOpen?'LEGATO':'STACCATO'):'\u2014'} note:${n} auto:${S.autoRhythm?'ON':'\u2014'}`,
+    ];
+    dbg.forEach((line, i) => ctx.fillText(line, 12*s, (18 + i*15)*s));
+
+    // Mode HUD (bottom-center, above chord bar)
+    const modeName = MUZE.Music.getScaleName(S.currentScale).toUpperCase();
     const v = S.lipCorner;
-    const hudW = 180, hudH = 54, hudX = (w - hudW) / 2, hudY = h - 100;
+    const hudW = 180*s, hudH = 54*s, hudX = (w - hudW) / 2, hudY = h - 100*s;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 10); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 10*s); ctx.fill();
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 22px monospace';
+    ctx.font = `bold ${22*s}px monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(sc, w / 2, hudY + 24);
+    ctx.fillText(modeName, w / 2, hudY + 24*s);
 
     // Valence bar
-    const barW = 140, barH = 5, barX = (w - barW) / 2, barY = hudY + 30;
+    const barW = 140*s, barH = 5*s, barX = (w - barW) / 2, barY = hudY + 30*s;
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.beginPath(); ctx.roundRect(barX, barY, barW, barH, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(barX, barY, barW, barH, 2*s); ctx.fill();
     const pct = (v + 1) / 2;
     ctx.fillStyle = `hsl(${pct * 120},70%,55%)`;
-    ctx.beginPath(); ctx.roundRect(barX + pct * (barW - 12), barY, 12, barH, 2); ctx.fill();
-
-    ctx.font = '10px monospace';
+    ctx.beginPath(); ctx.roundRect(barX + pct * (barW - 12*s), barY, 12*s, barH, 2*s); ctx.fill();
+    ctx.font = `${10*s}px monospace`;
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillText('valence ' + v.toFixed(2), w / 2, hudY + 48);
+    ctx.fillText('valence ' + v.toFixed(2), w / 2, hudY + 48*s);
+
+    // Auto-rhythm indicator
+    if (S.autoRhythm) {
+      ctx.font = `${11*s}px monospace`;
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.textAlign = 'center';
+      ctx.letterSpacing = `${2*s}px`;
+      ctx.fillText('AUTO', w / 2, h * 0.54);
+      ctx.letterSpacing = '0px';
+    }
 
     // Chord bar
-    const chordY = h - 40, chordH = 40;
+    const chordY = h - 40*s, chordH = 40*s;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(0, chordY, w, chordH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, chordY); ctx.lineTo(w, chordY); ctx.stroke();
     const chords = ['I', 'ii', 'iii', 'IV', 'V', 'vi'];
     const cw = w / 6;
-    ctx.font = '12px monospace';
+    ctx.font = `${12*s}px monospace`;
     ctx.textAlign = 'center';
     chords.forEach((c, i) => {
+      if (i === S.chordIndex) {
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect(cw * i, chordY, cw, chordH);
+      }
       ctx.fillStyle = i === S.chordIndex ? '#fff' : 'rgba(255,255,255,0.3)';
-      ctx.fillText(c, cw * i + cw / 2, chordY + chordH / 2 + 4);
+      ctx.fillText(c, cw * i + cw / 2, chordY + chordH / 2 + 4*s);
+      if (i < 5) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.beginPath(); ctx.moveTo(cw*(i+1), chordY); ctx.lineTo(cw*(i+1), h); ctx.stroke();
+      }
     });
 
-    // REC indicator
+    // REC indicator (top-right area)
     ctx.fillStyle = '#f33';
-    ctx.beginPath(); ctx.arc(20, 20, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(w - 30*s, 20*s, 5*s, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#fff';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('REC', 30, 24);
+    ctx.font = `${10*s}px monospace`;
+    ctx.textAlign = 'right';
+    ctx.fillText('REC', w - 40*s, 24*s);
   },
 
   async _save() {
