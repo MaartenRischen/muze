@@ -543,6 +543,7 @@ MUZE.Audio = {
   padSynth: null, _padPan: null,
   // Arpeggio synth
   leadSynth: null, _arpPan: null, _arpReverb: null, _arpDelay: null,
+  _arpReverbMax: 0.35, _arpDelayMax: 0.25,
   // Melody synth (hand-controlled)
   melodySynth: null, _melPan: null,
   // Drums
@@ -651,9 +652,9 @@ MUZE.Audio = {
     const comp = 1 + (1 - pitchN) * 0.35;
     this._filterGain.gain.rampTo(comp, 0.08);
 
-    // Arp reverb + delay: eye openness (wide open = 100% wet, shut = 0%)
-    this._arpReverb.wet.rampTo(state.eyeOpenness, 0.1);
-    this._arpDelay.wet.rampTo(state.eyeOpenness * 0.8, 0.1);
+    // Arp reverb + delay: eye openness scales from 0 to slider max
+    this._arpReverb.wet.rampTo(state.eyeOpenness * this._arpReverbMax, 0.1);
+    this._arpDelay.wet.rampTo(state.eyeOpenness * this._arpDelayMax, 0.1);
     // Chorus: head roll (tilt sideways)
     const rollN = Math.min(1, Math.abs(state.headRoll) / 0.35);
     this.chorus.depth = C.CHORUS_DEPTH_MIN + rollN * (C.CHORUS_DEPTH_MAX - C.CHORUS_DEPTH_MIN);
@@ -820,8 +821,8 @@ MUZE.SynthMenu = {
     this._bind('arp-rel', (v) => MUZE.Audio.leadSynth.set({ envelope: { release: +v } }));
     this._bind('arp-vol', (v) => { MUZE.Audio.leadSynth.volume.value = +v; });
     this._bind('arp-pan', (v) => { MUZE.Audio._arpPan.pan.value = +v; });
-    this._bind('arp-reverb', (v) => { MUZE.Audio._arpReverb.wet.value = +v; });
-    this._bind('arp-delay', (v) => { MUZE.Audio._arpDelay.wet.value = +v; });
+    this._bind('arp-reverb', (v) => { MUZE.Audio._arpReverbMax = +v; });
+    this._bind('arp-delay', (v) => { MUZE.Audio._arpDelayMax = +v; });
 
     // Melody synth controls
     this._bind('mel-osc', (v) => MUZE.Audio.melodySynth.set({ oscillator: { type: v } }), true);
