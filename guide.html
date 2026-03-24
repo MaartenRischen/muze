@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MUZE — How to Play</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a; color: #e0d8cc;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.7; padding: 20px;
+    max-width: 600px; margin: 0 auto;
+  }
+  h1 { font-size: 36px; font-weight: 200; letter-spacing: 10px; text-transform: uppercase; margin-bottom: 8px; color: #fff; }
+  h2 { font-size: 18px; font-weight: 600; margin: 36px 0 12px; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; }
+  h3 { font-size: 14px; font-weight: 600; margin: 20px 0 8px; color: rgba(255,255,255,0.85); }
+  p { margin-bottom: 12px; font-size: 14px; color: rgba(255,255,255,0.6); }
+  .subtitle { color: rgba(255,255,255,0.35); font-size: 13px; margin-bottom: 32px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+  th { text-align: left; color: rgba(255,255,255,0.4); font-weight: 400; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); color: rgba(255,255,255,0.6); }
+  td:first-child { color: rgba(255,255,255,0.8); white-space: nowrap; }
+  .emoji { font-size: 18px; margin-right: 6px; }
+  .tip { background: rgba(255,255,255,0.04); border-left: 2px solid rgba(255,255,255,0.15); padding: 10px 14px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 13px; }
+  .section-icon { font-size: 24px; margin-right: 8px; vertical-align: middle; }
+  a { color: rgba(255,255,255,0.5); }
+</style>
+</head>
+<body>
+
+<h1>Muze</h1>
+<p class="subtitle">Turn everyday sounds into music with your face, hand, and touch.</p>
+
+<h2><span class="section-icon">1.</span> Getting Started</h2>
+<p>Open MUZE on your phone (portrait mode). Tap <strong>"Touch to Begin"</strong> and allow camera access. The app loads 8 foley samples and the face/hand tracking models — this takes a few seconds on first load.</p>
+<p>Once loaded, you'll see yourself on camera with a debug panel (top-left) and sample buttons (top-right). Music starts as soon as your face is detected.</p>
+
+<h2><span class="section-icon">2.</span> Your Face = The Instrument</h2>
+<p>Your facial expressions shape the sound in real-time. You don't need to think about it — just emote naturally.</p>
+
+<table>
+  <tr><th>Expression</th><th>What it does</th></tr>
+  <tr><td>Open mouth</td><td>Opens the filter — sound gets brighter, more present</td></tr>
+  <tr><td>Close mouth</td><td>Closes the filter — warm, muffled, intimate</td></tr>
+  <tr><td>Smile</td><td>Shifts to brighter scales (lydian, major)</td></tr>
+  <tr><td>Frown</td><td>Shifts to darker scales (minor, phrygian)</td></tr>
+  <tr><td>Neutral face</td><td>Dorian mode — versatile, bittersweet</td></tr>
+  <tr><td>Raise eyebrows</td><td>Melody plays in higher octave</td></tr>
+  <tr><td>Quick brow raise</td><td>Advances to next chord in the progression</td></tr>
+  <tr><td>Wide eyes</td><td>More reverb — spacious, expansive sound</td></tr>
+  <tr><td>Squint</td><td>Less reverb — dry, intimate, close</td></tr>
+  <tr><td>Wide grin</td><td>More chorus + shimmer — thicker, dreamier</td></tr>
+  <tr><td>Turn head L/R</td><td>More delay/echo — turn away = more trails</td></tr>
+</table>
+
+<div class="tip">The pad sound (sustained texture) plays automatically when your face is detected. It responds to your grain and filter expressions. Just look at the camera and the music begins.</div>
+
+<h2><span class="section-icon">3.</span> Your Hand = The Melody</h2>
+<p>Raise your free hand into the camera frame. A melody voice activates instantly.</p>
+
+<table>
+  <tr><th>Gesture</th><th>What it does</th></tr>
+  <tr><td>Hand up/down</td><td>Pitch goes up/down (quantized to the current scale — always in key)</td></tr>
+  <tr><td>Open palm</td><td>Legato — notes sustain and blend smoothly</td></tr>
+  <tr><td>Closed fist</td><td>Staccato — short, plucky, percussive notes</td></tr>
+  <tr><td>Hand leaves frame</td><td>Melody fades out</td></tr>
+</table>
+
+<div class="tip">The melody is always quantized to the scale your face is choosing. You literally cannot play a wrong note. Move your hand slowly for gentle melodies, quickly for expressive runs.</div>
+
+<h2><span class="section-icon">4.</span> Touch = Drums &amp; Effects</h2>
+<p>Your thumb on the screen controls rhythm and special effects.</p>
+
+<h3>Drum Pad (3 zones)</h3>
+<table>
+  <tr><th>Screen Area</th><th>Sound</th></tr>
+  <tr><td>Top third</td><td>Hi-hat / cymbal</td></tr>
+  <tr><td>Middle third</td><td>Snare / clap</td></tr>
+  <tr><td>Bottom third</td><td>Kick drum</td></tr>
+</table>
+
+<h3>Gestures</h3>
+<table>
+  <tr><th>Gesture</th><th>What it does</th></tr>
+  <tr><td>Single tap</td><td>Plays a drum hit in that zone</td></tr>
+  <tr><td>Double-tap</td><td>Toggles auto-rhythm on/off (shows "AUTO" indicator)</td></tr>
+  <tr><td>Press &amp; hold</td><td>Riser/build effect — filtered noise sweeps up in pitch and volume</td></tr>
+  <tr><td>Release hold</td><td>The drop — everything hits at once with a kick impact</td></tr>
+  <tr><td>Swipe up</td><td>Reverb throw — sends current sound into a huge reverb wash</td></tr>
+  <tr><td>Swipe down</td><td>Tape stop — everything slows down, pitch drops, then snaps back</td></tr>
+  <tr><td>Swipe left/right</td><td>Cycle through 4 different drum patterns (when auto-rhythm is on)</td></tr>
+</table>
+
+<div class="tip">The press-and-hold riser is the most satisfying gesture. Hold for 2-3 seconds to build tension, then release for the drop. Try it with a brow raise at the same moment for a chord change on the drop.</div>
+
+<h2><span class="section-icon">5.</span> Samples — Your Sound Palette</h2>
+<p>MUZE turns everyday sounds into playable instruments. There are two sound slots:</p>
+
+<h3>Pad (sustained texture)</h3>
+<p>The pad loops a sample as a continuous, evolving sound. It plays when your face is detected. Your expressions shape it. Best with longer, tonal sounds.</p>
+
+<h3>Lead (pitched melody)</h3>
+<p>The lead pitch-shifts a sample across the musical scale. Your hand controls which note plays. Works with any sound — short percussive hits become plucky leads, longer tones become singing melodies.</p>
+
+<h3>Pre-loaded samples</h3>
+<table>
+  <tr><th>Sample</th><th>Best as</th><th>Character</th></tr>
+  <tr><td>Singing bowl</td><td>Pad</td><td>Sustained, meditative, rich harmonics</td></tr>
+  <tr><td>Humming</td><td>Pad</td><td>Warm vocal texture, organic</td></tr>
+  <tr><td>Bottle blow</td><td>Pad</td><td>Breathy, airy, flute-like</td></tr>
+  <tr><td>Water drop</td><td>Lead</td><td>Plucky, crystalline, delicate</td></tr>
+  <tr><td>Finger snap</td><td>Lead</td><td>Percussive, punchy, rhythmic</td></tr>
+  <tr><td>Wind chime</td><td>Lead</td><td>Bell-like, sparkling, ethereal</td></tr>
+  <tr><td>Keys jingle</td><td>Lead</td><td>Metallic, textural, sparkly</td></tr>
+  <tr><td>Wood knock</td><td>Lead</td><td>Marimba-like, warm, woody</td></tr>
+</table>
+
+<h3>Switching samples</h3>
+<p>Tap the <strong>"pad: ..."</strong> or <strong>"lead: ..."</strong> buttons in the top-right corner to cycle through all available samples. Any sample can be used for either slot — experiment!</p>
+
+<h3>Recording your own</h3>
+<p>Tap <strong>"record sample"</strong> — the app captures 2 seconds from your microphone. The recording is automatically assigned as your lead sound. Try:</p>
+<ul style="margin: 8px 0 16px 20px; font-size: 13px; color: rgba(255,255,255,0.5);">
+  <li>Humming a note — becomes a vocal lead instrument</li>
+  <li>Clapping — becomes a percussive, punchy lead</li>
+  <li>Tapping a glass — becomes a crystalline bell sound</li>
+  <li>Saying "ahhh" — becomes a choir-like pad (switch to pad slot after recording)</li>
+  <li>Any ambient sound — your room, rain, traffic — becomes unique texture</li>
+</ul>
+
+<h2><span class="section-icon">6.</span> Putting It All Together</h2>
+
+<h3>Session flow</h3>
+<p>1. Open the app, tap to begin. Your face starts the pad texture.<br>
+2. Play with expressions — open your mouth for brightness, smile for major key.<br>
+3. Raise your hand — a melody appears. Move slowly at first.<br>
+4. Double-tap for auto-drums. Swipe left/right to find a groove you like.<br>
+5. Now you're playing: face = mood, hand = melody, thumb = rhythm.<br>
+6. Try the hold-and-release for dramatic builds. Swipe up for reverb washes.<br>
+7. Quick brow raise to change chords when it feels right.<br>
+8. Record something around you and play it as your lead.</p>
+
+<h3>Combos to try</h3>
+<table>
+  <tr><th>Combo</th><th>Effect</th></tr>
+  <tr><td>Smile + open mouth + high hand</td><td>Bright, soaring, euphoric melody</td></tr>
+  <tr><td>Frown + squint + low hand + fist</td><td>Dark, intimate, percussive staccato</td></tr>
+  <tr><td>Wide eyes + grin + slow hand</td><td>Spacious, shimmery, dreamy legato</td></tr>
+  <tr><td>Hold screen + brow raise + release</td><td>Build tension then drop with chord change</td></tr>
+  <tr><td>Turn head + swipe up</td><td>Delay trails + reverb throw = infinite space</td></tr>
+  <tr><td>Neutral face + auto-rhythm + no hand</td><td>Ambient meditation mode — just pad and beats</td></tr>
+</table>
+
+<div class="tip">Every session is unique because it's driven by YOUR expressions. Nobody else will create the same music you do. The system is designed so that everything always sounds good — you can't make a wrong move.</div>
+
+<h2><span class="section-icon">7.</span> Tips</h2>
+<p><strong>Lighting:</strong> Face tracking works best in even, front-facing light. Avoid strong backlighting.</p>
+<p><strong>Distance:</strong> Keep your face roughly centered in the frame, about arm's length from the phone.</p>
+<p><strong>Hand tracking:</strong> Works best with a clear background behind your hand. Spread fingers clearly for open palm detection.</p>
+<p><strong>Headphones:</strong> Recommended for the best experience — you'll hear more detail in the effects and avoid feedback when recording samples.</p>
+<p><strong>Portrait mode:</strong> The app is designed for portrait orientation on mobile.</p>
+
+</body>
+</html>
