@@ -1520,9 +1520,9 @@ MUZE.Loop = {
       MUZE.Audio.updateParams(S);
 
       if(!S.modeFrozen){
-        const scale=MUZE.Music.selectScale(S.lipCorner);
-        S.currentScale=scale;
+        S.currentScale=MUZE.Music.selectScale(S.lipCorner);
       }
+      const scale=S.currentScale;
       const octShift=Math.floor(S.browHeight*C.OCTAVE_RANGE)*12;
       const root=C.ROOT_NOTE+octShift;
 
