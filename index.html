@@ -582,7 +582,7 @@ MUZE.FaceFeatures = {
 <script>
 MUZE.HandFeatures = {
   extract(lm) {
-    if(!lm||!lm.length) return {handPresent:false,handY:0.5,handX:0.5,handOpen:true};
+    if(!lm||!lm.length) return {handPresent:false,handY:0.5,handX:0.5,handOpen:1};
     const l=lm[0], hX=(l[0].x+l[9].x)/2, hY=(l[0].y+l[9].y)/2;
     const pS=this._d(l[0],l[9]);
     const aT=(this._d(l[8],l[0])+this._d(l[12],l[0])+this._d(l[16],l[0])+this._d(l[20],l[0]))/4;
@@ -817,7 +817,9 @@ MUZE.Audio = {
   // openness: 0=fist(full portamento sweep), 1=open(staccato stepped)
   setArticulation(openness) {
     if (!this.melodySynth) return;
-    this.melodySynth.portamento = (1 - openness) * 0.3;
+    this.melodySynth.portamento = (1 - openness) * 0.4;
+    // Short release when open (staccato), long when closed (legato sweep)
+    this.melodySynth.set({ envelope: { release: 0.05 + (1 - openness) * 0.6 } });
   },
 
   triggerDrum(type) {
@@ -1635,8 +1637,8 @@ MUZE.Loop = {
         const note=MUZE.Music.quantize(1-S.handY,scale,root,C.OCTAVE_RANGE);
         S.melodyNote=note;
         if(note!==this._prevMelodyNote){
-          if(S.handOpen>0.6){
-            // Staccato: retrigger each note
+          if(S.handOpen>0.4){
+            // Staccato: retrigger for short attack
             MUZE.Audio.stopMelody();
             MUZE.Audio.startMelody(note);
           } else {
