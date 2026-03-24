@@ -292,6 +292,12 @@
   <div class="synth-row"><label>volume</label><input type="range" id="mel-vol" min="-30" max="0" step="1" value="-6"><span class="val">-6</span></div>
   <div class="synth-row"><label>pan</label><input type="range" id="mel-pan" min="-1" max="1" step="0.05" value="-0.3"><span class="val">-0.30</span></div>
 
+  <h3>Binaural Beats</h3>
+  <div class="synth-row"><label>on/off</label><button class="synth-select" id="bin-toggle" style="text-align:center">OFF</button></div>
+  <div class="synth-row"><label>mode</label><button class="synth-select" id="bin-mode" style="text-align:center">tonic</button></div>
+  <div class="synth-row"><label>beat hz</label><input type="range" id="bin-hz" min="1" max="20" step="0.5" value="4"><span class="val">4.0</span></div>
+  <div class="synth-row"><label>volume</label><input type="range" id="bin-vol" min="-36" max="-6" step="1" value="-24"><span class="val">-24</span></div>
+
   <h3>Pad</h3>
   <div class="synth-row"><label>wave</label><select class="synth-select" id="pad-osc"><option>sine</option><option>triangle</option><option>sawtooth</option><option>square</option></select></div>
   <div class="synth-row"><label>harm</label><input type="range" id="pad-harm" min="0.5" max="8" step="0.1" value="2"><span class="val">2.0</span></div>
@@ -630,6 +636,16 @@ MUZE.Audio = {
     this.hatSynth.volume.value = -16;
     this.hatSynth.connect(this.compressor);
 
+    // Binaural beats layer
+    this._binauralL = new Tone.Oscillator({ type: 'sine', frequency: 110 }).connect(new Tone.Panner(-1).connect(this.compressor));
+    this._binauralR = new Tone.Oscillator({ type: 'sine', frequency: 114 }).connect(new Tone.Panner(1).connect(this.compressor));
+    this._binauralL.volume.value = -24;
+    this._binauralR.volume.value = -24;
+    this._binauralActive = false;
+    this._binauralFollowChord = false;
+    this._binauralBeatHz = 4;
+    this._binauralBaseFreq = 110;
+
     // Riser
     this._riserFilter = new Tone.Filter({ frequency: 200, type: 'bandpass', Q: 2 }).connect(this.compressor);
     this._riserGain = new Tone.Gain(0).connect(this._riserFilter);
@@ -725,6 +741,40 @@ MUZE.Audio = {
     if (this._arpSeq) { this._arpSeq.stop(); this._arpSeq.dispose(); this._arpSeq = null; }
     this._arpNotes = [];
   },
+  // Binaural beats
+  toggleBinaural() {
+    this._binauralActive = !this._binauralActive;
+    if (this._binauralActive) {
+      this._binauralL.start();
+      this._binauralR.start();
+      this._updateBinauralFreq(this._binauralBaseFreq);
+    } else {
+      this._binauralL.stop();
+      this._binauralR.stop();
+    }
+    return this._binauralActive;
+  },
+  setBinauralBeatHz(hz) {
+    this._binauralBeatHz = hz;
+    if (this._binauralActive) this._updateBinauralFreq(this._binauralL.frequency.value);
+  },
+  setBinauralVolume(db) {
+    this._binauralL.volume.value = db;
+    this._binauralR.volume.value = db;
+  },
+  _updateBinauralFreq(baseFreq) {
+    const half = this._binauralBeatHz / 2;
+    this._binauralL.frequency.rampTo(baseFreq - half, 0.1);
+    this._binauralR.frequency.rampTo(baseFreq + half, 0.1);
+  },
+  updateBinauralFromChord(notes) {
+    if (!this._binauralActive || !this._binauralFollowChord) return;
+    // Use the root note of the chord (first note), drop 1 octave for sub bass
+    const noteName = notes[0];
+    const freq = Tone.Frequency(noteName).toFrequency() / 2;
+    this._updateBinauralFreq(freq);
+  },
+
   reverbThrow(){const p=this.reverb.wet.value;this.reverb.wet.rampTo(0.95,0.05);setTimeout(()=>this.reverb.wet.rampTo(p,1.5),200);},
   tapeStop(){const o=Tone.Transport.bpm.value;Tone.Transport.bpm.rampTo(20,0.4);setTimeout(()=>Tone.Transport.bpm.rampTo(o,0.15),500);},
 };
@@ -832,6 +882,21 @@ MUZE.SynthMenu = {
     this._bind('mel-rel', (v) => MUZE.Audio.melodySynth.set({ envelope: { release: +v } }));
     this._bind('mel-vol', (v) => { MUZE.Audio.melodySynth.volume.value = +v; });
     this._bind('mel-pan', (v) => { MUZE.Audio._melPan.pan.value = +v; });
+
+    // Binaural controls
+    document.getElementById('bin-toggle').addEventListener('click', function() {
+      const on = MUZE.Audio.toggleBinaural();
+      this.textContent = on ? 'ON' : 'OFF';
+    });
+    document.getElementById('bin-mode').addEventListener('click', function() {
+      MUZE.Audio._binauralFollowChord = !MUZE.Audio._binauralFollowChord;
+      this.textContent = MUZE.Audio._binauralFollowChord ? 'chord' : 'tonic';
+      if (!MUZE.Audio._binauralFollowChord) {
+        MUZE.Audio._updateBinauralFreq(MUZE.Audio._binauralBaseFreq);
+      }
+    });
+    this._bind('bin-hz', (v) => MUZE.Audio.setBinauralBeatHz(+v));
+    this._bind('bin-vol', (v) => MUZE.Audio.setBinauralVolume(+v));
 
     // Pad synth controls
     this._bind('pad-osc', (v) => MUZE.Audio.padSynth.set({ oscillator: { type: v } }), true);
@@ -1077,6 +1142,7 @@ MUZE.Loop = {
       if(padKey!==this._currentPadKey){
         this._currentPadKey=padKey;
         MUZE.Audio.triggerPad(padNotes);
+        MUZE.Audio.updateBinauralFromChord(padNotes);
       }
 
       // Hand → lead melody
