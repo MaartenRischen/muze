@@ -73,6 +73,24 @@
   #start-screen.loading #loading-text { display: block; }
 
   #debug { position: fixed; top: env(safe-area-inset-top, 8px); left: 8px; z-index: 10; pointer-events: none; }
+  #mode-hud {
+    position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+    z-index: 10; pointer-events: none; text-align: center;
+    font: bold 32px/1.2 monospace; color: #fff;
+    background: rgba(0,0,0,0.5); padding: 12px 24px; border-radius: 12px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  #mode-hud .valence-bar {
+    margin-top: 8px; height: 12px; width: 240px; background: rgba(255,255,255,0.15);
+    border-radius: 6px; position: relative; overflow: hidden;
+  }
+  #mode-hud .valence-bar .fill {
+    position: absolute; top: 0; height: 100%; border-radius: 6px;
+    transition: left 0.15s, width 0.15s, background 0.15s;
+  }
+  #mode-hud .valence-label {
+    font-size: 14px; font-weight: normal; color: rgba(255,255,255,0.7); margin-top: 4px;
+  }
   #rhythm-indicator {
     position: fixed; bottom: 46%; left: 50%; transform: translateX(-50%);
     z-index: 5; color: rgba(255,255,255,0.5); font-size: 11px; letter-spacing: 2px;
@@ -110,6 +128,7 @@
 <div id="riser-overlay"></div>
 <div id="rhythm-indicator">AUTO</div>
 <div id="debug"></div>
+<div id="mode-hud"></div>
 
 <div id="sample-ui">
   <button class="sample-btn" id="btn-lead-sample">lead: water drop</button>
@@ -144,9 +163,9 @@ MUZE.Config = Object.freeze({
   DELAY_WET_MIN: 0.0, DELAY_WET_MAX: 0.4,
   CHORUS_DEPTH_MIN: 0.0, CHORUS_DEPTH_MAX: 0.7,
 
-  SCALE_LYDIAN: [0,2,4,6,7,9,11], SCALE_MAJOR: [0,2,4,5,7,9,11],
-  SCALE_DORIAN: [0,2,3,5,7,9,10], SCALE_MINOR: [0,2,3,5,7,8,10],
-  SCALE_PHRYGIAN: [0,1,3,5,7,8,10],
+  SCALE_LYDIAN: [0,2,4,6,7,9,11], SCALE_IONIAN: [0,2,4,5,7,9,11],
+  SCALE_MIXOLYDIAN: [0,2,4,5,7,9,10], SCALE_DORIAN: [0,2,3,5,7,9,10],
+  SCALE_AEOLIAN: [0,2,3,5,7,8,10], SCALE_PHRYGIAN: [0,1,3,5,7,8,10],
 
   ROOT_NOTE: 60, OCTAVE_RANGE: 2, BPM_DEFAULT: 85,
   CHORD_DEGREES: [0, 3, 4, 2, 5, 0],
@@ -302,14 +321,17 @@ MUZE.Music = {
   NN:['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
   selectScale(lc) {
     const C=MUZE.Config;
-    if(lc>0.6) return C.SCALE_LYDIAN; if(lc>0.25) return C.SCALE_MAJOR;
-    if(lc>-0.25) return C.SCALE_DORIAN; if(lc>-0.6) return C.SCALE_MINOR;
+    if(lc>0.75) return C.SCALE_LYDIAN;
+    if(lc>0.60) return C.SCALE_IONIAN;
+    if(lc>0.35) return C.SCALE_MIXOLYDIAN;
+    if(lc>0.15) return C.SCALE_DORIAN;
+    if(lc>-0.10) return C.SCALE_AEOLIAN;
     return C.SCALE_PHRYGIAN;
   },
   quantize(v,s,r,o){const t=s.length*o,c=Math.max(0,Math.min(t-1,Math.round(v*(t-1))));return r+Math.floor(c/s.length)*12+s[c%s.length];},
   midiToNote(m){return this.NN[m%12]+(Math.floor(m/12)-1);},
   getPadVoicing(r,s,d){const dd=d%s.length;return[r+s[dd]-12,r+s[(dd+4)%s.length],r+s[(dd+2)%s.length]+12].map(n=>this.midiToNote(n));},
-  getScaleName(s){const C=MUZE.Config;if(!s)return'-';if(s===C.SCALE_LYDIAN)return'lydian';if(s===C.SCALE_MAJOR)return'major';if(s===C.SCALE_DORIAN)return'dorian';if(s===C.SCALE_MINOR)return'minor';if(s===C.SCALE_PHRYGIAN)return'phrygian';return'?';}
+  getScaleName(s){const C=MUZE.Config;if(!s)return'-';if(s===C.SCALE_LYDIAN)return'lydian';if(s===C.SCALE_IONIAN)return'ionian';if(s===C.SCALE_MIXOLYDIAN)return'mixolydian';if(s===C.SCALE_DORIAN)return'dorian';if(s===C.SCALE_AEOLIAN)return'aeolian';if(s===C.SCALE_PHRYGIAN)return'phrygian';return'?';}
 };
 </script>
 
@@ -671,13 +693,14 @@ MUZE.Touch = {
 MUZE.Loop = {
   _running:false, _lastDetect:0, _currentPadKey:null,
   _prevMelodyNote:null, _prevBrow:0, _lastBrowSpike:0, _prevArticulation:true,
-  _debugEl:null,
+  _debugEl:null, _modeHudEl:null,
 
   init(){
     const c=document.getElementById('overlay');
     c.width=window.innerWidth*devicePixelRatio; c.height=window.innerHeight*devicePixelRatio;
     c.style.width=window.innerWidth+'px'; c.style.height=window.innerHeight+'px';
     this._debugEl=document.getElementById('debug');
+    this._modeHudEl=document.getElementById('mode-hud');
   },
   start(){this._running=true;this._tick();},
   _tick(){
@@ -775,6 +798,18 @@ MUZE.Loop = {
       `hand:${S.handPresent?(S.handOpen?'LEGATO':'STACCATO'):'—'} note:${n}<br>`+
       `lead:${leadId} auto:${S.autoRhythm?'ON':'—'}`+
       '</div>';
+
+    // Big mode + valence HUD
+    const sc2=MUZE.Music.getScaleName(S.currentScale).toUpperCase();
+    const v=S.lipCorner;
+    const pct=((v+1)/2)*100; // -1..+1 → 0..100%
+    const barW=8; // width% of fill indicator
+    const left=Math.max(0,Math.min(100-barW,pct-barW/2));
+    const hue=pct*1.2; // 0=red, 60=yellow, 120=green
+    this._modeHudEl.innerHTML=
+      `<div>${sc2}</div>`+
+      `<div class="valence-bar"><div class="fill" style="left:${left}%;width:${barW}%;background:hsl(${hue},70%,55%)"></div></div>`+
+      `<div class="valence-label">valence ${v.toFixed(2)}</div>`;
   }
 };
 </script>
