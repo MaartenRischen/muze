@@ -7,153 +7,121 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <title>MUZE</title>
-
-<!-- Tone.js -->
 <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
 
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   html, body {
     width: 100%; height: 100%;
     overflow: hidden;
-    background: #000;
+    background: #1a1520;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
   }
 
+  /* Camera — lo-fi color grade */
   #cam {
-    position: fixed;
-    top: 0; left: 0;
+    position: fixed; top: 0; left: 0;
     width: 100%; height: 100%;
     object-fit: cover;
     transform: scaleX(-1);
     z-index: 0;
+    filter: saturate(0.55) sepia(0.18) contrast(0.88) brightness(0.82);
   }
 
-  #overlay {
-    position: fixed;
-    top: 0; left: 0;
+  /* Vignette overlay */
+  #vignette {
+    position: fixed; top: 0; left: 0;
     width: 100%; height: 100%;
     z-index: 1;
     pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(26,21,32,0.7) 100%);
   }
 
-  #touch-zone {
-    position: fixed;
-    bottom: 0; left: 0;
-    width: 100%;
-    height: 45%;
+  /* Film grain canvas */
+  #grain {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
     z-index: 2;
+    pointer-events: none;
+    opacity: 0.06;
+    mix-blend-mode: overlay;
+  }
+
+  #overlay {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  /* Touch zones */
+  #touch-zone {
+    position: fixed; bottom: 0; left: 0;
+    width: 100%; height: 45%;
+    z-index: 4;
     display: flex;
     flex-direction: column;
     touch-action: none;
   }
-
   .drum-zone {
     flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     transition: background 0.1s ease-out;
   }
-
-  .drum-zone .label {
-    color: rgba(255,255,255,0.15);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    pointer-events: none;
-  }
-
   .drum-zone.hit { transition: none; }
-  #zone-hat { border-bottom: 1px solid rgba(255,255,255,0.05); }
-  #zone-hat.hit { background: rgba(200, 220, 255, 0.2); }
-  #zone-snare { border-bottom: 1px solid rgba(255,255,255,0.05); }
-  #zone-snare.hit { background: rgba(255, 200, 150, 0.2); }
-  #zone-kick.hit { background: rgba(255, 100, 100, 0.15); }
+  #zone-hat { border-bottom: 1px solid rgba(255,255,255,0.03); }
+  #zone-hat.hit { background: rgba(207,162,215,0.15); }
+  #zone-snare { border-bottom: 1px solid rgba(255,255,255,0.03); }
+  #zone-snare.hit { background: rgba(220,133,100,0.15); }
+  #zone-kick.hit { background: rgba(103,74,179,0.12); }
 
-  /* Riser overlay */
-  #riser-overlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    z-index: 3;
-    pointer-events: none;
-    background: radial-gradient(circle at center, transparent 0%, rgba(255,255,255,0) 100%);
-    opacity: 0;
-    transition: opacity 0.1s;
-  }
-  #riser-overlay.active {
-    opacity: 1;
-    background: radial-gradient(circle at center, rgba(255,255,255,0.08) 0%, rgba(255,200,100,0.12) 100%);
-  }
-
+  /* Start screen — lo-fi warm */
   #start-screen {
-    position: fixed;
-    top: 0; left: 0;
+    position: fixed; top: 0; left: 0;
     width: 100%; height: 100%;
     z-index: 100;
-    background: #0a0a0a;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 24px;
+    background: linear-gradient(160deg, #1a1520 0%, #2a1f35 50%, #1e1525 100%);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 20px;
   }
-
   #start-screen h1 {
-    color: #fff;
-    font-size: 48px;
+    color: #e4cba8;
+    font-size: 52px;
     font-weight: 200;
-    letter-spacing: 16px;
-    text-transform: uppercase;
+    letter-spacing: 18px;
+    text-transform: lowercase;
   }
-
   #start-screen p {
-    color: rgba(255,255,255,0.4);
-    font-size: 14px;
-    max-width: 260px;
+    color: rgba(228,203,168,0.45);
+    font-size: 13px;
+    max-width: 240px;
     text-align: center;
-    line-height: 1.5;
+    line-height: 1.6;
   }
-
   #start-btn {
     appearance: none;
-    border: 1px solid rgba(255,255,255,0.25);
+    border: 1px solid rgba(228,203,168,0.25);
     background: transparent;
-    color: #fff;
-    font-size: 16px;
-    padding: 16px 40px;
+    color: #e4cba8;
+    font-size: 15px;
+    padding: 14px 36px;
     border-radius: 50px;
     cursor: pointer;
-    letter-spacing: 1px;
-    margin-top: 16px;
+    letter-spacing: 2px;
+    margin-top: 12px;
     transition: all 0.2s;
   }
-
   #start-btn:active {
-    background: rgba(255,255,255,0.15);
+    background: rgba(228,203,168,0.1);
     transform: scale(0.97);
   }
-
-  #start-screen.loading #start-btn {
-    opacity: 0.4;
-    pointer-events: none;
-  }
-
-  #loading-text {
-    color: rgba(255,255,255,0.5);
-    font-size: 13px;
-    display: none;
-  }
-
-  #start-screen.loading #loading-text {
-    display: block;
-  }
+  #start-screen.loading #start-btn { opacity: 0.3; pointer-events: none; }
+  #loading-text { color: rgba(228,203,168,0.4); font-size: 12px; display: none; }
+  #start-screen.loading #loading-text { display: block; }
 
   #debug {
     position: fixed;
@@ -163,19 +131,14 @@
     pointer-events: none;
   }
 
-  /* Auto-rhythm indicator */
   #rhythm-indicator {
-    position: fixed;
-    bottom: 46%;
-    left: 50%;
+    position: fixed; bottom: 46%; left: 50%;
     transform: translateX(-50%);
     z-index: 5;
-    color: rgba(255,255,255,0.5);
-    font-size: 11px;
-    letter-spacing: 2px;
+    color: rgba(228,203,168,0.45);
+    font-size: 10px; letter-spacing: 3px;
     pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
+    opacity: 0; transition: opacity 0.3s;
   }
   #rhythm-indicator.visible { opacity: 1; }
 </style>
@@ -183,170 +146,159 @@
 <body>
 
 <video id="cam" autoplay playsinline muted></video>
+<div id="vignette"></div>
+<canvas id="grain"></canvas>
 <canvas id="overlay"></canvas>
 
 <div id="touch-zone">
-  <div id="zone-hat" class="drum-zone" data-drum="hat"><span class="label"></span></div>
-  <div id="zone-snare" class="drum-zone" data-drum="snare"><span class="label"></span></div>
-  <div id="zone-kick" class="drum-zone" data-drum="kick"><span class="label"></span></div>
+  <div id="zone-hat" class="drum-zone" data-drum="hat"></div>
+  <div id="zone-snare" class="drum-zone" data-drum="snare"></div>
+  <div id="zone-kick" class="drum-zone" data-drum="kick"></div>
 </div>
 
-<div id="riser-overlay"></div>
 <div id="rhythm-indicator">AUTO</div>
 <div id="debug"></div>
 
 <div id="start-screen">
-  <h1>Muze</h1>
-  <p>Create music with your face, hand, and touch. No music skills needed.</p>
-  <button id="start-btn">Touch to Begin</button>
-  <span id="loading-text">Loading models...</span>
+  <h1>muze</h1>
+  <p>lo-fi beats shaped by your face, hand, and touch</p>
+  <button id="start-btn">begin</button>
+  <span id="loading-text">loading...</span>
 </div>
 
 <!-- ===== MUZE MODULES ===== -->
-
-<script>
-window.MUZE = {};
-</script>
+<script>window.MUZE = {};</script>
 
 <!-- Config -->
 <script>
 MUZE.Config = Object.freeze({
-  // Camera
-  CAM_WIDTH: 640,
-  CAM_HEIGHT: 480,
+  CAM_WIDTH: 640, CAM_HEIGHT: 480,
 
   // Smoothing
-  SMOOTH_FAST: 0.35,
-  SMOOTH_SLOW: 0.15,
-  SMOOTH_HAND: 0.30,
+  SMOOTH_FAST: 0.35, SMOOTH_SLOW: 0.15, SMOOTH_HAND: 0.30,
 
   // Face thresholds (calibrated)
-  MOUTH_OPEN_MIN: 0.015,
-  MOUTH_OPEN_MAX: 0.09,
-  LIP_SMILE_MIN: -0.025,
-  LIP_SMILE_MAX: 0.025,
-  BROW_MIN: 0.100,
-  BROW_MAX: 0.143,
-  EYE_OPEN_MIN: 0.018,
-  EYE_OPEN_MAX: 0.045,
-  MOUTH_WIDTH_MIN: 0.28,
-  MOUTH_WIDTH_MAX: 0.38,
+  MOUTH_OPEN_MIN: 0.015, MOUTH_OPEN_MAX: 0.09,
+  LIP_SMILE_MIN: -0.025, LIP_SMILE_MAX: 0.025,
+  BROW_MIN: 0.100, BROW_MAX: 0.143,
+  EYE_OPEN_MIN: 0.018, EYE_OPEN_MAX: 0.045,
+  MOUTH_WIDTH_MIN: 0.28, MOUTH_WIDTH_MAX: 0.38,
 
-  // Audio
-  FILTER_FREQ_MIN: 400,
-  FILTER_FREQ_MAX: 12000,
-  REVERB_WET_MIN: 0.05,
-  REVERB_WET_MAX: 0.65,
-  REVERB_DECAY: 2.5,
-  DELAY_WET_MIN: 0.0,
-  DELAY_WET_MAX: 0.4,
-  CHORUS_DEPTH_MIN: 0.0,
-  CHORUS_DEPTH_MAX: 0.7,
+  // Lo-fi audio
+  FILTER_FREQ_MIN: 800, FILTER_FREQ_MAX: 6500,
+  MASTER_LPF: 8000,
+  LOFI_LPF: 6500,
+  REVERB_WET_MIN: 0.08, REVERB_WET_MAX: 0.55, REVERB_DECAY: 2.5,
+  DELAY_WET_MIN: 0.0, DELAY_WET_MAX: 0.35,
+  CHORUS_DEPTH_MIN: 0.1, CHORUS_DEPTH_MAX: 0.7,
+  BITCRUSHER_BITS: 12,
+  TAPE_SATURATION: 0.15,
+  VINYL_NOISE_DB: -28,
 
-  // Scales
-  SCALE_LYDIAN:    [0, 2, 4, 6, 7, 9, 11],
-  SCALE_MAJOR:     [0, 2, 4, 5, 7, 9, 11],
-  SCALE_DORIAN:    [0, 2, 3, 5, 7, 9, 10],
-  SCALE_MINOR:     [0, 2, 3, 5, 7, 8, 10],
-  SCALE_PHRYGIAN:  [0, 1, 3, 5, 7, 8, 10],
-  SCALE_PENT_MAJ:  [0, 2, 4, 7, 9],
-  SCALE_PENT_MIN:  [0, 3, 5, 7, 10],
+  // Tape detuning
+  TAPE_WOW_RATE: 1.2, TAPE_WOW_DEPTH: 12,
+  TAPE_FLUTTER_RATE: 8, TAPE_FLUTTER_DEPTH: 3,
+  TAPE_DRIFT_RATE: 0.08, TAPE_DRIFT_DEPTH: 5,
+  MICRO_DETUNE_RANGE: 16, // ±8 cents
 
-  ROOT_NOTE: 60,
-  OCTAVE_RANGE: 2,
-  BPM_DEFAULT: 85,
-  BPM_MIN: 60,
-  BPM_MAX: 130,
+  // Scales (lo-fi: dorian-centric)
+  SCALE_MAJOR_PENT: [0, 2, 4, 7, 9],
+  SCALE_DORIAN:     [0, 2, 3, 5, 7, 9, 10],
+  SCALE_MINOR_PENT: [0, 3, 5, 7, 10],
+  SCALE_MINOR:      [0, 2, 3, 5, 7, 8, 10],
 
-  // Chord progression degrees (cycle through on brow spikes)
-  CHORD_DEGREES: [0, 3, 4, 2, 5, 0],
+  ROOT_NOTE: 60, OCTAVE_RANGE: 1.5,
+  BPM: 75,
 
-  // Brow spike detection
-  BROW_SPIKE_THRESHOLD: 0.25,
-  BROW_SPIKE_COOLDOWN: 600,
+  // Jazz chord progressions (5-note MIDI voicings)
+  PROGRESSIONS: [
+    // ii-V-I-vi: Dm9 → G13 → Cmaj9 → Am11
+    [[50,57,60,65,69], [43,53,59,62,67], [48,55,59,64,67], [45,52,55,60,64]],
+    // IV-iii-ii-I: Fmaj7 → Em7 → Dm7 → Cmaj7
+    [[53,57,60,64,69], [52,55,59,64,67], [50,53,57,62,65], [48,52,55,60,64]],
+    // vi-ii-V-I: Am9 → Dm11 → G7 → Cmaj9
+    [[45,52,55,60,64], [50,55,60,65,69], [43,53,57,62,65], [48,55,59,64,67]],
+    // Two-chord hypnotic: Cmaj9 → Fmaj9
+    [[48,55,59,64,67], [53,57,60,65,69]],
+  ],
 
-  // Detection
+  // Brow spike
+  BROW_SPIKE_THRESHOLD: 0.25, BROW_SPIKE_COOLDOWN: 600,
+
+  // Drums
+  SWING_AMOUNT: 0.60,
+  VELOCITY_MIN: 0.55, VELOCITY_MAX: 1.0,
+  TIMING_HUMANIZE_MS: 18,
+  SIDECHAIN_DEPTH: 0.3, SIDECHAIN_RELEASE: 0.15,
+
+  RHYTHM_PATTERNS: [
+    { // Classic boom bap
+      kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+      snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      ghost: [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,0,1],
+      hat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    },
+    { // Laid-back
+      kick:  [1,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+      snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      ghost: [0,0,1,0, 0,0,0,0, 0,0,0,0, 0,1,0,0],
+      hat:   [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    },
+    { // Sparse meditation
+      kick:  [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+      snare: [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+      ghost: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,1,0],
+      hat:   [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+    },
+    { // Syncopated
+      kick:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+      snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      ghost: [0,0,0,1, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+      hat:   [1,0,1,0, 1,0,1,0, 1,0,1,1, 1,0,1,0],
+    },
+  ],
+
+  // Binaural
+  BINAURAL_CARRIER: 220, BINAURAL_DB: -24,
+  BINAURAL_FREQ_MIN: 6, BINAURAL_FREQ_MAX: 10,
+
+  // Meditation
+  MED_EYE_CLOSED: 0.15,
+  MED_DEEPEN_RATE: 0.0005,
+  MED_RECOVER_RATE: 0.0013,
+
   DETECT_INTERVAL: 33,
 
   // Touch
-  SWIPE_THRESHOLD: 50,
-  SWIPE_MAX_TIME: 300,
-  DOUBLE_TAP_TIME: 300,
-  HOLD_TIME: 400,
-
-  // Auto-rhythm patterns (1 = hit, 0 = rest) — 16 steps
-  RHYTHM_PATTERNS: [
-    { kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
-      snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-      hat:  [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0] },
-    { kick: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
-      snare:[0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
-      hat:  [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1] },
-    { kick: [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0],
-      snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
-      hat:  [1,0,1,0, 1,0,1,0, 1,0,1,1, 1,0,1,0] },
-    { kick: [1,0,0,0, 0,0,0,0, 1,0,1,0, 0,0,0,0],
-      snare:[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-      hat:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0] },
-  ],
+  SWIPE_THRESHOLD: 50, SWIPE_MAX_TIME: 300,
+  DOUBLE_TAP_TIME: 300, HOLD_TIME: 500,
 });
 </script>
 
 <!-- State -->
 <script>
 MUZE.State = {
-  // Face
-  mouthOpenness: 0,
-  lipCorner: 0,
-  browHeight: 0,
-  eyeOpenness: 0.5,
-  mouthWidth: 0,
-  headPitch: 0,
-  headYaw: 0,
-  headRoll: 0,
-  faceDetected: false,
-
-  // Hand
-  handPresent: false,
-  handY: 0.5,
-  handX: 0.5,
-  handOpen: true,
-
-  // Audio
-  filterFreq: 2000,
-  reverbWet: 0.3,
-  currentScale: null,
-  melodyNote: null,
-
-  // Chord progression
-  chordIndex: 0,
-
-  // Tempo
-  bpm: 85,
-
-  // Rhythm
+  mouthOpenness: 0, lipCorner: 0, browHeight: 0, eyeOpenness: 0.5,
+  mouthWidth: 0, headPitch: 0, headYaw: 0, headRoll: 0, faceDetected: false,
+  handPresent: false, handY: 0.5, handX: 0.5, handOpen: true,
+  currentScale: null, melodyNote: null,
+  chordIndex: 0, progressionIndex: 0,
+  grooveDensity: 0.6,
+  meditationScore: 0,
   autoRhythm: false,
-  rhythmPattern: 0,
-
-  // Riser
-  riserActive: false,
-  riserIntensity: 0,
-
-  // System
   audioReady: false,
   _browRaw: 0,
 };
 </script>
 
-<!-- Smooth (EMA) -->
+<!-- Smooth -->
 <script>
 MUZE.Smooth = {
   _prev: {},
   update(key, raw, alpha) {
     if (!(key in this._prev)) { this._prev[key] = raw; return raw; }
     const s = alpha * raw + (1 - alpha) * this._prev[key];
-    this._prev[key] = s;
-    return s;
+    this._prev[key] = s; return s;
   },
   reset() { this._prev = {}; }
 };
@@ -355,23 +307,16 @@ MUZE.Smooth = {
 <!-- Camera -->
 <script>
 MUZE.Camera = {
-  video: null,
-  stream: null,
+  video: null, stream: null,
   async init() {
     this.video = document.getElementById('cam');
     this.stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: 'user',
-        width: { ideal: MUZE.Config.CAM_WIDTH },
-        height: { ideal: MUZE.Config.CAM_HEIGHT },
-        frameRate: { ideal: 30 }
-      },
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
       audio: false
     });
     this.video.srcObject = this.stream;
     await new Promise(r => { this.video.onloadedmetadata = r; });
     await this.video.play();
-    return this.video;
   }
 };
 </script>
@@ -386,16 +331,13 @@ MUZE.FaceTracker = {
         modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task',
         delegate: 'GPU'
       },
-      runningMode: 'VIDEO',
-      numFaces: 1,
-      outputFaceBlendshapes: false,
-      outputFacialTransformationMatrixes: false
+      runningMode: 'VIDEO', numFaces: 1,
+      outputFaceBlendshapes: false, outputFacialTransformationMatrixes: false
     });
   },
   detect(video, ts) {
     if (!this.landmarker) return null;
-    try { return this.landmarker.detectForVideo(video, ts); }
-    catch(e) { return null; }
+    try { return this.landmarker.detectForVideo(video, ts); } catch(e) { return null; }
   }
 };
 </script>
@@ -410,16 +352,13 @@ MUZE.HandTracker = {
         modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task',
         delegate: 'GPU'
       },
-      runningMode: 'VIDEO',
-      numHands: 1,
-      minHandDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
+      runningMode: 'VIDEO', numHands: 1,
+      minHandDetectionConfidence: 0.5, minTrackingConfidence: 0.5
     });
   },
   detect(video, ts) {
     if (!this.landmarker) return null;
-    try { return this.landmarker.detectForVideo(video, ts); }
-    catch(e) { return null; }
+    try { return this.landmarker.detectForVideo(video, ts); } catch(e) { return null; }
   }
 };
 </script>
@@ -428,148 +367,103 @@ MUZE.HandTracker = {
 <script>
 MUZE.FaceFeatures = {
   LM: {
-    UPPER_LIP: 13, LOWER_LIP: 14,
-    LEFT_MOUTH: 61, RIGHT_MOUTH: 291,
-    R_EYE_TOP: 159, R_EYE_BOT: 145,
-    L_EYE_TOP: 386, L_EYE_BOT: 374,
+    UPPER_LIP: 13, LOWER_LIP: 14, LEFT_MOUTH: 61, RIGHT_MOUTH: 291,
+    R_EYE_TOP: 159, R_EYE_BOT: 145, L_EYE_TOP: 386, L_EYE_BOT: 374,
     R_BROW: 105, L_BROW: 334,
-    R_BROW_INNER: 107, L_BROW_INNER: 336,
-    NOSE_TIP: 1, FOREHEAD: 10, CHIN: 152,
-    L_EAR: 234, R_EAR: 454,
+    NOSE_TIP: 1, FOREHEAD: 10, CHIN: 152, L_EAR: 234, R_EAR: 454,
   },
-
   extract(lm) {
     const L = this.LM;
     const faceH = this._dist(lm[L.FOREHEAD], lm[L.CHIN]);
     if (faceH < 0.001) return null;
+    const C = MUZE.Config;
 
-    // Mouth openness
-    const mouthGap = this._dist(lm[L.UPPER_LIP], lm[L.LOWER_LIP]);
-    const mouthOpenness = this._clamp01(this._remap(mouthGap / faceH, MUZE.Config.MOUTH_OPEN_MIN, MUZE.Config.MOUTH_OPEN_MAX));
+    const mouthOpenness = this._c01(this._remap(this._dist(lm[L.UPPER_LIP], lm[L.LOWER_LIP]) / faceH, C.MOUTH_OPEN_MIN, C.MOUTH_OPEN_MAX));
 
-    // Lip corner elevation
     const mouthMidY = (lm[L.UPPER_LIP].y + lm[L.LOWER_LIP].y) / 2;
-    const lCornerD = mouthMidY - lm[L.LEFT_MOUTH].y;
-    const rCornerD = mouthMidY - lm[L.RIGHT_MOUTH].y;
-    const lipCorner = this._clamp(
-      this._remap((lCornerD + rCornerD) / 2 / faceH, MUZE.Config.LIP_SMILE_MIN, MUZE.Config.LIP_SMILE_MAX),
-      -1, 1
-    );
+    const lipCorner = this._cl(this._remap(((mouthMidY - lm[L.LEFT_MOUTH].y) + (mouthMidY - lm[L.RIGHT_MOUTH].y)) / 2 / faceH, C.LIP_SMILE_MIN, C.LIP_SMILE_MAX), -1, 1);
 
-    // Brow height
-    const rBrowDist = Math.abs(lm[L.R_BROW].y - lm[L.R_EYE_TOP].y);
-    const lBrowDist = Math.abs(lm[L.L_BROW].y - lm[L.L_EYE_TOP].y);
-    const browNorm = (rBrowDist + lBrowDist) / 2 / faceH;
+    const browNorm = (Math.abs(lm[L.R_BROW].y - lm[L.R_EYE_TOP].y) + Math.abs(lm[L.L_BROW].y - lm[L.L_EYE_TOP].y)) / 2 / faceH;
     MUZE.State._browRaw = browNorm;
-    const browHeight = this._clamp01(this._remap(browNorm, MUZE.Config.BROW_MIN, MUZE.Config.BROW_MAX));
+    const browHeight = this._c01(this._remap(browNorm, C.BROW_MIN, C.BROW_MAX));
 
-    // Eye openness
-    const rEAR = this._dist(lm[L.R_EYE_TOP], lm[L.R_EYE_BOT]);
-    const lEAR = this._dist(lm[L.L_EYE_TOP], lm[L.L_EYE_BOT]);
-    const eyeOpenness = this._clamp01(this._remap((rEAR + lEAR) / 2 / faceH, MUZE.Config.EYE_OPEN_MIN, MUZE.Config.EYE_OPEN_MAX));
+    const eyeOpenness = this._c01(this._remap((this._dist(lm[L.R_EYE_TOP], lm[L.R_EYE_BOT]) + this._dist(lm[L.L_EYE_TOP], lm[L.L_EYE_BOT])) / 2 / faceH, C.EYE_OPEN_MIN, C.EYE_OPEN_MAX));
 
-    // Mouth width (horizontal stretch — grin)
-    const mouthW = this._dist2D(lm[L.LEFT_MOUTH], lm[L.RIGHT_MOUTH]);
-    const mouthWidth = this._clamp01(this._remap(mouthW / faceH, MUZE.Config.MOUTH_WIDTH_MIN, MUZE.Config.MOUTH_WIDTH_MAX));
+    const mouthWidth = this._c01(this._remap(this._dist2D(lm[L.LEFT_MOUTH], lm[L.RIGHT_MOUTH]) / faceH, C.MOUTH_WIDTH_MIN, C.MOUTH_WIDTH_MAX));
 
-    // Head pose
-    const headYaw = Math.atan2(
-      this._dist2D(lm[L.NOSE_TIP], lm[L.L_EAR]) - this._dist2D(lm[L.NOSE_TIP], lm[L.R_EAR]),
-      faceH
-    );
-    const faceMidY = (lm[L.FOREHEAD].y + lm[L.CHIN].y) / 2;
-    const headPitch = (lm[L.NOSE_TIP].y - faceMidY) / faceH * Math.PI * 0.5;
-    const headRoll = Math.atan2(
-      lm[L.L_EAR].y - lm[L.R_EAR].y,
-      lm[L.L_EAR].x - lm[L.R_EAR].x
-    );
+    const headYaw = Math.atan2(this._dist2D(lm[L.NOSE_TIP], lm[L.L_EAR]) - this._dist2D(lm[L.NOSE_TIP], lm[L.R_EAR]), faceH);
+    const headPitch = (lm[L.NOSE_TIP].y - (lm[L.FOREHEAD].y + lm[L.CHIN].y) / 2) / faceH * Math.PI * 0.5;
+    const headRoll = Math.atan2(lm[L.L_EAR].y - lm[L.R_EAR].y, lm[L.L_EAR].x - lm[L.R_EAR].x);
 
     return { mouthOpenness, lipCorner, browHeight, eyeOpenness, mouthWidth, headPitch, headYaw, headRoll };
   },
-
   _dist(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + ((a.z||0)-(b.z||0))**2); },
   _dist2D(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2); },
-  _remap(v, min, max) { return (v - min) / (max - min); },
-  _clamp01(v) { return Math.max(0, Math.min(1, v)); },
-  _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); },
+  _remap(v, min, max) { return (v-min)/(max-min); },
+  _c01(v) { return Math.max(0, Math.min(1, v)); },
+  _cl(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); },
 };
 </script>
 
 <!-- HandFeatures -->
 <script>
 MUZE.HandFeatures = {
-  WRIST: 0, THUMB_TIP: 4, INDEX_TIP: 8, MIDDLE_TIP: 12,
-  RING_TIP: 16, PINKY_TIP: 20, INDEX_MCP: 5, MIDDLE_MCP: 9,
-
   extract(landmarks) {
-    if (!landmarks || landmarks.length === 0) {
-      return { handPresent: false, handY: 0.5, handX: 0.5, handOpen: true };
-    }
+    if (!landmarks || !landmarks.length) return { handPresent: false, handY: 0.5, handX: 0.5, handOpen: true };
     const lm = landmarks[0];
-    const handX = (lm[this.WRIST].x + lm[this.MIDDLE_MCP].x) / 2;
-    const handY = (lm[this.WRIST].y + lm[this.MIDDLE_MCP].y) / 2;
-    const palmSize = this._dist(lm[this.WRIST], lm[this.MIDDLE_MCP]);
-    const avgTipDist = (
-      this._dist(lm[this.INDEX_TIP], lm[this.WRIST]) +
-      this._dist(lm[this.MIDDLE_TIP], lm[this.WRIST]) +
-      this._dist(lm[this.RING_TIP], lm[this.WRIST]) +
-      this._dist(lm[this.PINKY_TIP], lm[this.WRIST])
-    ) / 4;
-    return {
-      handPresent: true,
-      handX: 1 - handX,
-      handY,
-      handOpen: (avgTipDist / palmSize) > 1.7,
-    };
+    const handX = (lm[0].x + lm[9].x) / 2;
+    const handY = (lm[0].y + lm[9].y) / 2;
+    const palmSize = this._d(lm[0], lm[9]);
+    const avgTip = (this._d(lm[8],lm[0]) + this._d(lm[12],lm[0]) + this._d(lm[16],lm[0]) + this._d(lm[20],lm[0])) / 4;
+    return { handPresent: true, handX: 1 - handX, handY, handOpen: (avgTip / palmSize) > 1.7 };
   },
-
-  _dist(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + ((a.z||0)-(b.z||0))**2); }
+  _d(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + ((a.z||0)-(b.z||0))**2); }
 };
 </script>
 
 <!-- Music -->
 <script>
 MUZE.Music = {
-  NOTE_NAMES: ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
+  NN: ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
 
-  selectScale(lipCorner) {
+  selectScale(lip) {
     const C = MUZE.Config;
-    if (lipCorner > 0.6)  return C.SCALE_LYDIAN;
-    if (lipCorner > 0.25) return C.SCALE_MAJOR;
-    if (lipCorner > -0.25) return C.SCALE_DORIAN;
-    if (lipCorner > -0.6) return C.SCALE_MINOR;
-    return C.SCALE_PHRYGIAN;
+    if (lip > 0.3)  return C.SCALE_MAJOR_PENT;
+    if (lip > -0.15) return C.SCALE_DORIAN;
+    if (lip > -0.5) return C.SCALE_MINOR_PENT;
+    return C.SCALE_MINOR;
   },
 
-  quantizeToScale(value01, scale, rootMidi, octaveRange) {
-    const totalNotes = scale.length * octaveRange;
-    const clamped = Math.max(0, Math.min(totalNotes - 1, Math.round(value01 * (totalNotes - 1))));
-    const octave = Math.floor(clamped / scale.length);
-    const degree = clamped % scale.length;
-    return rootMidi + (octave * 12) + scale[degree];
+  quantize(val01, scale, root, octRange) {
+    const total = scale.length * Math.ceil(octRange);
+    const idx = Math.max(0, Math.min(total - 1, Math.round(val01 * (total - 1))));
+    return root + Math.floor(idx / scale.length) * 12 + scale[idx % scale.length];
   },
 
-  midiToNote(midi) {
-    return this.NOTE_NAMES[midi % 12] + (Math.floor(midi / 12) - 1);
-  },
+  midiToNote(m) { return this.NN[m % 12] + (Math.floor(m / 12) - 1); },
 
-  getPadVoicing(rootMidi, scale, degree) {
-    const d = degree % scale.length;
-    const root = rootMidi + scale[d] - 12;
-    const fifth = rootMidi + scale[(d + 4) % scale.length];
-    const tenth = rootMidi + scale[(d + 2) % scale.length] + 12;
-    return [root, fifth, tenth].map(n => this.midiToNote(n));
-  },
-
-  getScaleName(scale) {
-    if (!scale) return '-';
+  getScaleName(s) {
     const C = MUZE.Config;
-    if (scale === C.SCALE_LYDIAN) return 'lydian';
-    if (scale === C.SCALE_MAJOR) return 'major';
-    if (scale === C.SCALE_DORIAN) return 'dorian';
-    if (scale === C.SCALE_MINOR) return 'minor';
-    if (scale === C.SCALE_PHRYGIAN) return 'phrygian';
-    return '?';
+    if (s === C.SCALE_MAJOR_PENT) return 'maj pent';
+    if (s === C.SCALE_DORIAN) return 'dorian';
+    if (s === C.SCALE_MINOR_PENT) return 'min pent';
+    if (s === C.SCALE_MINOR) return 'minor';
+    return '-';
+  },
+
+  // Get current chord as note names with micro-detuning (returns frequencies)
+  getCurrentChord(progIdx, chordIdx) {
+    const prog = MUZE.Config.PROGRESSIONS[progIdx];
+    const midi = prog[chordIdx % prog.length];
+    return midi.map(m => {
+      const detuneCents = (Math.random() - 0.5) * MUZE.Config.MICRO_DETUNE_RANGE;
+      const freq = Tone.Frequency(this.midiToNote(m)).toFrequency();
+      return freq * Math.pow(2, detuneCents / 1200);
+    });
+  },
+
+  getCurrentChordLength(progIdx) {
+    return MUZE.Config.PROGRESSIONS[progIdx].length;
   }
 };
 </script>
@@ -577,427 +471,472 @@ MUZE.Music = {
 <!-- Audio -->
 <script>
 MUZE.Audio = {
-  padSynth: null,
-  melodySynth: null,
-  kickSynth: null,
-  snareSynth: null,
-  hatSynth: null,
-  riserSynth: null,
-  filter: null,
-  reverb: null,
-  delay: null,
-  chorus: null,
-  compressor: null,
+  // Synths
+  padSynth: null, melodySynth: null, melodyPanner: null,
+  kickSynth: null, snareNoise: null, hatSynth: null,
+  // Effects
+  sidechainGain: null, bitCrusher: null, tapeSat: null,
+  lofiFilter: null, chorus: null, delay: null, reverb: null,
+  masterLPF: null, masterLimiter: null,
+  // Drums
+  drumBus: null, kickFilter: null, snareFilter: null, hatFilter: null,
+  // Vinyl
+  vinylNoise: null, vinylGain: null,
+  // Binaural
+  binauralOscL: null, binauralOscR: null, binauralGainL: null, binauralGainR: null,
+  // AM
+  amLFO: null,
+  // Tape
+  wowLFO: null, flutterLFO: null, driftLFO: null,
+  // State
   _melodyPlaying: false,
-  _riserGain: null,
-  _riserFilter: null,
+  _tapeDetuneSignal: null,
 
   async init() {
     await Tone.start();
-    Tone.Transport.bpm.value = MUZE.Config.BPM_DEFAULT;
+    Tone.Transport.bpm.value = MUZE.Config.BPM;
+    const C = MUZE.Config;
 
-    // Master chain: Filter → Chorus → Delay → Reverb → Limiter → Destination
-    this.compressor = new Tone.Limiter(-3).toDestination();
-
-    this.reverb = new Tone.Reverb({ decay: MUZE.Config.REVERB_DECAY, preDelay: 0.01 }).connect(this.compressor);
+    // === MASTER CHAIN ===
+    this.masterLimiter = new Tone.Limiter(-3).toDestination();
+    this.masterLPF = new Tone.Filter({ frequency: C.MASTER_LPF, type: 'lowpass', rolloff: -12 }).connect(this.masterLimiter);
+    this.reverb = new Tone.Reverb({ decay: C.REVERB_DECAY, preDelay: 0.02 }).connect(this.masterLPF);
     await this.reverb.ready;
-    this.reverb.wet.value = 0.3;
-
-    this.delay = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.3, wet: 0 }).connect(this.reverb);
-
-    this.chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0, wet: 0.5 }).connect(this.delay);
+    this.reverb.wet.value = 0.25;
+    this.delay = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.25, wet: 0.12 }).connect(this.reverb);
+    this.chorus = new Tone.Chorus({ frequency: 0.8, delayTime: 20, depth: 0.3, wet: 0.4 }).connect(this.delay);
     this.chorus.start();
+    this.lofiFilter = new Tone.Filter({ frequency: C.LOFI_LPF, type: 'lowpass', rolloff: -24, Q: 0.8 }).connect(this.chorus);
+    this.tapeSat = new Tone.Distortion({ distortion: C.TAPE_SATURATION, wet: 1.0 }).connect(this.lofiFilter);
+    this.bitCrusher = new Tone.BitCrusher({ bits: C.BITCRUSHER_BITS }).connect(this.tapeSat);
+    this.sidechainGain = new Tone.Gain(1).connect(this.bitCrusher);
 
-    this.filter = new Tone.Filter({ frequency: 2000, type: 'lowpass', rolloff: -24, Q: 1.2 }).connect(this.chorus);
-
-    // Pad synth
+    // === RHODES PAD ===
     this.padSynth = new Tone.PolySynth(Tone.FMSynth, {
-      maxPolyphony: 6,
+      maxPolyphony: 8,
       voice: {
-        harmonicity: 2, modulationIndex: 1.2,
+        harmonicity: 3.01,
+        modulationIndex: 2.5,
         oscillator: { type: 'sine' },
-        envelope: { attack: 1.0, decay: 0.4, sustain: 0.85, release: 2.5 },
-        modulation: { type: 'triangle' },
-        modulationEnvelope: { attack: 0.6, decay: 0.3, sustain: 0.7, release: 2.0 }
+        envelope: { attack: 0.08, decay: 1.2, sustain: 0.6, release: 3.0 },
+        modulation: { type: 'sine' },
+        modulationEnvelope: { attack: 0.01, decay: 0.8, sustain: 0.3, release: 2.0 }
       }
     });
-    this.padSynth.volume.value = -14;
-    this.padSynth.connect(this.filter);
+    this.padSynth.volume.value = -12;
+    this.padSynth.connect(this.sidechainGain);
 
-    // Melody synth — legato mode (default: sustained)
-    this.melodySynth = new Tone.Synth({
-      oscillator: { type: 'triangle' },
-      envelope: { attack: 0.02, decay: 0.3, sustain: 0.4, release: 1.0 },
-      portamento: 0.08
-    });
-    this.melodySynth.volume.value = -8;
-    this.melodySynth.connect(this.filter);
-
-    // Drums — bypass tonal effects
-    this.kickSynth = new Tone.MembraneSynth({
-      pitchDecay: 0.05, octaves: 6,
+    // === MELODY ===
+    this.melodyPanner = new Tone.Panner(0).connect(this.sidechainGain);
+    this.melodySynth = new Tone.FMSynth({
+      harmonicity: 2, modulationIndex: 1.5,
       oscillator: { type: 'sine' },
-      envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.4 }
+      envelope: { attack: 0.05, decay: 0.4, sustain: 0.3, release: 1.5 },
+      modulation: { type: 'triangle' },
+      modulationEnvelope: { attack: 0.02, decay: 0.3, sustain: 0.2, release: 1.0 },
+      portamento: 0.12
     });
-    this.kickSynth.volume.value = -6;
-    this.kickSynth.connect(this.compressor);
+    this.melodySynth.volume.value = -10;
+    this.melodySynth.connect(this.melodyPanner);
 
-    this.snareSynth = new Tone.NoiseSynth({
+    // === TAPE WOW/FLUTTER/DRIFT ===
+    // Connect to melody synth detune directly
+    this.wowLFO = new Tone.LFO({ frequency: C.TAPE_WOW_RATE, min: -C.TAPE_WOW_DEPTH, max: C.TAPE_WOW_DEPTH, type: 'sine' });
+    this.flutterLFO = new Tone.LFO({ frequency: C.TAPE_FLUTTER_RATE, min: -C.TAPE_FLUTTER_DEPTH, max: C.TAPE_FLUTTER_DEPTH, type: 'triangle' });
+    this.driftLFO = new Tone.LFO({ frequency: C.TAPE_DRIFT_RATE, min: -C.TAPE_DRIFT_DEPTH, max: C.TAPE_DRIFT_DEPTH, type: 'sine' });
+
+    // Connect all to melody detune (they sum)
+    this.wowLFO.connect(this.melodySynth.detune);
+    this.flutterLFO.connect(this.melodySynth.detune);
+    this.driftLFO.connect(this.melodySynth.detune);
+
+    // For PolySynth pad: read combined value in tick loop and apply via .set()
+    this._tapeDetuneSignal = new Tone.Add(0);
+    const wowForPad = new Tone.LFO({ frequency: C.TAPE_WOW_RATE, min: -C.TAPE_WOW_DEPTH, max: C.TAPE_WOW_DEPTH, type: 'sine' });
+    const flutterForPad = new Tone.LFO({ frequency: C.TAPE_FLUTTER_RATE, min: -C.TAPE_FLUTTER_DEPTH, max: C.TAPE_FLUTTER_DEPTH, type: 'triangle' });
+    wowForPad.start(); flutterForPad.start();
+    // We'll read these in the loop
+    this._padWow = wowForPad;
+    this._padFlutter = flutterForPad;
+
+    this.wowLFO.start(); this.flutterLFO.start(); this.driftLFO.start();
+
+    // === DRUMS (separate bus) ===
+    this.drumBus = new Tone.Gain(1).connect(this.masterLimiter);
+    this.kickFilter = new Tone.Filter({ frequency: 200, type: 'lowpass', rolloff: -12 }).connect(this.drumBus);
+    this.kickSynth = new Tone.MembraneSynth({
+      pitchDecay: 0.08, octaves: 4,
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.005, decay: 0.5, sustain: 0, release: 0.5 }
+    });
+    this.kickSynth.volume.value = -4;
+    this.kickSynth.connect(this.kickFilter);
+
+    this.snareFilter = new Tone.Filter({ frequency: 4000, type: 'lowpass', rolloff: -12 }).connect(this.drumBus);
+    this.snareNoise = new Tone.NoiseSynth({
+      noise: { type: 'pink' },
+      envelope: { attack: 0.002, decay: 0.2, sustain: 0, release: 0.15 }
+    });
+    this.snareNoise.volume.value = -12;
+    this.snareNoise.connect(this.snareFilter);
+
+    this.hatFilter = new Tone.Filter({ frequency: 8000, type: 'bandpass', Q: 0.8 }).connect(this.drumBus);
+    this.hatSynth = new Tone.NoiseSynth({
       noise: { type: 'white' },
-      envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.15 }
+      envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.04 }
     });
-    this.snareSynth.volume.value = -10;
-    this.snareSynth.connect(this.compressor);
+    this.hatSynth.volume.value = -18;
+    this.hatSynth.connect(this.hatFilter);
 
-    this.hatSynth = new Tone.MetalSynth({
-      frequency: 400,
-      envelope: { attack: 0.001, decay: 0.08, release: 0.05 },
-      harmonicity: 5.1, modulationIndex: 32, resonance: 8000, octaves: 1.5
-    });
-    this.hatSynth.volume.value = -16;
-    this.hatSynth.connect(this.compressor);
+    // === VINYL CRACKLE ===
+    this.vinylGain = new Tone.Gain(Tone.dbToGain(C.VINYL_NOISE_DB)).connect(this.masterLimiter);
+    const vinylFilter = new Tone.Filter({ frequency: 3000, type: 'bandpass', Q: 0.5 }).connect(this.vinylGain);
+    this.vinylNoise = new Tone.Noise('white').connect(vinylFilter);
+    this.vinylNoise.start();
 
-    // Riser synth (filtered noise sweep for press-and-hold)
-    this._riserFilter = new Tone.Filter({ frequency: 200, type: 'bandpass', Q: 2 }).connect(this.compressor);
-    this._riserGain = new Tone.Gain(0).connect(this._riserFilter);
-    this.riserSynth = new Tone.Noise('pink').connect(this._riserGain);
-    this.riserSynth.start();
+    // === BINAURAL BEATS ===
+    const binVol = Tone.dbToGain(C.BINAURAL_DB);
+    this.binauralGainL = new Tone.Gain(binVol).toDestination();
+    this.binauralGainR = new Tone.Gain(binVol).toDestination();
+    const panL = new Tone.Panner(-1).connect(this.binauralGainL);
+    const panR = new Tone.Panner(1).connect(this.binauralGainR);
+    this.binauralOscL = new Tone.Oscillator(C.BINAURAL_CARRIER, 'sine').connect(panL);
+    this.binauralOscR = new Tone.Oscillator(C.BINAURAL_CARRIER + C.BINAURAL_FREQ_MAX, 'sine').connect(panR);
+    this.binauralOscL.start(); this.binauralOscR.start();
+
+    // === AMPLITUDE MODULATION (Brain.fm technique) ===
+    this.amLFO = new Tone.LFO({ frequency: 8, min: 0.88, max: 1.0, type: 'sine' });
+    this.amLFO.connect(this.sidechainGain.gain);
+    this.amLFO.start();
 
     Tone.Transport.start();
     MUZE.State.audioReady = true;
   },
 
   updateParams(state) {
-    // Mouth → filter cutoff
-    const fMin = MUZE.Config.FILTER_FREQ_MIN;
-    const fMax = MUZE.Config.FILTER_FREQ_MAX;
-    this.filter.frequency.rampTo(fMin * Math.pow(fMax / fMin, state.mouthOpenness), 0.05);
-
+    const C = MUZE.Config;
+    // Mouth → lo-fi filter
+    this.lofiFilter.frequency.rampTo(C.FILTER_FREQ_MIN * Math.pow(C.FILTER_FREQ_MAX / C.FILTER_FREQ_MIN, state.mouthOpenness), 0.05);
     // Eyes → reverb
-    const wMin = MUZE.Config.REVERB_WET_MIN;
-    const wMax = MUZE.Config.REVERB_WET_MAX;
-    this.reverb.wet.rampTo(wMin + state.eyeOpenness * (wMax - wMin), 0.1);
-
-    // Head yaw → delay send
-    const yawNorm = Math.min(1, Math.abs(state.headYaw) / 0.4);
-    const dMin = MUZE.Config.DELAY_WET_MIN;
-    const dMax = MUZE.Config.DELAY_WET_MAX;
-    this.delay.wet.rampTo(dMin + yawNorm * (dMax - dMin), 0.15);
-
-    // Mouth width (grin) → chorus depth
-    const cMin = MUZE.Config.CHORUS_DEPTH_MIN;
-    const cMax = MUZE.Config.CHORUS_DEPTH_MAX;
-    this.chorus.depth = cMin + state.mouthWidth * (cMax - cMin);
-
-    // Head roll → melody panning
-    if (this.melodySynth._panNode) {
-      // Tone.Synth doesn't have built-in pan, skip for now
-    }
+    this.reverb.wet.rampTo(C.REVERB_WET_MIN + state.eyeOpenness * (C.REVERB_WET_MAX - C.REVERB_WET_MIN), 0.1);
+    // Head yaw → delay
+    const yawN = Math.min(1, Math.abs(state.headYaw) / 0.4);
+    this.delay.wet.rampTo(C.DELAY_WET_MIN + yawN * (C.DELAY_WET_MAX - C.DELAY_WET_MIN), 0.15);
+    // Mouth width → chorus + tape intensity
+    this.chorus.depth = C.CHORUS_DEPTH_MIN + state.mouthWidth * (C.CHORUS_DEPTH_MAX - C.CHORUS_DEPTH_MIN);
+    this._setTapeIntensity(state.mouthWidth);
+    // Head roll → melody pan
+    const panVal = Math.max(-1, Math.min(1, state.headRoll * 3));
+    this.melodyPanner.pan.rampTo(panVal, 0.1);
+    // Head pitch → groove density
+    state.grooveDensity = 0.3 + (1 - Math.max(0, Math.min(1, (state.headPitch + 0.3) / 0.6))) * 0.7;
   },
 
-  // Articulation: switch envelope for legato (open palm) vs staccato (fist)
+  _setTapeIntensity(v) {
+    const C = MUZE.Config;
+    const wD = v * C.TAPE_WOW_DEPTH;
+    this.wowLFO.min = -wD; this.wowLFO.max = wD;
+    this._padWow.min = -wD; this._padWow.max = wD;
+    const fD = v * C.TAPE_FLUTTER_DEPTH;
+    this.flutterLFO.min = -fD; this.flutterLFO.max = fD;
+    this._padFlutter.min = -fD; this._padFlutter.max = fD;
+  },
+
+  // Apply tape detune to pad (called from loop)
+  updatePadDetune() {
+    try {
+      const w = this._padWow.getValue();
+      const f = this._padFlutter.getValue();
+      const total = (typeof w === 'number' ? w : 0) + (typeof f === 'number' ? f : 0);
+      this.padSynth.set({ detune: total });
+    } catch(e) {}
+  },
+
   setArticulation(legato) {
     if (legato) {
-      this.melodySynth.envelope.attack = 0.02;
-      this.melodySynth.envelope.decay = 0.3;
-      this.melodySynth.envelope.sustain = 0.4;
-      this.melodySynth.envelope.release = 1.0;
+      this.melodySynth.envelope.attack = 0.05;
+      this.melodySynth.envelope.decay = 0.4;
+      this.melodySynth.envelope.sustain = 0.3;
+      this.melodySynth.envelope.release = 1.5;
     } else {
       this.melodySynth.envelope.attack = 0.005;
-      this.melodySynth.envelope.decay = 0.1;
+      this.melodySynth.envelope.decay = 0.12;
       this.melodySynth.envelope.sustain = 0.0;
-      this.melodySynth.envelope.release = 0.1;
+      this.melodySynth.envelope.release = 0.12;
     }
   },
 
-  triggerDrum(type) {
-    const now = Tone.now();
+  triggerDrum(type, time, vel) {
+    const t = time || Tone.now();
+    const v = vel || 0.8;
     switch (type) {
-      case 'kick':  this.kickSynth.triggerAttackRelease('C1', '8n', now); break;
-      case 'snare': this.snareSynth.triggerAttackRelease('8n', now); break;
-      case 'hat':   this.hatSynth.triggerAttackRelease('32n', now); break;
+      case 'kick':
+        this.kickSynth.triggerAttackRelease('C1', '8n', t, v);
+        // Sidechain duck
+        this.sidechainGain.gain.cancelScheduledValues(t);
+        this.sidechainGain.gain.setValueAtTime(1 - MUZE.Config.SIDECHAIN_DEPTH, t);
+        this.sidechainGain.gain.linearRampToValueAtTime(1, t + MUZE.Config.SIDECHAIN_RELEASE);
+        break;
+      case 'snare': this.snareNoise.triggerAttackRelease('8n', t, v); break;
+      case 'hat':   this.hatSynth.triggerAttackRelease('32n', t, v); break;
     }
   },
 
   startMelody(note) {
-    this.melodySynth.triggerAttack(MUZE.Music.midiToNote(note), Tone.now(), 0.7);
+    this.melodySynth.triggerAttack(MUZE.Music.midiToNote(note), Tone.now(), 0.65);
     this._melodyPlaying = true;
   },
-
   updateMelody(note) {
     if (!this._melodyPlaying) { this.startMelody(note); return; }
     this.melodySynth.setNote(MUZE.Music.midiToNote(note));
   },
-
   stopMelody() {
-    if (this._melodyPlaying) {
-      this.melodySynth.triggerRelease(Tone.now());
-      this._melodyPlaying = false;
-    }
+    if (this._melodyPlaying) { this.melodySynth.triggerRelease(Tone.now()); this._melodyPlaying = false; }
   },
 
-  triggerPad(notes) {
+  triggerPad(freqs) {
     this.padSynth.releaseAll();
-    this.padSynth.triggerAttack(notes, Tone.now(), 0.4);
+    this.padSynth.triggerAttack(freqs, Tone.now(), 0.35);
   },
+  releasePad() { this.padSynth.releaseAll(); },
 
-  releasePad() {
-    this.padSynth.releaseAll();
-  },
-
-  // Riser (press and hold)
-  startRiser() {
-    this._riserGain.gain.cancelScheduledValues(Tone.now());
-    this._riserGain.gain.rampTo(0.3, 2);
-    this._riserFilter.frequency.cancelScheduledValues(Tone.now());
-    this._riserFilter.frequency.rampTo(4000, 2);
-  },
-
-  stopRiser() {
-    // The "drop" — quick release + kick hit
-    this._riserGain.gain.cancelScheduledValues(Tone.now());
-    this._riserGain.gain.rampTo(0, 0.05);
-    this._riserFilter.frequency.cancelScheduledValues(Tone.now());
-    this._riserFilter.frequency.rampTo(200, 0.1);
-    // Impact
-    this.kickSynth.triggerAttackRelease('C1', '4n', Tone.now(), 1);
-  },
-
-  cancelRiser() {
-    this._riserGain.gain.cancelScheduledValues(Tone.now());
-    this._riserGain.gain.rampTo(0, 0.2);
-    this._riserFilter.frequency.cancelScheduledValues(Tone.now());
-    this._riserFilter.frequency.rampTo(200, 0.2);
-  },
-
-  // Reverb throw (swipe up)
+  // Reverb throw
   reverbThrow() {
-    const prevDecay = this.reverb.wet.value;
-    this.reverb.wet.rampTo(0.95, 0.05);
-    setTimeout(() => { this.reverb.wet.rampTo(prevDecay, 1.5); }, 200);
+    const prev = this.reverb.wet.value;
+    this.reverb.wet.rampTo(0.92, 0.05);
+    setTimeout(() => this.reverb.wet.rampTo(prev, 1.5), 200);
   },
 
-  // Tape stop (swipe down)
+  // Tape stop
   tapeStop() {
-    const origBpm = Tone.Transport.bpm.value;
-    Tone.Transport.bpm.rampTo(20, 0.4);
-    setTimeout(() => {
-      Tone.Transport.bpm.rampTo(origBpm, 0.15);
-    }, 500);
+    const orig = Tone.Transport.bpm.value;
+    Tone.Transport.bpm.rampTo(25, 0.4);
+    setTimeout(() => Tone.Transport.bpm.rampTo(orig, 0.15), 500);
   },
 
-  setBPM(bpm) {
-    Tone.Transport.bpm.rampTo(bpm, 0.3);
+  // Binaural beat frequency
+  setBinauralBeat(hz) {
+    this.binauralOscR.frequency.rampTo(MUZE.Config.BINAURAL_CARRIER + hz, 2);
+  },
+
+  // AM depth
+  setAMDepth(d) {
+    this.amLFO.min = 1 - (d * 0.25);
+  },
+  setAMFrequency(hz) {
+    this.amLFO.frequency.rampTo(hz, 2);
+  },
+
+  // Hold effect: increase vinyl + reverb
+  startHold() {
+    this.vinylGain.gain.rampTo(Tone.dbToGain(-16), 2);
+    this.reverb.wet.rampTo(0.75, 2);
+  },
+  stopHold() {
+    this.vinylGain.gain.rampTo(Tone.dbToGain(MUZE.Config.VINYL_NOISE_DB), 0.5);
+    this.reverb.wet.rampTo(0.25, 0.5);
   }
 };
 </script>
 
-<!-- AutoRhythm (sequencer) -->
+<!-- LoFi Sequencer -->
 <script>
-MUZE.AutoRhythm = {
-  _seq: null,
-  _step: 0,
-  _active: false,
-  _patternIdx: 0,
+MUZE.Sequencer = {
+  _id: null, _step: 0, _active: false, _patIdx: 0,
 
   start() {
-    if (this._seq) this._seq.dispose();
-    this._step = 0;
-    this._active = true;
-
-    this._seq = new Tone.Sequence((time, step) => {
-      const pat = MUZE.Config.RHYTHM_PATTERNS[this._patternIdx];
-      if (pat.kick[step])  MUZE.Audio.kickSynth.triggerAttackRelease('C1', '8n', time);
-      if (pat.snare[step]) MUZE.Audio.snareSynth.triggerAttackRelease('8n', time);
-      if (pat.hat[step])   MUZE.Audio.hatSynth.triggerAttackRelease('32n', time);
-    }, [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15], '16n');
-
-    this._seq.start(0);
+    if (this._id !== null) Tone.Transport.clear(this._id);
+    this._active = true; this._step = 0;
+    this._id = Tone.Transport.scheduleRepeat((time) => {
+      this._onStep(time, this._step);
+      this._step = (this._step + 1) % 16;
+    }, '16n');
   },
 
-  stop() {
-    this._active = false;
-    if (this._seq) { this._seq.stop(); this._seq.dispose(); this._seq = null; }
+  _onStep(time, step) {
+    const pat = MUZE.Config.RHYTHM_PATTERNS[this._patIdx];
+    const C = MUZE.Config;
+    const density = MUZE.State.grooveDensity;
+
+    // Swing: delay odd 16th notes
+    let offset = 0;
+    if (step % 2 === 1) offset += (C.SWING_AMOUNT - 0.5) * Tone.Time('16n').toSeconds();
+    // Humanize
+    offset += (Math.random() - 0.5) * 2 * (C.TIMING_HUMANIZE_MS / 1000);
+    const t = time + Math.max(0, offset);
+
+    const velRange = C.VELOCITY_MAX - C.VELOCITY_MIN;
+
+    if (pat.kick[step]) {
+      MUZE.Audio.triggerDrum('kick', t, C.VELOCITY_MIN + Math.random() * velRange * 0.3);
+    }
+    if (pat.snare[step]) {
+      MUZE.Audio.triggerDrum('snare', t, C.VELOCITY_MIN + Math.random() * velRange);
+    }
+    if (pat.ghost && pat.ghost[step]) {
+      MUZE.Audio.triggerDrum('snare', t, 0.25 + Math.random() * 0.15);
+    }
+    if (pat.hat[step]) {
+      if (Math.random() < density) {
+        MUZE.Audio.triggerDrum('hat', t, C.VELOCITY_MIN + Math.random() * velRange);
+      }
+    }
   },
 
-  toggle() {
-    if (this._active) this.stop(); else this.start();
-    return this._active;
-  },
-
-  nextPattern() {
-    this._patternIdx = (this._patternIdx + 1) % MUZE.Config.RHYTHM_PATTERNS.length;
-    return this._patternIdx;
-  },
-
-  prevPattern() {
-    this._patternIdx = (this._patternIdx - 1 + MUZE.Config.RHYTHM_PATTERNS.length) % MUZE.Config.RHYTHM_PATTERNS.length;
-    return this._patternIdx;
-  },
-
+  stop() { this._active = false; if (this._id !== null) { Tone.Transport.clear(this._id); this._id = null; } },
+  toggle() { if (this._active) this.stop(); else this.start(); return this._active; },
+  nextPattern() { this._patIdx = (this._patIdx + 1) % MUZE.Config.RHYTHM_PATTERNS.length; },
+  prevPattern() { this._patIdx = (this._patIdx - 1 + MUZE.Config.RHYTHM_PATTERNS.length) % MUZE.Config.RHYTHM_PATTERNS.length; },
   isActive() { return this._active; }
 };
 </script>
 
-<!-- TapTempo -->
+<!-- Meditation -->
 <script>
-MUZE.TapTempo = {
-  _taps: [],
-  _maxTaps: 6,
+MUZE.Meditation = {
+  _score: 0,
+  _window: [],
+  _winSize: 90,
 
-  tap() {
-    const now = performance.now();
-    // Discard taps older than 3 seconds
-    this._taps = this._taps.filter(t => now - t < 3000);
-    this._taps.push(now);
+  update(state, dt) {
+    const C = MUZE.Config;
+    this._window.push({ m: state.mouthOpenness, b: state.browHeight, e: state.eyeOpenness, w: state.mouthWidth, y: state.headYaw, p: state.headPitch });
+    if (this._window.length > this._winSize) this._window.shift();
 
-    if (this._taps.length < 3) return null;
+    const eyeClosed = state.eyeOpenness < C.MED_EYE_CLOSED ? 1 : 0;
+    const stillness = 1 - this._variance();
+    const jawRelaxed = 1 - state.mouthOpenness;
+    const browRelaxed = 1 - state.browHeight;
 
-    // Calculate average interval
-    let totalInterval = 0;
-    for (let i = 1; i < this._taps.length; i++) {
-      totalInterval += this._taps[i] - this._taps[i - 1];
-    }
-    const avgInterval = totalInterval / (this._taps.length - 1);
-    const bpm = Math.round(60000 / avgInterval);
-
-    // Clamp
-    return Math.max(MUZE.Config.BPM_MIN, Math.min(MUZE.Config.BPM_MAX, bpm));
+    const target = eyeClosed * 0.35 + stillness * 0.30 + jawRelaxed * 0.15 + browRelaxed * 0.20;
+    const rate = target > this._score ? C.MED_DEEPEN_RATE : C.MED_RECOVER_RATE;
+    this._score += (target - this._score) * rate * dt;
+    this._score = Math.max(0, Math.min(1, this._score));
+    return this._score;
   },
 
-  reset() { this._taps = []; }
+  _variance() {
+    if (this._window.length < 10) return 1;
+    const keys = ['m','b','e','w','y','p'];
+    let total = 0;
+    for (const k of keys) {
+      const vals = this._window.map(s => s[k]);
+      const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+      total += vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length;
+    }
+    return Math.min(1, total * 50);
+  },
+
+  getScore() { return this._score; }
 };
 </script>
 
-<!-- Touch (enhanced: swipes, hold, double-tap, tap-tempo) -->
+<!-- Film Grain -->
+<script>
+MUZE.Grain = {
+  _ctx: null, _w: 0, _h: 0, _interval: null,
+
+  init() {
+    const canvas = document.getElementById('grain');
+    this._w = canvas.width = Math.floor(window.innerWidth / 3);
+    this._h = canvas.height = Math.floor(window.innerHeight / 3);
+    this._ctx = canvas.getContext('2d');
+    this._interval = setInterval(() => this._render(), 66); // ~15fps
+  },
+
+  _render() {
+    const img = this._ctx.createImageData(this._w, this._h);
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = Math.random() * 255;
+      d[i] = d[i+1] = d[i+2] = v;
+      d[i+3] = 255;
+    }
+    this._ctx.putImageData(img, 0, 0);
+  }
+};
+</script>
+
+<!-- Touch -->
 <script>
 MUZE.Touch = {
-  _cooldown: {},
-  _touchStart: null,
-  _lastTapTime: 0,
-  _holdTimer: null,
-  _isHolding: false,
-  _riserOverlay: null,
+  _cooldown: {}, _touchStart: null, _lastTapTime: 0,
+  _holdTimer: null, _isHolding: false,
 
   init() {
     const zone = document.getElementById('touch-zone');
-    this._riserOverlay = document.getElementById('riser-overlay');
-
     zone.addEventListener('touchstart', this._onStart.bind(this), { passive: false });
-    zone.addEventListener('touchmove', this._onMove.bind(this), { passive: false });
+    zone.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
     zone.addEventListener('touchend', this._onEnd.bind(this), { passive: false });
     zone.addEventListener('touchcancel', this._onEnd.bind(this), { passive: false });
   },
 
   _onStart(e) {
     e.preventDefault();
-    const touch = e.changedTouches[0];
-    this._touchStart = {
-      x: touch.clientX,
-      y: touch.clientY,
-      time: performance.now(),
-      id: touch.identifier
-    };
-
-    // Start hold timer for riser
+    const t = e.changedTouches[0];
+    this._touchStart = { x: t.clientX, y: t.clientY, time: performance.now() };
     this._isHolding = false;
     this._holdTimer = setTimeout(() => {
       this._isHolding = true;
-      MUZE.Audio.startRiser();
-      MUZE.State.riserActive = true;
-      this._riserOverlay.classList.add('active');
+      MUZE.Audio.startHold();
     }, MUZE.Config.HOLD_TIME);
-  },
-
-  _onMove(e) {
-    e.preventDefault();
   },
 
   _onEnd(e) {
     e.preventDefault();
     if (!this._touchStart) return;
-
-    const touch = e.changedTouches[0];
-    const dx = touch.clientX - this._touchStart.x;
-    const dy = touch.clientY - this._touchStart.y;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - this._touchStart.x;
+    const dy = t.clientY - this._touchStart.y;
     const dt = performance.now() - this._touchStart.time;
-
-    // Cancel hold timer
     clearTimeout(this._holdTimer);
 
-    // If was holding → release = drop
     if (this._isHolding) {
-      MUZE.Audio.stopRiser();
-      MUZE.State.riserActive = false;
-      this._riserOverlay.classList.remove('active');
+      MUZE.Audio.stopHold();
       this._isHolding = false;
       this._touchStart = null;
       return;
     }
 
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-    const threshold = MUZE.Config.SWIPE_THRESHOLD;
+    const C = MUZE.Config;
+    const ax = Math.abs(dx), ay = Math.abs(dy);
 
-    // Swipe detection
-    if (dt < MUZE.Config.SWIPE_MAX_TIME && (absDx > threshold || absDy > threshold)) {
-      if (absDy > absDx) {
-        if (dy < -threshold) {
-          // Swipe UP → reverb throw
-          MUZE.Audio.reverbThrow();
-        } else if (dy > threshold) {
-          // Swipe DOWN → tape stop
-          MUZE.Audio.tapeStop();
-        }
+    // Swipe
+    if (dt < C.SWIPE_MAX_TIME && (ax > C.SWIPE_THRESHOLD || ay > C.SWIPE_THRESHOLD)) {
+      if (ay > ax) {
+        if (dy < -C.SWIPE_THRESHOLD) MUZE.Audio.reverbThrow();
+        else if (dy > C.SWIPE_THRESHOLD) MUZE.Audio.tapeStop();
       } else {
-        if (dx > threshold) {
-          // Swipe RIGHT → next pattern
-          MUZE.AutoRhythm.nextPattern();
-        } else if (dx < -threshold) {
-          // Swipe LEFT → prev pattern
-          MUZE.AutoRhythm.prevPattern();
-        }
+        if (dx > C.SWIPE_THRESHOLD) MUZE.Sequencer.nextPattern();
+        else if (dx < -C.SWIPE_THRESHOLD) MUZE.Sequencer.prevPattern();
       }
-      this._touchStart = null;
-      return;
+      this._touchStart = null; return;
     }
 
-    // Tap — check double-tap first
+    // Double-tap
     const now = performance.now();
-    if (now - this._lastTapTime < MUZE.Config.DOUBLE_TAP_TIME) {
-      // Double tap → toggle auto-rhythm
-      const active = MUZE.AutoRhythm.toggle();
+    if (now - this._lastTapTime < C.DOUBLE_TAP_TIME) {
+      const active = MUZE.Sequencer.toggle();
       MUZE.State.autoRhythm = active;
-      const indicator = document.getElementById('rhythm-indicator');
-      indicator.classList.toggle('visible', active);
-      this._lastTapTime = 0;
-      this._touchStart = null;
-      return;
+      document.getElementById('rhythm-indicator').classList.toggle('visible', active);
+      this._lastTapTime = 0; this._touchStart = null; return;
     }
     this._lastTapTime = now;
 
-    // Single tap → drum hit + tap tempo
-    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    // Single tap → drum
+    const target = document.elementFromPoint(t.clientX, t.clientY);
     if (target) {
       const drum = target.dataset.drum || target.parentElement?.dataset?.drum;
       if (drum) {
-        const cooldownNow = performance.now();
-        if (!this._cooldown[drum] || cooldownNow - this._cooldown[drum] > 50) {
-          this._cooldown[drum] = cooldownNow;
+        const cn = performance.now();
+        if (!this._cooldown[drum] || cn - this._cooldown[drum] > 50) {
+          this._cooldown[drum] = cn;
           MUZE.Audio.triggerDrum(drum);
           const el = document.getElementById('zone-' + drum);
           if (el) { el.classList.add('hit'); setTimeout(() => el.classList.remove('hit'), 100); }
         }
       }
     }
-
-    // Tap tempo
-    const bpm = MUZE.TapTempo.tap();
-    if (bpm) {
-      MUZE.State.bpm = bpm;
-      MUZE.Audio.setBPM(bpm);
-    }
-
     this._touchStart = null;
   }
 };
@@ -1006,131 +945,115 @@ MUZE.Touch = {
 <!-- Main Loop -->
 <script>
 MUZE.Loop = {
-  _running: false,
-  _lastDetect: 0,
-  _currentPadKey: null,
+  _running: false, _lastDetect: 0, _lastTime: 0,
+  _currentPadKey: null, _prevMelodyNote: null,
+  _prevBrow: 0, _lastBrowSpike: 0, _prevArticulation: true,
   _debugEl: null,
-  _prevMelodyNote: null,
-  _prevBrow: 0,
-  _lastBrowSpike: 0,
-  _prevArticulation: true,
 
   init() {
-    const canvas = document.getElementById('overlay');
-    canvas.width = window.innerWidth * devicePixelRatio;
-    canvas.height = window.innerHeight * devicePixelRatio;
-    canvas.style.width = window.innerWidth + 'px';
-    canvas.style.height = window.innerHeight + 'px';
+    const c = document.getElementById('overlay');
+    c.width = window.innerWidth * devicePixelRatio;
+    c.height = window.innerHeight * devicePixelRatio;
+    c.style.width = window.innerWidth + 'px';
+    c.style.height = window.innerHeight + 'px';
     this._debugEl = document.getElementById('debug');
+    this._lastTime = performance.now();
   },
 
-  start() {
-    this._running = true;
-    this._tick();
-  },
+  start() { this._running = true; this._tick(); },
 
   _tick() {
     if (!this._running) return;
     requestAnimationFrame(() => this._tick());
 
     const now = performance.now();
+    const dt = now - this._lastTime;
+    this._lastTime = now;
     const video = MUZE.Camera.video;
     const S = MUZE.State;
     const C = MUZE.Config;
 
-    // Detection at ~30fps
+    // Detection ~30fps
     if (now - this._lastDetect >= C.DETECT_INTERVAL) {
       this._lastDetect = now;
       const ts = Math.round(now);
 
-      // Face
-      const faceResult = MUZE.FaceTracker.detect(video, ts);
-      if (faceResult && faceResult.faceLandmarks && faceResult.faceLandmarks.length > 0) {
-        const raw = MUZE.FaceFeatures.extract(faceResult.faceLandmarks[0]);
+      const fr = MUZE.FaceTracker.detect(video, ts);
+      if (fr && fr.faceLandmarks && fr.faceLandmarks.length > 0) {
+        const raw = MUZE.FaceFeatures.extract(fr.faceLandmarks[0]);
         if (raw) {
           S.mouthOpenness = MUZE.Smooth.update('mouth', raw.mouthOpenness, C.SMOOTH_FAST);
-          S.lipCorner     = MUZE.Smooth.update('lip', raw.lipCorner, C.SMOOTH_FAST);
-          S.browHeight    = MUZE.Smooth.update('brow', raw.browHeight, C.SMOOTH_FAST);
-          S.eyeOpenness   = MUZE.Smooth.update('eye', raw.eyeOpenness, C.SMOOTH_SLOW);
-          S.mouthWidth    = MUZE.Smooth.update('mouthW', raw.mouthWidth, C.SMOOTH_SLOW);
-          S.headPitch     = MUZE.Smooth.update('pitch', raw.headPitch, C.SMOOTH_SLOW);
-          S.headYaw       = MUZE.Smooth.update('yaw', raw.headYaw, C.SMOOTH_SLOW);
-          S.headRoll      = MUZE.Smooth.update('roll', raw.headRoll, C.SMOOTH_SLOW);
+          S.lipCorner = MUZE.Smooth.update('lip', raw.lipCorner, C.SMOOTH_FAST);
+          S.browHeight = MUZE.Smooth.update('brow', raw.browHeight, C.SMOOTH_FAST);
+          S.eyeOpenness = MUZE.Smooth.update('eye', raw.eyeOpenness, C.SMOOTH_SLOW);
+          S.mouthWidth = MUZE.Smooth.update('mouthW', raw.mouthWidth, C.SMOOTH_SLOW);
+          S.headPitch = MUZE.Smooth.update('pitch', raw.headPitch, C.SMOOTH_SLOW);
+          S.headYaw = MUZE.Smooth.update('yaw', raw.headYaw, C.SMOOTH_SLOW);
+          S.headRoll = MUZE.Smooth.update('roll', raw.headRoll, C.SMOOTH_SLOW);
           S.faceDetected = true;
         }
-      } else {
-        S.faceDetected = false;
-      }
+      } else { S.faceDetected = false; }
 
-      // Hand
-      const handResult = MUZE.HandTracker.detect(video, ts + 1);
-      if (handResult && handResult.landmarks && handResult.landmarks.length > 0) {
-        const raw = MUZE.HandFeatures.extract(handResult.landmarks);
+      const hr = MUZE.HandTracker.detect(video, ts + 1);
+      if (hr && hr.landmarks && hr.landmarks.length > 0) {
+        const raw = MUZE.HandFeatures.extract(hr.landmarks);
         S.handPresent = raw.handPresent;
         S.handX = MUZE.Smooth.update('handX', raw.handX, C.SMOOTH_HAND);
         S.handY = MUZE.Smooth.update('handY', raw.handY, C.SMOOTH_HAND);
         S.handOpen = raw.handOpen;
-      } else {
-        S.handPresent = false;
-      }
+      } else { S.handPresent = false; }
     }
 
-    // Audio update (every frame)
     if (S.faceDetected && S.audioReady) {
       MUZE.Audio.updateParams(S);
+      MUZE.Audio.updatePadDetune();
 
-      // Scale + chord progression
+      // Meditation
+      const med = MUZE.Meditation.update(S, dt);
+      S.meditationScore = med;
+      // Binaural: 10Hz (alpha) → 6Hz (theta)
+      const binFreq = C.BINAURAL_FREQ_MAX - med * (C.BINAURAL_FREQ_MAX - C.BINAURAL_FREQ_MIN);
+      MUZE.Audio.setBinauralBeat(binFreq);
+      MUZE.Audio.setAMDepth(med * 0.8);
+      MUZE.Audio.setAMFrequency(binFreq);
+
+      // Scale + chord
       const scale = MUZE.Music.selectScale(S.lipCorner);
       S.currentScale = scale;
-      const octaveShift = Math.floor(S.browHeight * C.OCTAVE_RANGE) * 12;
-      const root = C.ROOT_NOTE + octaveShift;
 
-      // Brow spike detection → advance chord
+      // Brow spike → advance chord
       const browDelta = S.browHeight - this._prevBrow;
       if (browDelta > C.BROW_SPIKE_THRESHOLD && now - this._lastBrowSpike > C.BROW_SPIKE_COOLDOWN) {
-        S.chordIndex = (S.chordIndex + 1) % C.CHORD_DEGREES.length;
+        const progLen = MUZE.Music.getCurrentChordLength(S.progressionIndex);
+        S.chordIndex = (S.chordIndex + 1) % progLen;
         this._lastBrowSpike = now;
       }
       this._prevBrow = S.browHeight;
 
-      // Pad voicing from chord degree
-      const degree = C.CHORD_DEGREES[S.chordIndex];
-      const padNotes = MUZE.Music.getPadVoicing(C.ROOT_NOTE, scale, degree);
-      const padKey = padNotes.join(',');
+      // Pad chord (with micro-detuning)
+      const chordFreqs = MUZE.Music.getCurrentChord(S.progressionIndex, S.chordIndex);
+      const padKey = S.progressionIndex + '.' + S.chordIndex;
       if (padKey !== this._currentPadKey) {
         this._currentPadKey = padKey;
-        MUZE.Audio.triggerPad(padNotes);
+        MUZE.Audio.triggerPad(chordFreqs);
       }
 
-      // Hand → melody
+      // Hand melody
       if (S.handPresent) {
-        // Articulation (legato/staccato based on palm open/fist)
         if (S.handOpen !== this._prevArticulation) {
           MUZE.Audio.setArticulation(S.handOpen);
           this._prevArticulation = S.handOpen;
         }
-
-        const melodyNote = MUZE.Music.quantizeToScale(1 - S.handY, scale, root, C.OCTAVE_RANGE);
-        S.melodyNote = melodyNote;
-
+        const octShift = Math.floor(S.browHeight * C.OCTAVE_RANGE) * 12;
+        const note = MUZE.Music.quantize(1 - S.handY, scale, C.ROOT_NOTE + octShift, C.OCTAVE_RANGE);
+        S.melodyNote = note;
         if (S.handOpen) {
-          // Legato: glide between notes
-          if (melodyNote !== this._prevMelodyNote) {
-            MUZE.Audio.updateMelody(melodyNote);
-            this._prevMelodyNote = melodyNote;
-          }
+          if (note !== this._prevMelodyNote) { MUZE.Audio.updateMelody(note); this._prevMelodyNote = note; }
         } else {
-          // Staccato: retrigger each note
-          if (melodyNote !== this._prevMelodyNote) {
-            MUZE.Audio.stopMelody();
-            MUZE.Audio.startMelody(melodyNote);
-            this._prevMelodyNote = melodyNote;
-          }
+          if (note !== this._prevMelodyNote) { MUZE.Audio.stopMelody(); MUZE.Audio.startMelody(note); this._prevMelodyNote = note; }
         }
       } else if (this._prevMelodyNote !== null) {
-        MUZE.Audio.stopMelody();
-        this._prevMelodyNote = null;
-        S.melodyNote = null;
+        MUZE.Audio.stopMelody(); this._prevMelodyNote = null; S.melodyNote = null;
       }
     } else {
       if (this._currentPadKey) { MUZE.Audio.releasePad(); this._currentPadKey = null; }
@@ -1141,44 +1064,33 @@ MUZE.Loop = {
   },
 
   _drawDebug(S) {
-    const noteStr = S.melodyNote ? MUZE.Music.midiToNote(S.melodyNote) : '-';
-    const scaleName = MUZE.Music.getScaleName(S.currentScale);
-    const chord = MUZE.Config.CHORD_DEGREES[S.chordIndex];
-
+    const n = S.melodyNote ? MUZE.Music.midiToNote(S.melodyNote) : '-';
+    const sc = MUZE.Music.getScaleName(S.currentScale);
     this._debugEl.innerHTML =
-      '<div style="font:11px/1.5 monospace;color:rgba(255,255,255,0.65);' +
-      'background:rgba(0,0,0,0.35);padding:6px 10px;border-radius:6px;' +
+      '<div style="font:10px/1.5 monospace;color:rgba(228,203,168,0.55);' +
+      'background:rgba(26,21,32,0.5);padding:5px 8px;border-radius:6px;' +
       'backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">' +
-      `face: ${S.faceDetected ? 'YES' : 'no'}<br>` +
-      `mouth: ${S.mouthOpenness.toFixed(2)}<br>` +
-      `smile: ${S.lipCorner.toFixed(2)}<br>` +
-      `brow: ${S.browHeight.toFixed(2)}<br>` +
-      `eyes: ${S.eyeOpenness.toFixed(2)}<br>` +
-      `grin: ${S.mouthWidth.toFixed(2)}<br>` +
-      `scale: ${scaleName} | chord: ${chord}<br>` +
-      `hand: ${S.handPresent ? (S.handOpen ? 'LEGATO' : 'STACCATO') : 'no'}<br>` +
-      `note: ${noteStr}<br>` +
-      `bpm: ${S.bpm} | auto: ${S.autoRhythm ? 'ON' : 'off'}<br>` +
-      `yaw: ${S.headYaw.toFixed(2)} | roll: ${S.headRoll.toFixed(2)}` +
+      `${S.faceDetected?'face':'...'} | ${sc} | chord ${S.chordIndex}<br>` +
+      `mouth:${S.mouthOpenness.toFixed(2)} smile:${S.lipCorner.toFixed(2)} brow:${S.browHeight.toFixed(2)}<br>` +
+      `eyes:${S.eyeOpenness.toFixed(2)} grin:${S.mouthWidth.toFixed(2)}<br>` +
+      `hand:${S.handPresent?(S.handOpen?'legato':'staccato'):'—'} note:${n}<br>` +
+      `med:${S.meditationScore.toFixed(2)} auto:${S.autoRhythm?'ON':'—'}` +
       '</div>';
   }
 };
 </script>
 
-<!-- App Bootstrap -->
+<!-- Bootstrap -->
 <script type="module">
-import {
-  FaceLandmarker, HandLandmarker, FilesetResolver
-} from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs';
+import { FaceLandmarker, HandLandmarker, FilesetResolver }
+  from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs';
 
 document.getElementById('start-btn').addEventListener('click', async () => {
-  const startScreen = document.getElementById('start-screen');
-  startScreen.classList.add('loading');
-
+  const ss = document.getElementById('start-screen');
+  ss.classList.add('loading');
   try {
     await MUZE.Audio.init();
     await MUZE.Camera.init();
-
     const vision = await FilesetResolver.forVisionTasks(
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm'
     );
@@ -1186,15 +1098,15 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       MUZE.FaceTracker.init(FaceLandmarker, vision),
       MUZE.HandTracker.init(HandLandmarker, vision),
     ]);
-
     MUZE.Touch.init();
+    MUZE.Grain.init();
     MUZE.Loop.init();
-    startScreen.remove();
+    ss.remove();
     MUZE.Loop.start();
   } catch (err) {
     console.error('MUZE init failed:', err);
-    document.getElementById('loading-text').textContent = 'Error: ' + err.message;
-    startScreen.classList.remove('loading');
+    document.getElementById('loading-text').textContent = err.message;
+    ss.classList.remove('loading');
   }
 });
 </script>
