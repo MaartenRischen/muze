@@ -273,21 +273,32 @@
 </div>
 <button id="synth-menu-btn">&#9881;</button>
 <div id="synth-panel">
-  <h3>Lead Synth</h3>
-  <div class="synth-row"><label>wave</label><select class="synth-select" id="lead-osc"><option>sawtooth</option><option>triangle</option><option>square</option><option>sine</option></select></div>
-  <div class="synth-row"><label>attack</label><input type="range" id="lead-atk" min="0.001" max="2" step="0.01" value="0.01"><span class="val">0.01</span></div>
-  <div class="synth-row"><label>decay</label><input type="range" id="lead-dec" min="0.01" max="2" step="0.01" value="0.3"><span class="val">0.30</span></div>
-  <div class="synth-row"><label>sustain</label><input type="range" id="lead-sus" min="0" max="1" step="0.01" value="0.6"><span class="val">0.60</span></div>
-  <div class="synth-row"><label>release</label><input type="range" id="lead-rel" min="0.01" max="4" step="0.01" value="0.8"><span class="val">0.80</span></div>
-  <div class="synth-row"><label>volume</label><input type="range" id="lead-vol" min="-30" max="0" step="1" value="-8"><span class="val">-8</span></div>
+  <h3>Arpeggio</h3>
+  <div class="synth-row"><label>wave</label><select class="synth-select" id="arp-osc"><option>sawtooth</option><option>triangle</option><option>square</option><option>sine</option></select></div>
+  <div class="synth-row"><label>attack</label><input type="range" id="arp-atk" min="0.001" max="2" step="0.01" value="0.01"><span class="val">0.01</span></div>
+  <div class="synth-row"><label>decay</label><input type="range" id="arp-dec" min="0.01" max="2" step="0.01" value="0.3"><span class="val">0.30</span></div>
+  <div class="synth-row"><label>sustain</label><input type="range" id="arp-sus" min="0" max="1" step="0.01" value="0.6"><span class="val">0.60</span></div>
+  <div class="synth-row"><label>release</label><input type="range" id="arp-rel" min="0.01" max="4" step="0.01" value="0.8"><span class="val">0.80</span></div>
+  <div class="synth-row"><label>volume</label><input type="range" id="arp-vol" min="-30" max="0" step="1" value="-8"><span class="val">-8</span></div>
+  <div class="synth-row"><label>pan</label><input type="range" id="arp-pan" min="-1" max="1" step="0.05" value="0.3"><span class="val">0.30</span></div>
 
-  <h3>Pad Synth</h3>
+  <h3>Melody (Hand)</h3>
+  <div class="synth-row"><label>wave</label><select class="synth-select" id="mel-osc"><option>triangle</option><option>sawtooth</option><option>square</option><option>sine</option></select></div>
+  <div class="synth-row"><label>attack</label><input type="range" id="mel-atk" min="0.001" max="2" step="0.01" value="0.05"><span class="val">0.05</span></div>
+  <div class="synth-row"><label>decay</label><input type="range" id="mel-dec" min="0.01" max="2" step="0.01" value="0.2"><span class="val">0.20</span></div>
+  <div class="synth-row"><label>sustain</label><input type="range" id="mel-sus" min="0" max="1" step="0.01" value="0.7"><span class="val">0.70</span></div>
+  <div class="synth-row"><label>release</label><input type="range" id="mel-rel" min="0.01" max="4" step="0.01" value="0.4"><span class="val">0.40</span></div>
+  <div class="synth-row"><label>volume</label><input type="range" id="mel-vol" min="-30" max="0" step="1" value="-6"><span class="val">-6</span></div>
+  <div class="synth-row"><label>pan</label><input type="range" id="mel-pan" min="-1" max="1" step="0.05" value="-0.3"><span class="val">-0.30</span></div>
+
+  <h3>Pad</h3>
   <div class="synth-row"><label>wave</label><select class="synth-select" id="pad-osc"><option>sine</option><option>triangle</option><option>sawtooth</option><option>square</option></select></div>
   <div class="synth-row"><label>harm</label><input type="range" id="pad-harm" min="0.5" max="8" step="0.1" value="2"><span class="val">2.0</span></div>
   <div class="synth-row"><label>mod idx</label><input type="range" id="pad-mod" min="0" max="10" step="0.1" value="1.2"><span class="val">1.2</span></div>
   <div class="synth-row"><label>attack</label><input type="range" id="pad-atk" min="0.01" max="4" step="0.01" value="1.0"><span class="val">1.00</span></div>
   <div class="synth-row"><label>release</label><input type="range" id="pad-rel" min="0.1" max="8" step="0.1" value="2.5"><span class="val">2.5</span></div>
   <div class="synth-row"><label>volume</label><input type="range" id="pad-vol" min="-30" max="0" step="1" value="-14"><span class="val">-14</span></div>
+  <div class="synth-row"><label>pan</label><input type="range" id="pad-pan" min="-1" max="1" step="0.05" value="0"><span class="val">0.00</span></div>
 </div>
 
 <div id="start-screen">
@@ -528,9 +539,11 @@ MUZE.SampleLib = {
 <script>
 MUZE.Audio = {
   // Pad: synthesized FM chords
-  padSynth: null,
-  // Lead: generated synth
-  leadSynth: null,
+  padSynth: null, _padPan: null,
+  // Arpeggio synth
+  leadSynth: null, _arpPan: null,
+  // Melody synth (hand-controlled)
+  melodySynth: null, _melPan: null,
   // Drums
   kickSynth: null, snareSynth: null, hatSynth: null,
   // Riser
@@ -565,16 +578,28 @@ MUZE.Audio = {
       }
     });
     this.padSynth.volume.value = -14;
-    this.padSynth.connect(this.filter);
+    this._padPan = new Tone.Panner(0).connect(this.filter);
+    this.padSynth.connect(this._padPan);
 
-    // Lead synth — poly for arpeggio + melody
+    // Arpeggio synth
     this.leadSynth = new Tone.PolySynth(Tone.Synth, {
       maxPolyphony: 8,
       oscillator: { type: 'sawtooth' },
       envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.8 },
     });
     this.leadSynth.volume.value = -8;
-    this.leadSynth.connect(this.filter);
+    this._arpPan = new Tone.Panner(0.3).connect(this.filter);
+    this.leadSynth.connect(this._arpPan);
+
+    // Melody synth (hand-controlled)
+    this.melodySynth = new Tone.MonoSynth({
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 0.4 },
+      filterEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.5, release: 0.3, baseFrequency: 300, octaves: 3 },
+    });
+    this.melodySynth.volume.value = -6;
+    this._melPan = new Tone.Panner(-0.3).connect(this.filter);
+    this.melodySynth.connect(this._melPan);
 
     // Drums — bypass tonal effects
     this.kickSynth = new Tone.MembraneSynth({
@@ -622,27 +647,27 @@ MUZE.Audio = {
   triggerPad(notes) { this.padSynth.releaseAll(); this.padSynth.triggerAttack(notes, Tone.now(), 0.4); },
   releasePad() { this.padSynth.releaseAll(); },
 
-  // Lead melody (generated synth)
+  // Hand melody (MonoSynth)
   startMelody(note) {
-    if (!this.leadSynth) return;
-    this.leadSynth.triggerAttack(MUZE.Music.midiToNote(note), Tone.now(), 0.7);
+    if (!this.melodySynth) return;
+    this.melodySynth.triggerAttack(MUZE.Music.midiToNote(note), Tone.now(), 0.7);
     this._melodyPlaying = true;
   },
   updateMelody(note) {
-    if (!this.leadSynth) return;
+    if (!this.melodySynth) return;
     if (!this._melodyPlaying) { this.startMelody(note); return; }
-    this.leadSynth.triggerAttack(MUZE.Music.midiToNote(note), Tone.now(), 0.7);
+    // MonoSynth: setNote for glide
+    this.melodySynth.setNote(MUZE.Music.midiToNote(note));
   },
   stopMelody() {
-    if (this._melodyPlaying && this.leadSynth) {
-      this.leadSynth.releaseAll(Tone.now());
+    if (this._melodyPlaying && this.melodySynth) {
+      this.melodySynth.triggerRelease(Tone.now());
       this._melodyPlaying = false;
     }
   },
   setArticulation(legato) {
-    if (!this.leadSynth) return;
-    // Adjust release on all voices
-    this.leadSynth.set({ envelope: { release: legato ? 0.8 : 0.05 } });
+    if (!this.melodySynth) return;
+    this.melodySynth.set({ envelope: { release: legato ? 0.4 : 0.05 } });
   },
 
   triggerDrum(type) {
@@ -771,13 +796,23 @@ MUZE.SynthMenu = {
       }
     });
 
-    // Lead synth controls
-    this._bind('lead-osc', (v) => MUZE.Audio.leadSynth.set({ oscillator: { type: v } }), true);
-    this._bind('lead-atk', (v) => MUZE.Audio.leadSynth.set({ envelope: { attack: +v } }));
-    this._bind('lead-dec', (v) => MUZE.Audio.leadSynth.set({ envelope: { decay: +v } }));
-    this._bind('lead-sus', (v) => MUZE.Audio.leadSynth.set({ envelope: { sustain: +v } }));
-    this._bind('lead-rel', (v) => MUZE.Audio.leadSynth.set({ envelope: { release: +v } }));
-    this._bind('lead-vol', (v) => { MUZE.Audio.leadSynth.volume.value = +v; });
+    // Arpeggio synth controls
+    this._bind('arp-osc', (v) => MUZE.Audio.leadSynth.set({ oscillator: { type: v } }), true);
+    this._bind('arp-atk', (v) => MUZE.Audio.leadSynth.set({ envelope: { attack: +v } }));
+    this._bind('arp-dec', (v) => MUZE.Audio.leadSynth.set({ envelope: { decay: +v } }));
+    this._bind('arp-sus', (v) => MUZE.Audio.leadSynth.set({ envelope: { sustain: +v } }));
+    this._bind('arp-rel', (v) => MUZE.Audio.leadSynth.set({ envelope: { release: +v } }));
+    this._bind('arp-vol', (v) => { MUZE.Audio.leadSynth.volume.value = +v; });
+    this._bind('arp-pan', (v) => { MUZE.Audio._arpPan.pan.value = +v; });
+
+    // Melody synth controls
+    this._bind('mel-osc', (v) => MUZE.Audio.melodySynth.set({ oscillator: { type: v } }), true);
+    this._bind('mel-atk', (v) => MUZE.Audio.melodySynth.set({ envelope: { attack: +v } }));
+    this._bind('mel-dec', (v) => MUZE.Audio.melodySynth.set({ envelope: { decay: +v } }));
+    this._bind('mel-sus', (v) => MUZE.Audio.melodySynth.set({ envelope: { sustain: +v } }));
+    this._bind('mel-rel', (v) => MUZE.Audio.melodySynth.set({ envelope: { release: +v } }));
+    this._bind('mel-vol', (v) => { MUZE.Audio.melodySynth.volume.value = +v; });
+    this._bind('mel-pan', (v) => { MUZE.Audio._melPan.pan.value = +v; });
 
     // Pad synth controls
     this._bind('pad-osc', (v) => MUZE.Audio.padSynth.set({ oscillator: { type: v } }), true);
@@ -786,6 +821,7 @@ MUZE.SynthMenu = {
     this._bind('pad-atk', (v) => MUZE.Audio.padSynth.set({ envelope: { attack: +v } }));
     this._bind('pad-rel', (v) => MUZE.Audio.padSynth.set({ envelope: { release: +v } }));
     this._bind('pad-vol', (v) => { MUZE.Audio.padSynth.volume.value = +v; });
+    this._bind('pad-pan', (v) => { MUZE.Audio._padPan.pan.value = +v; });
   },
 
   _bind(id, fn, isSelect) {
