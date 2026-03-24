@@ -1370,17 +1370,22 @@ MUZE.Tutorial = {
 MUZE.Touch = {
   _cooldown:{}, _touchStart:null, _lastTapTime:0, _holdTimer:null, _isHolding:false,
   init(){
-    // Chord zone — left side
-    document.getElementById('chord-zone').addEventListener('touchstart',(e)=>{
-      e.preventDefault();
-      const t=e.changedTouches[0];
-      const el=document.elementFromPoint(t.clientX,t.clientY);
+    // Chord zone
+    const selectChord = (el) => {
       if(el&&el.dataset.chord!==undefined){
         const idx=parseInt(el.dataset.chord);
         MUZE.State.chordIndex=idx;
         document.querySelectorAll('.chord-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
       }
+    };
+    document.getElementById('chord-zone').addEventListener('touchstart',(e)=>{
+      e.preventDefault();
+      const t=e.changedTouches[0];
+      selectChord(document.elementFromPoint(t.clientX,t.clientY));
     },{passive:false});
+    document.querySelectorAll('.chord-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>selectChord(btn));
+    });
 
     // Drum zone
     const z=document.getElementById('touch-zone');
