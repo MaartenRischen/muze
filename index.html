@@ -897,7 +897,10 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     MUZE.Touch.init();
     MUZE.SynthMenu.init();
     MUZE.Loop.init();
-    document.getElementById('mode-hud').addEventListener('click', () => MUZE.Audio.playArpeggio());
+    const hud=document.getElementById('mode-hud');
+    const fireArp = () => { MUZE.Audio.playArpeggio(); hud.style.background='rgba(255,255,255,0.3)'; setTimeout(()=>hud.style.background='',200); };
+    hud.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); fireArp(); });
+    hud.addEventListener('click', fireArp);
     ss.remove();
     MUZE.Loop.start();
   } catch (err) {
