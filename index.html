@@ -112,7 +112,6 @@
 <div id="debug"></div>
 
 <div id="sample-ui">
-  <button class="sample-btn" id="btn-pad-sample">pad: singing bowl</button>
   <button class="sample-btn" id="btn-lead-sample">lead: water drop</button>
   <button class="sample-btn" id="btn-record">record sample</button>
 </div>
@@ -164,21 +163,21 @@ MUZE.Config = Object.freeze({
 
   // Sample library
   SAMPLES: [
-    { id: 'singing-bowl', name: 'singing bowl', type: 'pad',
+    { id: 'singing-bowl', name: 'singing bowl',
       url: SAMPLE_BASE + '240934__the_very_real_horst__neptun-solo-07-tibetan-singing-bowl.wav' },
-    { id: 'water-drop', name: 'water drop', type: 'lead',
+    { id: 'water-drop', name: 'water drop',
       url: SAMPLE_BASE + '273868__beskhu__water-drop-3.aiff' },
-    { id: 'bottle-blow', name: 'bottle blow', type: 'pad',
+    { id: 'bottle-blow', name: 'bottle blow',
       url: SAMPLE_BASE + '352796__cabled_mess__bottle-blown-08.wav' },
-    { id: 'wind-chime', name: 'wind chime', type: 'lead',
+    { id: 'wind-chime', name: 'wind chime',
       url: SAMPLE_BASE + '398492__anthousai__wind-chimes-single-03.wav' },
-    { id: 'keys-jingle', name: 'keys jingle', type: 'lead',
+    { id: 'keys-jingle', name: 'keys jingle',
       url: SAMPLE_BASE + '565909__fenodyrie__keys-jingling.wav' },
-    { id: 'wood-knock', name: 'wood knock', type: 'lead',
+    { id: 'wood-knock', name: 'wood knock',
       url: SAMPLE_BASE + '573835__trp__door-knocks-wood-close-77mel-191026.wav' },
-    { id: 'humming', name: 'humming', type: 'pad',
+    { id: 'humming', name: 'humming',
       url: SAMPLE_BASE + '646179__mayatakeda__woman-humming-softly-mp3.mp3' },
-    { id: 'finger-snap', name: 'finger snap', type: 'lead',
+    { id: 'finger-snap', name: 'finger snap',
       url: SAMPLE_BASE + '824674__bassimat__finger-snaps-001.wav' },
   ],
 });
@@ -192,7 +191,6 @@ MUZE.State = {
   handPresent: false, handY: 0.5, handX: 0.5, handOpen: true,
   currentScale: null, melodyNote: null, chordIndex: 0,
   autoRhythm: false, riserActive: false,
-  padSampleIdx: 0, leadSampleIdx: 1,
   audioReady: false, _browRaw: 0,
 };
 </script>
@@ -339,32 +337,24 @@ MUZE.SampleLib = {
   addCustom(name, buffer) {
     const id = 'custom-' + Date.now();
     this._buffers[id] = buffer;
-    this._custom.push({ id, name, type: 'both' });
+    this._custom.push({ id, name });
     return id;
   },
 
   getAllSamples() {
     return [...MUZE.Config.SAMPLES, ...this._custom];
-  },
-
-  getPadSamples() {
-    return this.getAllSamples().filter(s => s.type === 'pad' || s.type === 'both');
-  },
-
-  getLeadSamples() {
-    return this.getAllSamples().filter(s => s.type === 'lead' || s.type === 'both');
   }
 };
 </script>
 
-<!-- Audio (sample-based pad + lead) -->
+<!-- Audio (synth pad + sample lead) -->
 <script>
 MUZE.Audio = {
-  // Pad: GrainPlayer for sustained texture
-  padGrain: null,
-  _padGainNode: null,
-  // Lead: Sampler for pitched melody
+  // Pad: synthesized FM chords
+  padSynth: null,
+  // Lead: sample-based Sampler
   leadSampler: null,
+  _currentLeadId: null,
   // Drums
   kickSynth: null, snareSynth: null, hatSynth: null,
   // Riser
@@ -372,14 +362,12 @@ MUZE.Audio = {
   // Effects
   filter: null, reverb: null, delay: null, chorus: null, compressor: null,
   _melodyPlaying: false,
-  _currentPadId: null,
-  _currentLeadId: null,
 
   async init() {
     await Tone.start();
     Tone.Transport.bpm.value = MUZE.Config.BPM_DEFAULT;
 
-    // Effects chain
+    // Effects chain: Filter → Chorus → Delay → Reverb → Limiter
     this.compressor = new Tone.Limiter(-3).toDestination();
     this.reverb = new Tone.Reverb({ decay: MUZE.Config.REVERB_DECAY, preDelay: 0.01 }).connect(this.compressor);
     await this.reverb.ready;
@@ -389,11 +377,21 @@ MUZE.Audio = {
     this.chorus.start();
     this.filter = new Tone.Filter({ frequency: 2000, type: 'lowpass', rolloff: -24, Q: 1.2 }).connect(this.chorus);
 
-    // Pad: GrainPlayer (sustained texture from any sample)
-    this._padGainNode = new Tone.Gain(0).connect(this.filter);
+    // Pad synth — warm FM chords
+    this.padSynth = new Tone.PolySynth(Tone.FMSynth, {
+      maxPolyphony: 6,
+      voice: {
+        harmonicity: 2, modulationIndex: 1.2,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 1.0, decay: 0.4, sustain: 0.85, release: 2.5 },
+        modulation: { type: 'triangle' },
+        modulationEnvelope: { attack: 0.6, decay: 0.3, sustain: 0.7, release: 2.0 }
+      }
+    });
+    this.padSynth.volume.value = -14;
+    this.padSynth.connect(this.filter);
 
-    // Lead: will be created when sample is loaded
-    // Drums
+    // Drums — bypass tonal effects
     this.kickSynth = new Tone.MembraneSynth({
       pitchDecay: 0.05, octaves: 6, oscillator: { type: 'sine' },
       envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.4 }
@@ -425,60 +423,16 @@ MUZE.Audio = {
     MUZE.State.audioReady = true;
   },
 
-  // Load a sample as the pad sound (GrainPlayer)
-  setPadSample(sampleId) {
-    const buf = MUZE.SampleLib.get(sampleId);
-    if (!buf) return;
-    if (this.padGrain) { this.padGrain.stop(); this.padGrain.dispose(); }
-    this.padGrain = new Tone.GrainPlayer({
-      url: buf,
-      loop: true,
-      grainSize: 0.08,
-      overlap: 0.05,
-      playbackRate: 1,
-      reverse: false
-    });
-    this.padGrain.volume.value = -10;
-    this.padGrain.connect(this._padGainNode);
-    this._currentPadId = sampleId;
-  },
-
   // Load a sample as the lead sound (Sampler)
   setLeadSample(sampleId) {
     const buf = MUZE.SampleLib.get(sampleId);
     if (!buf) return;
     if (this.leadSampler) { this.leadSampler.dispose(); }
-    // Map the sample to C4 — Sampler auto-pitches from there
-    this.leadSampler = new Tone.Sampler({
-      urls: { C4: buf },
-      attack: 0,
-      release: 0.8,
-    });
+    this.leadSampler = new Tone.Sampler({ urls: { C4: buf }, attack: 0, release: 0.8 });
     this.leadSampler.volume.value = -6;
     this.leadSampler.connect(this.filter);
     this._currentLeadId = sampleId;
     this._melodyPlaying = false;
-  },
-
-  // Start/stop pad texture
-  startPad() {
-    if (this.padGrain && this.padGrain.state !== 'started') {
-      try { this.padGrain.start(); } catch(e) {}
-    }
-    this._padGainNode.gain.rampTo(0.7, 0.5);
-  },
-
-  stopPad() {
-    this._padGainNode.gain.rampTo(0, 1.0);
-  },
-
-  // Update pad grain parameters from face
-  updatePadGrain(state) {
-    if (!this.padGrain) return;
-    // Mouth width → grain size (small = shimmery, large = smooth)
-    this.padGrain.grainSize = 0.03 + state.mouthWidth * 0.15;
-    // Lip corner → playback rate (slight pitch variation)
-    this.padGrain.playbackRate = 0.9 + state.lipCorner * 0.15 + 0.1;
   },
 
   // Continuous effect updates
@@ -489,32 +443,29 @@ MUZE.Audio = {
     const yawN = Math.min(1, Math.abs(state.headYaw) / 0.4);
     this.delay.wet.rampTo(C.DELAY_WET_MIN + yawN * (C.DELAY_WET_MAX - C.DELAY_WET_MIN), 0.15);
     this.chorus.depth = C.CHORUS_DEPTH_MIN + state.mouthWidth * (C.CHORUS_DEPTH_MAX - C.CHORUS_DEPTH_MIN);
-    this.updatePadGrain(state);
   },
+
+  // Pad (synth)
+  triggerPad(notes) { this.padSynth.releaseAll(); this.padSynth.triggerAttack(notes, Tone.now(), 0.4); },
+  releasePad() { this.padSynth.releaseAll(); },
 
   // Lead melody (sample-based)
   startMelody(note) {
     if (!this.leadSampler) return;
-    const n = MUZE.Music.midiToNote(note);
-    this.leadSampler.triggerAttack(n, Tone.now(), 0.7);
+    this.leadSampler.triggerAttack(MUZE.Music.midiToNote(note), Tone.now(), 0.7);
     this._melodyPlaying = true;
   },
-
   updateMelody(note) {
     if (!this.leadSampler) return;
     if (!this._melodyPlaying) { this.startMelody(note); return; }
-    // Release previous, start new (Sampler doesn't have setNote)
-    const n = MUZE.Music.midiToNote(note);
-    this.leadSampler.triggerAttack(n, Tone.now(), 0.7);
+    this.leadSampler.triggerAttack(MUZE.Music.midiToNote(note), Tone.now(), 0.7);
   },
-
   stopMelody() {
     if (this._melodyPlaying && this.leadSampler) {
       this.leadSampler.releaseAll(Tone.now());
       this._melodyPlaying = false;
     }
   },
-
   setArticulation(legato) {
     if (!this.leadSampler) return;
     this.leadSampler.release = legato ? 0.8 : 0.05;
@@ -604,45 +555,36 @@ MUZE.AutoRhythm = {
 <!-- Sample Picker UI -->
 <script>
 MUZE.SampleUI = {
-  _padSamples: [],
-  _leadSamples: [],
-  _padIdx: 0,
   _leadIdx: 0,
 
   init() {
     const all = MUZE.SampleLib.getAllSamples();
-    this._padSamples = all.filter(s => s.type === 'pad' || s.type === 'both');
-    this._leadSamples = all.filter(s => s.type === 'lead' || s.type === 'both');
-
-    // Default: first pad sample, first lead sample
-    if (this._padSamples.length) {
-      MUZE.Audio.setPadSample(this._padSamples[0].id);
-      this._updateBtn('pad');
-    }
-    if (this._leadSamples.length) {
-      MUZE.Audio.setLeadSample(this._leadSamples[0].id);
-      this._updateBtn('lead');
+    // Default lead: first sample with a loaded buffer
+    for (let i = 0; i < all.length; i++) {
+      if (MUZE.SampleLib.get(all[i].id)) {
+        MUZE.Audio.setLeadSample(all[i].id);
+        this._leadIdx = i;
+        document.getElementById('btn-lead-sample').textContent = 'lead: ' + all[i].name;
+        break;
+      }
     }
 
-    document.getElementById('btn-pad-sample').addEventListener('click', () => this.cyclePad());
     document.getElementById('btn-lead-sample').addEventListener('click', () => this.cycleLead());
     document.getElementById('btn-record').addEventListener('click', () => this.recordSample());
   },
 
-  cyclePad() {
-    if (!this._padSamples.length) return;
-    // Cycle through ALL samples for pad (any sample can be a pad)
-    const all = MUZE.SampleLib.getAllSamples();
-    this._padIdx = (this._padIdx + 1) % all.length;
-    MUZE.Audio.setPadSample(all[this._padIdx].id);
-    document.getElementById('btn-pad-sample').textContent = 'pad: ' + all[this._padIdx].name;
-  },
-
   cycleLead() {
     const all = MUZE.SampleLib.getAllSamples();
-    this._leadIdx = (this._leadIdx + 1) % all.length;
-    MUZE.Audio.setLeadSample(all[this._leadIdx].id);
-    document.getElementById('btn-lead-sample').textContent = 'lead: ' + all[this._leadIdx].name;
+    // Find next sample that has a loaded buffer
+    for (let i = 1; i <= all.length; i++) {
+      const idx = (this._leadIdx + i) % all.length;
+      if (MUZE.SampleLib.get(all[idx].id)) {
+        this._leadIdx = idx;
+        MUZE.Audio.setLeadSample(all[idx].id);
+        document.getElementById('btn-lead-sample').textContent = 'lead: ' + all[idx].name;
+        return;
+      }
+    }
   },
 
   async recordSample() {
@@ -654,24 +596,14 @@ MUZE.SampleUI = {
 
     const buffer = await MUZE.MicRecorder.record(2000);
     if (buffer) {
-      const name = 'recording ' + (MUZE.SampleLib._custom.length + 1);
+      const name = 'rec ' + (MUZE.SampleLib._custom.length + 1);
       const id = MUZE.SampleLib.addCustom(name, buffer);
-      // Auto-assign to lead
       MUZE.Audio.setLeadSample(id);
       document.getElementById('btn-lead-sample').textContent = 'lead: ' + name;
     }
 
     btn.textContent = 'record sample';
     btn.classList.remove('recording');
-  },
-
-  _updateBtn(type) {
-    if (type === 'pad' && this._padSamples.length) {
-      document.getElementById('btn-pad-sample').textContent = 'pad: ' + this._padSamples[0].name;
-    }
-    if (type === 'lead' && this._leadSamples.length) {
-      document.getElementById('btn-lead-sample').textContent = 'lead: ' + this._leadSamples[0].name;
-    }
   }
 };
 </script>
@@ -739,7 +671,7 @@ MUZE.Touch = {
 MUZE.Loop = {
   _running:false, _lastDetect:0, _currentPadKey:null,
   _prevMelodyNote:null, _prevBrow:0, _lastBrowSpike:0, _prevArticulation:true,
-  _padActive:false, _debugEl:null,
+  _debugEl:null,
 
   init(){
     const c=document.getElementById('overlay');
@@ -784,30 +716,27 @@ MUZE.Loop = {
     if(S.faceDetected&&S.audioReady){
       MUZE.Audio.updateParams(S);
 
-      // Start pad when face detected
-      if(!this._padActive){
-        MUZE.Audio.startPad();
-        this._padActive=true;
-      }
-
       const scale=MUZE.Music.selectScale(S.lipCorner);
       S.currentScale=scale;
       const octShift=Math.floor(S.browHeight*C.OCTAVE_RANGE)*12;
       const root=C.ROOT_NOTE+octShift;
 
-      // Brow spike → chord advance (affects pad grain pitch)
+      // Brow spike → advance chord
       const browDelta=S.browHeight-this._prevBrow;
       if(browDelta>C.BROW_SPIKE_THRESHOLD&&now-this._lastBrowSpike>C.BROW_SPIKE_COOLDOWN){
         S.chordIndex=(S.chordIndex+1)%C.CHORD_DEGREES.length;
         this._lastBrowSpike=now;
-        // Shift pad grain pitch based on chord degree
-        if(MUZE.Audio.padGrain){
-          const deg=C.CHORD_DEGREES[S.chordIndex];
-          const semitones=scale[deg%scale.length]||0;
-          MUZE.Audio.padGrain.playbackRate=Math.pow(2,semitones/12);
-        }
       }
       this._prevBrow=S.browHeight;
+
+      // Pad voicing from chord degree
+      const degree=C.CHORD_DEGREES[S.chordIndex];
+      const padNotes=MUZE.Music.getPadVoicing(C.ROOT_NOTE,scale,degree);
+      const padKey=padNotes.join(',');
+      if(padKey!==this._currentPadKey){
+        this._currentPadKey=padKey;
+        MUZE.Audio.triggerPad(padNotes);
+      }
 
       // Hand → lead melody
       if(S.handPresent){
@@ -826,7 +755,7 @@ MUZE.Loop = {
         MUZE.Audio.stopMelody(); this._prevMelodyNote=null; S.melodyNote=null;
       }
     } else {
-      if(this._padActive){MUZE.Audio.stopPad();this._padActive=false;}
+      if(this._currentPadKey){MUZE.Audio.releasePad();this._currentPadKey=null;}
       if(this._prevMelodyNote!==null){MUZE.Audio.stopMelody();this._prevMelodyNote=null;}
     }
 
@@ -835,7 +764,6 @@ MUZE.Loop = {
   _drawDebug(S){
     const n=S.melodyNote?MUZE.Music.midiToNote(S.melodyNote):'-';
     const sc=MUZE.Music.getScaleName(S.currentScale);
-    const padId=MUZE.Audio._currentPadId||'-';
     const leadId=MUZE.Audio._currentLeadId||'-';
     this._debugEl.innerHTML=
       '<div style="font:10px/1.5 monospace;color:rgba(255,255,255,0.6);'+
@@ -845,7 +773,7 @@ MUZE.Loop = {
       `mouth:${S.mouthOpenness.toFixed(2)} smile:${S.lipCorner.toFixed(2)} brow:${S.browHeight.toFixed(2)}<br>`+
       `eyes:${S.eyeOpenness.toFixed(2)} grin:${S.mouthWidth.toFixed(2)}<br>`+
       `hand:${S.handPresent?(S.handOpen?'LEGATO':'STACCATO'):'—'} note:${n}<br>`+
-      `pad:${padId} lead:${leadId}`+
+      `lead:${leadId} auto:${S.autoRhythm?'ON':'—'}`+
       '</div>';
   }
 };
