@@ -280,6 +280,8 @@
   <div class="synth-row"><label>release</label><input type="range" id="arp-rel" min="0.01" max="4" step="0.01" value="0.8"><span class="val">0.80</span></div>
   <div class="synth-row"><label>volume</label><input type="range" id="arp-vol" min="-30" max="0" step="1" value="-8"><span class="val">-8</span></div>
   <div class="synth-row"><label>pan</label><input type="range" id="arp-pan" min="-1" max="1" step="0.05" value="0.3"><span class="val">0.30</span></div>
+  <div class="synth-row"><label>reverb</label><input type="range" id="arp-reverb" min="0" max="1" step="0.01" value="0.35"><span class="val">0.35</span></div>
+  <div class="synth-row"><label>delay</label><input type="range" id="arp-delay" min="0" max="0.8" step="0.01" value="0.25"><span class="val">0.25</span></div>
 
   <h3>Melody (Hand)</h3>
   <div class="synth-row"><label>wave</label><select class="synth-select" id="mel-osc"><option>triangle</option><option>sawtooth</option><option>square</option><option>sine</option></select></div>
@@ -540,7 +542,7 @@ MUZE.Audio = {
   // Pad: synthesized FM chords
   padSynth: null, _padPan: null,
   // Arpeggio synth
-  leadSynth: null, _arpPan: null,
+  leadSynth: null, _arpPan: null, _arpReverb: null, _arpDelay: null,
   // Melody synth (hand-controlled)
   melodySynth: null, _melPan: null,
   // Drums
@@ -581,14 +583,18 @@ MUZE.Audio = {
     this._padPan = new Tone.Panner(0).connect(this.filter);
     this.padSynth.connect(this._padPan);
 
-    // Arpeggio synth
+    // Arpeggio synth — own reverb + delay chain
+    this._arpReverb = new Tone.Reverb({ decay: 3, preDelay: 0.01 }).connect(this.compressor);
+    await this._arpReverb.ready;
+    this._arpReverb.wet.value = 0.35;
+    this._arpDelay = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.35, wet: 0.25 }).connect(this._arpReverb);
     this.leadSynth = new Tone.PolySynth(Tone.Synth, {
       maxPolyphony: 8,
       oscillator: { type: 'sawtooth' },
       envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.8 },
     });
     this.leadSynth.volume.value = -8;
-    this._arpPan = new Tone.Panner(0.3).connect(this.filter);
+    this._arpPan = new Tone.Panner(0.3).connect(this._arpDelay);
     this.leadSynth.connect(this._arpPan);
 
     // Melody synth (hand-controlled)
@@ -816,6 +822,8 @@ MUZE.SynthMenu = {
     this._bind('arp-rel', (v) => MUZE.Audio.leadSynth.set({ envelope: { release: +v } }));
     this._bind('arp-vol', (v) => { MUZE.Audio.leadSynth.volume.value = +v; });
     this._bind('arp-pan', (v) => { MUZE.Audio._arpPan.pan.value = +v; });
+    this._bind('arp-reverb', (v) => { MUZE.Audio._arpReverb.wet.value = +v; });
+    this._bind('arp-delay', (v) => { MUZE.Audio._arpDelay.wet.value = +v; });
 
     // Melody synth controls
     this._bind('mel-osc', (v) => MUZE.Audio.melodySynth.set({ oscillator: { type: v } }), true);
