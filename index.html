@@ -75,7 +75,7 @@
   #debug { position: fixed; top: env(safe-area-inset-top, 8px); left: 8px; z-index: 10; pointer-events: none; }
   #mode-hud {
     position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
-    z-index: 10; pointer-events: auto; cursor: pointer; text-align: center;
+    z-index: 10; pointer-events: none; text-align: center;
     font: bold 32px/1.2 monospace; color: #fff;
     background: rgba(0,0,0,0.5); padding: 12px 24px; border-radius: 12px;
     backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
@@ -552,18 +552,32 @@ MUZE.Audio = {
 
   startRiser(){this._riserGain.gain.rampTo(0.3,2);this._riserFilter.frequency.rampTo(4000,2);},
   stopRiser(){this._riserGain.gain.rampTo(0,0.05);this._riserFilter.frequency.rampTo(200,0.1);this.kickSynth.triggerAttackRelease('C1','4n',Tone.now(),1);},
-  playArpeggio() {
-    const S=MUZE.State, C=MUZE.Config;
-    if(!S.currentScale||!this.leadSynth) return;
-    const root=C.ROOT_NOTE;
-    const up=S.currentScale.map(i=>MUZE.Music.midiToNote(root+i));
-    const down=[...up].reverse().slice(1);
-    const notes=[...up,...down];
-    const gap=0.15;
-    const now=Tone.now();
-    notes.forEach((n,i)=>{
-      this.leadSynth.triggerAttackRelease(n,0.12,now+i*gap,0.5);
-    });
+  // Auto-arpeggio — loops continuously on transport
+  _arpSeq: null,
+  _arpNotes: [],
+  _arpIdx: 0,
+
+  startArpeggio() {
+    if (this._arpSeq) return;
+    this._arpIdx = 0;
+    this._arpSeq = new Tone.Loop((time) => {
+      if (!this._arpNotes.length || !this.leadSynth) return;
+      const note = this._arpNotes[this._arpIdx % this._arpNotes.length];
+      this.leadSynth.triggerAttackRelease(note, '8n', time, 0.5);
+      this._arpIdx++;
+    }, '8n');
+    this._arpSeq.start(0);
+  },
+
+  updateArpNotes(scale, root) {
+    const up = scale.map(i => MUZE.Music.midiToNote(root + i));
+    const down = [...up].reverse().slice(1);
+    this._arpNotes = [...up, ...down];
+  },
+
+  stopArpeggio() {
+    if (this._arpSeq) { this._arpSeq.stop(); this._arpSeq.dispose(); this._arpSeq = null; }
+    this._arpNotes = [];
   },
   reverbThrow(){const p=this.reverb.wet.value;this.reverb.wet.rampTo(0.95,0.05);setTimeout(()=>this.reverb.wet.rampTo(p,1.5),200);},
   tapeStop(){const o=Tone.Transport.bpm.value;Tone.Transport.bpm.rampTo(20,0.4);setTimeout(()=>Tone.Transport.bpm.rampTo(o,0.15),500);},
@@ -800,6 +814,10 @@ MUZE.Loop = {
       const octShift=Math.floor(S.browHeight*C.OCTAVE_RANGE)*12;
       const root=C.ROOT_NOTE+octShift;
 
+      // Auto-arpeggio — always running
+      MUZE.Audio.updateArpNotes(scale, root);
+      if(!MUZE.Audio._arpSeq) MUZE.Audio.startArpeggio();
+
       // Brow spike → advance chord
       const browDelta=S.browHeight-this._prevBrow;
       if(browDelta>C.BROW_SPIKE_THRESHOLD&&now-this._lastBrowSpike>C.BROW_SPIKE_COOLDOWN){
@@ -897,10 +915,6 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     MUZE.Touch.init();
     MUZE.SynthMenu.init();
     MUZE.Loop.init();
-    const hud=document.getElementById('mode-hud');
-    const fireArp = () => { MUZE.Audio.playArpeggio(); hud.style.background='rgba(255,255,255,0.3)'; setTimeout(()=>hud.style.background='',200); };
-    hud.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); fireArp(); });
-    hud.addEventListener('click', fireArp);
     ss.remove();
     MUZE.Loop.start();
   } catch (err) {
