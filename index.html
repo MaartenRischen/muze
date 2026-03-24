@@ -461,13 +461,11 @@ MUZE.Audio = {
     this.padSynth.volume.value = -14;
     this.padSynth.connect(this.filter);
 
-    // Lead synth — mono for melody, poly for arpeggio
+    // Lead synth — poly for arpeggio + melody
     this.leadSynth = new Tone.PolySynth(Tone.Synth, {
       maxPolyphony: 8,
-      voice: {
-        oscillator: { type: 'sawtooth' },
-        envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.8 },
-      }
+      oscillator: { type: 'sawtooth' },
+      envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.8 },
     });
     this.leadSynth.volume.value = -8;
     this.leadSynth.connect(this.filter);
