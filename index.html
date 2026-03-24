@@ -844,6 +844,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     // Load samples
     document.getElementById('loading-text').textContent = 'Loading samples...';
     await MUZE.SampleLib.loadAll();
+    MUZE.Audio.setLeadSample('singing-bowl');
 
     // MediaPipe
     document.getElementById('loading-text').textContent = 'Loading face + hand models...';
