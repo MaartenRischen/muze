@@ -651,11 +651,9 @@ MUZE.Audio = {
     const comp = 1 + (1 - pitchN) * 0.35;
     this._filterGain.gain.rampTo(comp, 0.08);
 
-    // Reverb: eye openness
-    this.reverb.wet.rampTo(C.REVERB_WET_MIN + state.eyeOpenness * (C.REVERB_WET_MAX - C.REVERB_WET_MIN), 0.1);
-    // Delay: head yaw (turn L/R)
-    const yawN = Math.min(1, Math.abs(state.headYaw) / 0.4);
-    this.delay.wet.rampTo(C.DELAY_WET_MIN + yawN * (C.DELAY_WET_MAX - C.DELAY_WET_MIN), 0.15);
+    // Arp reverb + delay: eye openness (wide open = 100% wet, shut = 0%)
+    this._arpReverb.wet.rampTo(state.eyeOpenness, 0.1);
+    this._arpDelay.wet.rampTo(state.eyeOpenness * 0.8, 0.1);
     // Chorus: head roll (tilt sideways)
     const rollN = Math.min(1, Math.abs(state.headRoll) / 0.35);
     this.chorus.depth = C.CHORUS_DEPTH_MIN + rollN * (C.CHORUS_DEPTH_MAX - C.CHORUS_DEPTH_MIN);
