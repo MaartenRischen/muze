@@ -358,6 +358,7 @@
     <button class="synth-tab active" data-tab="tab-arp">Arp</button>
     <button class="synth-tab" data-tab="tab-mel">Melody</button>
     <button class="synth-tab" data-tab="tab-pad">Pad</button>
+    <button class="synth-tab" data-tab="tab-drums">Drums</button>
     <button class="synth-tab" data-tab="tab-bin">Binaural</button>
   </div>
 
@@ -403,6 +404,13 @@
     <h3>Mix</h3>
     <div class="synth-row"><label>volume</label><input type="range" id="pad-vol" min="-30" max="0" step="1" value="-14"><span class="val">-14</span></div>
     <div class="synth-row"><label>pan</label><input type="range" id="pad-pan" min="-1" max="1" step="0.05" value="0"><span class="val">0.00</span></div>
+  </div>
+
+  <div class="synth-tab-content" id="tab-drums">
+    <h3>Volume</h3>
+    <div class="synth-row"><label>kick</label><input type="range" id="drum-kick-vol" min="-30" max="0" step="1" value="-6"><span class="val">-6</span></div>
+    <div class="synth-row"><label>snare</label><input type="range" id="drum-snare-vol" min="-30" max="0" step="1" value="-10"><span class="val">-10</span></div>
+    <div class="synth-row"><label>hat</label><input type="range" id="drum-hat-vol" min="-30" max="0" step="1" value="-16"><span class="val">-16</span></div>
   </div>
 
   <div class="synth-tab-content" id="tab-bin">
@@ -1081,6 +1089,11 @@ MUZE.SynthMenu = {
     this._bind('mel-pan', (v) => { MUZE.Audio._melPan.pan.value = +v; });
     this._bind('mel-reverb', (v) => { MUZE.Audio._melReverbMax = +v; });
     this._bind('mel-delay', (v) => { MUZE.Audio._melDelayMax = +v; });
+
+    // Drum controls
+    this._bind('drum-kick-vol', (v) => { MUZE.Audio.kickSynth.volume.value = +v; });
+    this._bind('drum-snare-vol', (v) => { MUZE.Audio.snareSynth.volume.value = +v; });
+    this._bind('drum-hat-vol', (v) => { MUZE.Audio.hatSynth.volume.value = +v; });
 
     // Binaural controls
     document.getElementById('bin-toggle').addEventListener('click', function() {
