@@ -803,15 +803,15 @@ MUZE.Audio = {
   _padVolPre: -14, _drumVolPre: {},
   startRiser(){
     // Riser noise sweep up
-    this._riserGain.gain.rampTo(0.3,2);
-    this._riserFilter.frequency.rampTo(4000,2);
+    this._riserGain.gain.rampTo(0.3,4);
+    this._riserFilter.frequency.rampTo(4000,4);
     // Duck pad + drums
     this._padVolPre = this.padSynth.volume.value;
     this._drumVolPre = { kick: this.kickSynth.volume.value, snare: this.snareSynth.volume.value, hat: this.hatSynth.volume.value };
-    this.padSynth.volume.rampTo(this._padVolPre - 14, 2);
-    this.kickSynth.volume.rampTo(-30, 2);
-    this.snareSynth.volume.rampTo(-30, 2);
-    this.hatSynth.volume.rampTo(-30, 2);
+    this.padSynth.volume.rampTo(this._padVolPre - 14, 4);
+    this.kickSynth.volume.rampTo(-30, 4);
+    this.snareSynth.volume.rampTo(-30, 4);
+    this.hatSynth.volume.rampTo(-30, 4);
   },
   dropRiser(){
     // Big reverb-drenched drop
