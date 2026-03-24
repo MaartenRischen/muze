@@ -625,7 +625,7 @@ MUZE.Audio = {
   // Pad: synthesized FM chords
   padSynth: null, _padPan: null,
   // Arpeggio synth
-  leadSynth: null, _arpPan: null, _arpReverb: null, _arpDelay: null,
+  leadSynth: null, _arpPan: null, _arpReverb: null, _arpDelay: null, _arpFilter: null, _arpFilterGain: null,
   _arpReverbMax: 0.35, _arpDelayMax: 0.25,
   // Melody synth (hand-controlled)
   melodySynth: null, _melPan: null, _melReverb: null, _melDelay: null,
@@ -679,7 +679,9 @@ MUZE.Audio = {
       envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.8 },
     });
     this.leadSynth.volume.value = -8;
-    this._arpPan = new Tone.Panner(0.3).connect(this._arpDelay);
+    this._arpFilterGain = new Tone.Gain(1).connect(this._arpDelay);
+    this._arpFilter = new Tone.Filter({ frequency: 2000, type: 'lowpass', rolloff: -24, Q: 1.2 }).connect(this._arpFilterGain);
+    this._arpPan = new Tone.Panner(0.3).connect(this._arpFilter);
     this.leadSynth.connect(this._arpPan);
 
     // Melody synth (hand-controlled) — own reverb + delay
@@ -746,9 +748,11 @@ MUZE.Audio = {
     const pitchN = 1 - Math.max(0, Math.min(1, (state.headPitch + 0.4) / 0.8));
     const filterFreq = C.FILTER_FREQ_MIN * Math.pow(C.FILTER_FREQ_MAX / C.FILTER_FREQ_MIN, pitchN);
     this.filter.frequency.rampTo(filterFreq, 0.08);
+    this._arpFilter.frequency.rampTo(filterFreq, 0.08);
     // Gain compensation: boost when filter is low to keep perceived volume even
     const comp = 1 + (1 - pitchN) * 0.35;
     this._filterGain.gain.rampTo(comp, 0.08);
+    this._arpFilterGain.gain.rampTo(comp, 0.08);
 
     // Arp + melody reverb/delay: eye openness scales from 0 to slider max
     this._arpReverb.wet.rampTo(state.eyeOpenness * this._arpReverbMax, 0.1);
