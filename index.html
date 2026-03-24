@@ -189,6 +189,15 @@
     font-size: 11px; padding: 4px 8px; border-radius: 8px;
     font-family: monospace;
   }
+  #rec-multitrack {
+    position: fixed; top: env(safe-area-inset-top, 8px); right: 200px;
+    z-index: 20; appearance: none; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.5);
+    font: 8px/1 monospace; padding: 0 6px; height: 40px; border-radius: 20px;
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    cursor: pointer; letter-spacing: 0.5px;
+  }
+  #rec-multitrack:active { background: rgba(255,255,255,0.15); }
   #rec-btn {
     position: fixed; top: env(safe-area-inset-top, 8px); right: 152px;
     z-index: 20; appearance: none; border: 1px solid rgba(255,255,255,0.2);
@@ -320,6 +329,7 @@
 </div>
 
 <canvas id="rec-canvas"></canvas>
+<button id="rec-multitrack">STEREO</button>
 <button id="rec-btn">&#9679;</button>
 <button id="pause-btn">&#10074;&#10074;</button>
 <button id="help-btn">?</button>
@@ -1112,6 +1122,8 @@ MUZE.Recorder = {
   _mediaRec: null, _chunks: [], _recording: false,
   _recCanvas: null, _recCtx: null, _audioDest: null, _mimeType: null,
   _w: 0, _h: 0,
+  _multitrack: false,
+  _trackRecs: [], _trackChunks: {},
 
   init() {
     this._recCanvas = document.getElementById('rec-canvas');
@@ -1119,13 +1131,49 @@ MUZE.Recorder = {
     this._audioDest = Tone.context.createMediaStreamDestination();
     Tone.getDestination().connect(this._audioDest);
 
+    // Per-track destinations (tapped before compressor)
+    this._trackDests = {};
+    const A = MUZE.Audio;
+    const tracks = {
+      pad: A.reverb,        // end of pad chain
+      arp: A._arpReverb,    // end of arp chain
+      melody: A._melReverb, // end of melody chain
+      drums: A.compressor,  // drums go direct to compressor
+      binaural: A.compressor // binaural panners go to compressor
+    };
+    // Create a gain tap for each track
+    this._trackTaps = {};
+    for (const [name, node] of Object.entries(tracks)) {
+      const dest = Tone.context.createMediaStreamDestination();
+      const tap = new Tone.Gain(1);
+      tap.connect(dest);
+      this._trackDests[name] = dest;
+      this._trackTaps[name] = tap;
+    }
+    // Connect taps — each synth's final stage also feeds its tap
+    A.reverb.connect(this._trackTaps.pad);
+    A._arpReverb.connect(this._trackTaps.arp);
+    A._melReverb.connect(this._trackTaps.melody);
+    A.kickSynth.connect(this._trackTaps.drums);
+    A.snareSynth.connect(this._trackTaps.drums);
+    A.hatSynth.connect(this._trackTaps.drums);
+
     document.getElementById('rec-btn').addEventListener('click', () => {
       if (this._recording) this.stop(); else this.start();
     });
+    document.getElementById('rec-multitrack').addEventListener('click', function() {
+      MUZE.Recorder._multitrack = !MUZE.Recorder._multitrack;
+      this.textContent = MUZE.Recorder._multitrack ? 'MULTI' : 'STEREO';
+    });
+  },
+
+  _audioMime() {
+    if (MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return 'audio/webm;codecs=opus';
+    return 'audio/webm';
   },
 
   start() {
-    // Use fixed 720p-ish resolution (no DPR) for clean recording
     this._w = 720;
     this._h = Math.round(720 * (window.innerHeight / window.innerWidth));
     this._recCanvas.width = this._w;
@@ -1135,7 +1183,6 @@ MUZE.Recorder = {
     const audioTrack = this._audioDest.stream.getAudioTracks()[0];
     if (audioTrack) canvasStream.addTrack(audioTrack);
 
-    // Prefer mp4 for iOS camera roll compatibility
     this._mimeType = MediaRecorder.isTypeSupported('video/mp4')
       ? 'video/mp4'
       : MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
@@ -1149,6 +1196,20 @@ MUZE.Recorder = {
     this._mediaRec.ondataavailable = (e) => { if (e.data.size > 0) this._chunks.push(e.data); };
     this._mediaRec.onstop = () => this._save();
     this._mediaRec.start(500);
+
+    // Start multitrack recorders if enabled
+    this._trackRecs = [];
+    if (this._multitrack) {
+      const aMime = this._audioMime();
+      for (const [name, dest] of Object.entries(this._trackDests)) {
+        this._trackChunks[name] = [];
+        const rec = new MediaRecorder(dest.stream, { mimeType: aMime });
+        rec.ondataavailable = (e) => { if (e.data.size > 0) this._trackChunks[name].push(e.data); };
+        rec.start(500);
+        this._trackRecs.push({ name, rec, mime: aMime });
+      }
+    }
+
     this._recording = true;
     document.getElementById('rec-btn').classList.add('recording');
   },
@@ -1157,6 +1218,18 @@ MUZE.Recorder = {
     this._recording = false;
     if (this._mediaRec && this._mediaRec.state === 'recording') {
       this._mediaRec.stop();
+    }
+    // Stop multitrack recorders
+    const pending = this._trackRecs.filter(t => t.rec.state === 'recording');
+    let done = 0;
+    if (pending.length) {
+      pending.forEach(t => {
+        t.rec.onstop = () => {
+          done++;
+          if (done === pending.length) this._saveMultitrack();
+        };
+        t.rec.stop();
+      });
     }
     document.getElementById('rec-btn').classList.remove('recording');
   },
@@ -1292,6 +1365,20 @@ MUZE.Recorder = {
     const a = document.createElement('a');
     a.href = url; a.download = fileName; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+  },
+
+  _saveMultitrack() {
+    const ts = Date.now();
+    for (const [name, chunks] of Object.entries(this._trackChunks)) {
+      if (!chunks.length) continue;
+      const rec = this._trackRecs.find(t => t.name === name);
+      const ext = rec.mime.includes('mp4') ? 'm4a' : 'webm';
+      const blob = new Blob(chunks, { type: rec.mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `muze-${name}-${ts}.${ext}`; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
   }
 };
 </script>
