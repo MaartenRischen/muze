@@ -30,24 +30,9 @@
     z-index: 1; pointer-events: none;
   }
   #touch-zone {
-    position: fixed; bottom: 0; left: 0;
-    width: 100%; height: 45%; z-index: 2;
-    display: flex; flex-direction: row; touch-action: none;
-  }
-  #chord-zone {
-    width: 30%; height: 100%; display: flex; flex-direction: column;
-    border-right: 1px solid rgba(255,255,255,0.06);
-  }
-  .chord-btn {
-    flex: 1; display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,0.35); font: 13px/1 monospace;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    transition: background 0.1s ease-out;
-  }
-  .chord-btn.active { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.08); }
-  .chord-btn:active { background: rgba(255,255,255,0.12); }
-  #drum-zone {
-    flex: 1; height: 100%; display: flex; flex-direction: column;
+    position: fixed; bottom: 44px; left: 0;
+    width: 100%; height: calc(45% - 44px); z-index: 2;
+    display: flex; flex-direction: column; touch-action: none;
   }
   .drum-cell {
     flex: 1; display: flex; align-items: center; justify-content: center;
@@ -59,6 +44,22 @@
   #zone-snare { border-bottom: 1px solid rgba(255,255,255,0.05); }
   #zone-snare.hit { background: rgba(255,200,150,0.2); }
   #zone-kick.hit { background: rgba(255,100,100,0.15); }
+  #chord-zone {
+    position: fixed; bottom: 0; left: 0; width: 100%; height: 44px;
+    z-index: 3; display: flex; flex-direction: row; touch-action: none;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .chord-btn {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.35); font: 13px/1 monospace;
+    border-right: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.1s ease-out;
+  }
+  .chord-btn:last-child { border-right: none; }
+  .chord-btn.active { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.08); }
+  .chord-btn:active { background: rgba(255,255,255,0.12); }
 
   #riser-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -254,19 +255,17 @@
 <canvas id="overlay"></canvas>
 
 <div id="touch-zone">
-  <div id="chord-zone">
-    <div class="chord-btn" data-chord="0">I</div>
-    <div class="chord-btn" data-chord="1">ii</div>
-    <div class="chord-btn" data-chord="2">iii</div>
-    <div class="chord-btn" data-chord="3">IV</div>
-    <div class="chord-btn" data-chord="4">V</div>
-    <div class="chord-btn" data-chord="5">vi</div>
-  </div>
-  <div id="drum-zone">
-    <div id="zone-hat" class="drum-cell" data-drum="hat"></div>
-    <div id="zone-snare" class="drum-cell" data-drum="snare"></div>
-    <div id="zone-kick" class="drum-cell" data-drum="kick"></div>
-  </div>
+  <div id="zone-hat" class="drum-cell" data-drum="hat"></div>
+  <div id="zone-snare" class="drum-cell" data-drum="snare"></div>
+  <div id="zone-kick" class="drum-cell" data-drum="kick"></div>
+</div>
+<div id="chord-zone">
+  <div class="chord-btn" data-chord="0">I</div>
+  <div class="chord-btn" data-chord="1">ii</div>
+  <div class="chord-btn" data-chord="2">iii</div>
+  <div class="chord-btn" data-chord="3">IV</div>
+  <div class="chord-btn" data-chord="4">V</div>
+  <div class="chord-btn" data-chord="5">vi</div>
 </div>
 
 <div id="riser-overlay"></div>
@@ -1062,8 +1061,8 @@ MUZE.Touch = {
       }
     },{passive:false});
 
-    // Drum zone — right side
-    const z=document.getElementById('drum-zone');
+    // Drum zone
+    const z=document.getElementById('touch-zone');
     z.addEventListener('touchstart',this._onStart.bind(this),{passive:false});
     z.addEventListener('touchmove',(e)=>e.preventDefault(),{passive:false});
     z.addEventListener('touchend',this._onEnd.bind(this),{passive:false});
