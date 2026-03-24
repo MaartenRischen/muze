@@ -147,6 +147,16 @@
     font-size: 11px; padding: 4px 8px; border-radius: 8px;
     font-family: monospace;
   }
+  #pause-btn {
+    position: fixed; top: env(safe-area-inset-top, 8px); right: 104px;
+    z-index: 20; appearance: none; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.7);
+    font-size: 12px; width: 40px; height: 40px; border-radius: 50%;
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  #pause-btn:active { background: rgba(255,255,255,0.15); }
+  #pause-btn.paused { border-color: rgba(255,100,100,0.5); color: rgba(255,100,100,0.8); }
   #help-btn {
     position: fixed; top: env(safe-area-inset-top, 8px); right: 56px;
     z-index: 20; appearance: none; border: 1px solid rgba(255,255,255,0.2);
@@ -239,6 +249,7 @@
 <div id="debug"></div>
 <div id="mode-hud"></div>
 
+<button id="pause-btn">&#10074;&#10074;</button>
 <button id="help-btn">?</button>
 <div id="tut-picker">
   <h2>Tutorial</h2>
@@ -309,11 +320,11 @@ MUZE.Config = Object.freeze({
   MOUTH_OPEN_MIN: 0.015, MOUTH_OPEN_MAX: 0.09,
   LIP_SMILE_MIN: -0.025, LIP_SMILE_MAX: 0.025,
   BROW_MIN: 0.100, BROW_MAX: 0.143,
-  EYE_OPEN_MIN: 0.018, EYE_OPEN_MAX: 0.045,
+  EYE_OPEN_MIN: 0.012, EYE_OPEN_MAX: 0.055,
   MOUTH_WIDTH_MIN: 0.28, MOUTH_WIDTH_MAX: 0.38,
 
   FILTER_FREQ_MIN: 800, FILTER_FREQ_MAX: 10000,
-  REVERB_WET_MIN: 0.05, REVERB_WET_MAX: 0.65, REVERB_DECAY: 2.5,
+  REVERB_WET_MIN: 0.0, REVERB_WET_MAX: 0.75, REVERB_DECAY: 2.5,
   DELAY_WET_MIN: 0.0, DELAY_WET_MAX: 0.4,
   CHORUS_DEPTH_MIN: 0.0, CHORUS_DEPTH_MAX: 0.7,
 
@@ -1013,7 +1024,7 @@ MUZE.Loop = {
           S.mouthOpenness=MUZE.Smooth.update('mouth',r.mouthOpenness,C.SMOOTH_FAST);
           S.lipCorner=MUZE.Smooth.update('lip',r.lipCorner,C.SMOOTH_FAST);
           S.browHeight=MUZE.Smooth.update('brow',r.browHeight,C.SMOOTH_FAST);
-          S.eyeOpenness=MUZE.Smooth.update('eye',r.eyeOpenness,C.SMOOTH_SLOW);
+          S.eyeOpenness=MUZE.Smooth.update('eye',r.eyeOpenness,C.SMOOTH_FAST);
           S.mouthWidth=MUZE.Smooth.update('mouthW',r.mouthWidth,C.SMOOTH_SLOW);
           S.headPitch=MUZE.Smooth.update('pitch',r.headPitch,C.SMOOTH_SLOW);
           S.headYaw=MUZE.Smooth.update('yaw',r.headYaw,C.SMOOTH_SLOW);
@@ -1142,6 +1153,28 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     MUZE.SynthMenu.init();
     MUZE.Tutorial.init();
     MUZE.Loop.init();
+
+    // Pause button
+    const pauseBtn = document.getElementById('pause-btn');
+    pauseBtn.addEventListener('click', () => {
+      if (MUZE.Loop._running) {
+        MUZE.Loop._running = false;
+        MUZE.Audio.releasePad();
+        MUZE.Audio.stopMelody();
+        MUZE.Audio.stopArpeggio();
+        if (MUZE.AutoRhythm.isActive()) MUZE.AutoRhythm.stop();
+        Tone.Transport.pause();
+        pauseBtn.textContent = '\u25B6';
+        pauseBtn.classList.add('paused');
+      } else {
+        Tone.Transport.start();
+        MUZE.Loop._running = true;
+        MUZE.Loop._tick();
+        pauseBtn.textContent = '\u23F8';
+        pauseBtn.classList.remove('paused');
+      }
+    });
+
     ss.remove();
     MUZE.Loop.start();
   } catch (err) {
