@@ -312,7 +312,7 @@ MUZE.Config = Object.freeze({
   EYE_OPEN_MIN: 0.018, EYE_OPEN_MAX: 0.045,
   MOUTH_WIDTH_MIN: 0.28, MOUTH_WIDTH_MAX: 0.38,
 
-  FILTER_FREQ_MIN: 400, FILTER_FREQ_MAX: 12000,
+  FILTER_FREQ_MIN: 800, FILTER_FREQ_MAX: 10000,
   REVERB_WET_MIN: 0.05, REVERB_WET_MAX: 0.65, REVERB_DECAY: 2.5,
   DELAY_WET_MIN: 0.0, DELAY_WET_MAX: 0.4,
   CHORUS_DEPTH_MIN: 0.0, CHORUS_DEPTH_MAX: 0.7,
@@ -537,7 +537,7 @@ MUZE.Audio = {
   // Riser
   riserSynth: null, _riserGain: null, _riserFilter: null,
   // Effects
-  filter: null, reverb: null, delay: null, chorus: null, compressor: null,
+  filter: null, _filterGain: null, reverb: null, delay: null, chorus: null, compressor: null,
   _melodyPlaying: false,
 
   async init() {
@@ -552,7 +552,8 @@ MUZE.Audio = {
     this.delay = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.3, wet: 0 }).connect(this.reverb);
     this.chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0, wet: 0.5 }).connect(this.delay);
     this.chorus.start();
-    this.filter = new Tone.Filter({ frequency: 2000, type: 'lowpass', rolloff: -24, Q: 1.2 }).connect(this.chorus);
+    this._filterGain = new Tone.Gain(1).connect(this.chorus);
+    this.filter = new Tone.Filter({ frequency: 2000, type: 'lowpass', rolloff: -24, Q: 1.2 }).connect(this._filterGain);
 
     // Pad synth — warm FM chords
     this.padSynth = new Tone.PolySynth(Tone.FMSynth, {
@@ -624,11 +625,23 @@ MUZE.Audio = {
   // Continuous effect updates
   updateParams(state) {
     const C = MUZE.Config;
-    this.filter.frequency.rampTo(C.FILTER_FREQ_MIN * Math.pow(C.FILTER_FREQ_MAX / C.FILTER_FREQ_MIN, state.mouthOpenness), 0.05);
+    // Filter: head pitch (tilt up = bright, down = dark)
+    // headPitch ~-0.4..+0.4, normalize to 0..1 (center-neutral = ~0.5)
+    const pitchN = Math.max(0, Math.min(1, (state.headPitch + 0.3) / 0.6));
+    const filterFreq = C.FILTER_FREQ_MIN * Math.pow(C.FILTER_FREQ_MAX / C.FILTER_FREQ_MIN, pitchN);
+    this.filter.frequency.rampTo(filterFreq, 0.08);
+    // Gain compensation: boost when filter is low to keep perceived volume even
+    const comp = 1 + (1 - pitchN) * 0.35;
+    this._filterGain.gain.rampTo(comp, 0.08);
+
+    // Reverb: eye openness
     this.reverb.wet.rampTo(C.REVERB_WET_MIN + state.eyeOpenness * (C.REVERB_WET_MAX - C.REVERB_WET_MIN), 0.1);
+    // Delay: head yaw (turn L/R)
     const yawN = Math.min(1, Math.abs(state.headYaw) / 0.4);
     this.delay.wet.rampTo(C.DELAY_WET_MIN + yawN * (C.DELAY_WET_MAX - C.DELAY_WET_MIN), 0.15);
-    this.chorus.depth = C.CHORUS_DEPTH_MIN + state.mouthWidth * (C.CHORUS_DEPTH_MAX - C.CHORUS_DEPTH_MIN);
+    // Chorus: head roll (tilt sideways)
+    const rollN = Math.min(1, Math.abs(state.headRoll) / 0.35);
+    this.chorus.depth = C.CHORUS_DEPTH_MIN + rollN * (C.CHORUS_DEPTH_MAX - C.CHORUS_DEPTH_MIN);
   },
 
   // Pad (synth)
@@ -836,7 +849,7 @@ MUZE.Tutorial = {
   BASIC: [
     { title: 'Smile', desc: 'Try smiling. The music shifts to a brighter, happier mode. Watch the mode name change at the bottom of the screen.' },
     { title: 'Frown', desc: 'Now frown or make a sad face. The music becomes darker and more tense.' },
-    { title: 'Open Your Mouth', desc: 'Open your mouth wide. The sound gets brighter as the filter opens up. Close it for a warm, muffled tone.' },
+    { title: 'Tilt Your Head', desc: 'Tilt your head up — the sound gets brighter as the filter opens. Tilt down for a warm, muffled tone.' },
     { title: 'Tap the Screen', desc: 'The bottom half of the screen has three drum zones. Tap the top for hi-hat, middle for snare, bottom for kick.' },
     { title: 'Double Tap', desc: 'Double-tap anywhere in the drum zone to start an auto-rhythm. Double-tap again to stop it.' },
     { title: 'Show Your Hand', desc: 'Hold your hand up to the camera. A melody synth starts playing — move your hand up and down to change the pitch.' },
@@ -846,9 +859,9 @@ MUZE.Tutorial = {
 
   ADVANCED: [
     { title: 'Six Modes', desc: 'Your smile controls which mode plays. From dark to bright: Phrygian, Aeolian, Dorian, Mixolydian, Ionian, Lydian. Each has a different emotional character.' },
-    { title: 'Filter (Mouth)', desc: 'Mouth openness controls a lowpass filter (400Hz\u201312kHz). Open = bright and present. Closed = warm and muffled.' },
+    { title: 'Filter (Head Pitch)', desc: 'Tilting your head up/down controls a lowpass filter (800Hz\u201310kHz). Up = bright and present. Down = warm and muffled. Volume-compensated so it stays even.' },
     { title: 'Reverb (Eyes)', desc: 'Eye openness controls reverb amount. Wide eyes = spacious and ambient. Squinting = dry and intimate.' },
-    { title: 'Chorus (Grin)', desc: 'A wide grin increases chorus depth, making the sound shimmer and widen in stereo.' },
+    { title: 'Chorus (Head Roll)', desc: 'Tilting your head sideways increases chorus depth, making the sound shimmer and widen in stereo.' },
     { title: 'Delay (Head Turn)', desc: 'Turn your head left or right to add delay/echo. The further you turn, the more echo.' },
     { title: 'Octave (Brow Height)', desc: 'Raising your eyebrows shifts the melody and arpeggio to a higher octave.' },
     { title: 'Chord Change (Brow Spike)', desc: 'A quick, sharp eyebrow raise advances the chord progression. There are 6 chords in the cycle.' },
@@ -1079,8 +1092,8 @@ MUZE.Loop = {
       'background:rgba(0,0,0,0.35);padding:5px 8px;border-radius:6px;'+
       'backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">'+
       `${S.faceDetected?'face':'...'} | ${sc} | chord ${S.chordIndex}<br>`+
-      `mouth:${S.mouthOpenness.toFixed(2)} smile:${S.lipCorner.toFixed(2)} brow:${S.browHeight.toFixed(2)}<br>`+
-      `eyes:${S.eyeOpenness.toFixed(2)} grin:${S.mouthWidth.toFixed(2)}<br>`+
+      `smile:${S.lipCorner.toFixed(2)} brow:${S.browHeight.toFixed(2)} eyes:${S.eyeOpenness.toFixed(2)}<br>`+
+      `pitch:${S.headPitch.toFixed(2)} yaw:${S.headYaw.toFixed(2)} roll:${S.headRoll.toFixed(2)}<br>`+
       `hand:${S.handPresent?(S.handOpen?'LEGATO':'STACCATO'):'—'} note:${n}<br>`+
       `auto:${S.autoRhythm?'ON':'—'}`+
       '</div>';
