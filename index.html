@@ -133,11 +133,23 @@
     -webkit-overflow-scrolling: touch;
   }
   #synth-panel.open { right: 0; }
+  #synth-tabs {
+    display: flex; gap: 0; margin-top: 48px; margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .synth-tab {
+    flex: 1; appearance: none; border: none; background: none;
+    color: rgba(255,255,255,0.35); font-size: 10px; letter-spacing: 1px;
+    text-transform: uppercase; padding: 8px 4px; cursor: pointer;
+    border-bottom: 2px solid transparent; font-family: monospace;
+  }
+  .synth-tab.active { color: #fff; border-bottom-color: #fff; }
+  .synth-tab-content { display: none; }
+  .synth-tab-content.active { display: block; }
   #synth-panel h3 {
     color: rgba(255,255,255,0.5); font-size: 10px; letter-spacing: 2px;
-    text-transform: uppercase; margin: 20px 0 10px; font-weight: 500;
+    text-transform: uppercase; margin: 12px 0 10px; font-weight: 500;
   }
-  #synth-panel h3:first-child { margin-top: 48px; }
   .synth-row {
     display: flex; align-items: center; gap: 8px; margin: 6px 0;
   }
@@ -296,42 +308,62 @@
 </div>
 <button id="synth-menu-btn">&#9881;</button>
 <div id="synth-panel">
-  <h3>Arpeggio</h3>
-  <div class="synth-row"><label>wave</label><select class="synth-select" id="arp-osc"><option>sawtooth</option><option>triangle</option><option>square</option><option>sine</option></select></div>
-  <div class="synth-row"><label>attack</label><input type="range" id="arp-atk" min="0.001" max="2" step="0.01" value="0.01"><span class="val">0.01</span></div>
-  <div class="synth-row"><label>decay</label><input type="range" id="arp-dec" min="0.01" max="2" step="0.01" value="0.3"><span class="val">0.30</span></div>
-  <div class="synth-row"><label>sustain</label><input type="range" id="arp-sus" min="0" max="1" step="0.01" value="0.6"><span class="val">0.60</span></div>
-  <div class="synth-row"><label>release</label><input type="range" id="arp-rel" min="0.01" max="4" step="0.01" value="0.8"><span class="val">0.80</span></div>
-  <div class="synth-row"><label>volume</label><input type="range" id="arp-vol" min="-30" max="0" step="1" value="-8"><span class="val">-8</span></div>
-  <div class="synth-row"><label>pan</label><input type="range" id="arp-pan" min="-1" max="1" step="0.05" value="0.3"><span class="val">0.30</span></div>
-  <div class="synth-row"><label>reverb</label><input type="range" id="arp-reverb" min="0" max="1" step="0.01" value="0.35"><span class="val">0.35</span></div>
-  <div class="synth-row"><label>delay</label><input type="range" id="arp-delay" min="0" max="0.8" step="0.01" value="0.25"><span class="val">0.25</span></div>
+  <div id="synth-tabs">
+    <button class="synth-tab active" data-tab="tab-arp">Arp</button>
+    <button class="synth-tab" data-tab="tab-mel">Melody</button>
+    <button class="synth-tab" data-tab="tab-pad">Pad</button>
+    <button class="synth-tab" data-tab="tab-bin">Binaural</button>
+  </div>
 
-  <h3>Melody (Hand)</h3>
-  <div class="synth-row"><label>wave</label><select class="synth-select" id="mel-osc"><option>triangle</option><option>sawtooth</option><option>square</option><option>sine</option></select></div>
-  <div class="synth-row"><label>attack</label><input type="range" id="mel-atk" min="0.001" max="2" step="0.01" value="0.05"><span class="val">0.05</span></div>
-  <div class="synth-row"><label>decay</label><input type="range" id="mel-dec" min="0.01" max="2" step="0.01" value="0.2"><span class="val">0.20</span></div>
-  <div class="synth-row"><label>sustain</label><input type="range" id="mel-sus" min="0" max="1" step="0.01" value="0.7"><span class="val">0.70</span></div>
-  <div class="synth-row"><label>release</label><input type="range" id="mel-rel" min="0.01" max="4" step="0.01" value="0.4"><span class="val">0.40</span></div>
-  <div class="synth-row"><label>volume</label><input type="range" id="mel-vol" min="-30" max="0" step="1" value="-6"><span class="val">-6</span></div>
-  <div class="synth-row"><label>pan</label><input type="range" id="mel-pan" min="-1" max="1" step="0.05" value="-0.3"><span class="val">-0.30</span></div>
-  <div class="synth-row"><label>reverb</label><input type="range" id="mel-reverb" min="0" max="1" step="0.01" value="0.3"><span class="val">0.30</span></div>
-  <div class="synth-row"><label>delay</label><input type="range" id="mel-delay" min="0" max="0.8" step="0.01" value="0.2"><span class="val">0.20</span></div>
+  <div class="synth-tab-content active" id="tab-arp">
+    <h3>Synth</h3>
+    <div class="synth-row"><label>wave</label><select class="synth-select" id="arp-osc"><option>sawtooth</option><option>triangle</option><option>square</option><option>sine</option></select></div>
+    <div class="synth-row"><label>attack</label><input type="range" id="arp-atk" min="0.001" max="2" step="0.01" value="0.01"><span class="val">0.01</span></div>
+    <div class="synth-row"><label>decay</label><input type="range" id="arp-dec" min="0.01" max="2" step="0.01" value="0.3"><span class="val">0.30</span></div>
+    <div class="synth-row"><label>sustain</label><input type="range" id="arp-sus" min="0" max="1" step="0.01" value="0.6"><span class="val">0.60</span></div>
+    <div class="synth-row"><label>release</label><input type="range" id="arp-rel" min="0.01" max="4" step="0.01" value="0.8"><span class="val">0.80</span></div>
+    <h3>Mix</h3>
+    <div class="synth-row"><label>volume</label><input type="range" id="arp-vol" min="-30" max="0" step="1" value="-8"><span class="val">-8</span></div>
+    <div class="synth-row"><label>pan</label><input type="range" id="arp-pan" min="-1" max="1" step="0.05" value="0.3"><span class="val">0.30</span></div>
+    <h3>FX (eye-linked)</h3>
+    <div class="synth-row"><label>reverb</label><input type="range" id="arp-reverb" min="0" max="1" step="0.01" value="0.35"><span class="val">0.35</span></div>
+    <div class="synth-row"><label>delay</label><input type="range" id="arp-delay" min="0" max="0.8" step="0.01" value="0.25"><span class="val">0.25</span></div>
+  </div>
 
-  <h3>Binaural Beats</h3>
-  <div class="synth-row"><label>on/off</label><button class="synth-select" id="bin-toggle" style="text-align:center">OFF</button></div>
-  <div class="synth-row"><label>mode</label><button class="synth-select" id="bin-mode" style="text-align:center">tonic</button></div>
-  <div class="synth-row"><label>beat hz</label><input type="range" id="bin-hz" min="1" max="20" step="0.5" value="4"><span class="val">4.0</span></div>
-  <div class="synth-row"><label>volume</label><input type="range" id="bin-vol" min="-36" max="-6" step="1" value="-24"><span class="val">-24</span></div>
+  <div class="synth-tab-content" id="tab-mel">
+    <h3>Synth</h3>
+    <div class="synth-row"><label>wave</label><select class="synth-select" id="mel-osc"><option>triangle</option><option>sawtooth</option><option>square</option><option>sine</option></select></div>
+    <div class="synth-row"><label>attack</label><input type="range" id="mel-atk" min="0.001" max="2" step="0.01" value="0.05"><span class="val">0.05</span></div>
+    <div class="synth-row"><label>decay</label><input type="range" id="mel-dec" min="0.01" max="2" step="0.01" value="0.2"><span class="val">0.20</span></div>
+    <div class="synth-row"><label>sustain</label><input type="range" id="mel-sus" min="0" max="1" step="0.01" value="0.7"><span class="val">0.70</span></div>
+    <div class="synth-row"><label>release</label><input type="range" id="mel-rel" min="0.01" max="4" step="0.01" value="0.4"><span class="val">0.40</span></div>
+    <h3>Mix</h3>
+    <div class="synth-row"><label>volume</label><input type="range" id="mel-vol" min="-30" max="0" step="1" value="-6"><span class="val">-6</span></div>
+    <div class="synth-row"><label>pan</label><input type="range" id="mel-pan" min="-1" max="1" step="0.05" value="-0.3"><span class="val">-0.30</span></div>
+    <h3>FX (eye-linked)</h3>
+    <div class="synth-row"><label>reverb</label><input type="range" id="mel-reverb" min="0" max="1" step="0.01" value="0.3"><span class="val">0.30</span></div>
+    <div class="synth-row"><label>delay</label><input type="range" id="mel-delay" min="0" max="0.8" step="0.01" value="0.2"><span class="val">0.20</span></div>
+  </div>
 
-  <h3>Pad</h3>
-  <div class="synth-row"><label>wave</label><select class="synth-select" id="pad-osc"><option>sine</option><option>triangle</option><option>sawtooth</option><option>square</option></select></div>
-  <div class="synth-row"><label>harm</label><input type="range" id="pad-harm" min="0.5" max="8" step="0.1" value="2"><span class="val">2.0</span></div>
-  <div class="synth-row"><label>mod idx</label><input type="range" id="pad-mod" min="0" max="10" step="0.1" value="1.2"><span class="val">1.2</span></div>
-  <div class="synth-row"><label>attack</label><input type="range" id="pad-atk" min="0.01" max="4" step="0.01" value="1.0"><span class="val">1.00</span></div>
-  <div class="synth-row"><label>release</label><input type="range" id="pad-rel" min="0.1" max="8" step="0.1" value="2.5"><span class="val">2.5</span></div>
-  <div class="synth-row"><label>volume</label><input type="range" id="pad-vol" min="-30" max="0" step="1" value="-14"><span class="val">-14</span></div>
-  <div class="synth-row"><label>pan</label><input type="range" id="pad-pan" min="-1" max="1" step="0.05" value="0"><span class="val">0.00</span></div>
+  <div class="synth-tab-content" id="tab-pad">
+    <h3>Synth</h3>
+    <div class="synth-row"><label>wave</label><select class="synth-select" id="pad-osc"><option>sine</option><option>triangle</option><option>sawtooth</option><option>square</option></select></div>
+    <div class="synth-row"><label>harm</label><input type="range" id="pad-harm" min="0.5" max="8" step="0.1" value="2"><span class="val">2.0</span></div>
+    <div class="synth-row"><label>mod idx</label><input type="range" id="pad-mod" min="0" max="10" step="0.1" value="1.2"><span class="val">1.2</span></div>
+    <div class="synth-row"><label>attack</label><input type="range" id="pad-atk" min="0.01" max="4" step="0.01" value="1.0"><span class="val">1.00</span></div>
+    <div class="synth-row"><label>release</label><input type="range" id="pad-rel" min="0.1" max="8" step="0.1" value="2.5"><span class="val">2.5</span></div>
+    <h3>Mix</h3>
+    <div class="synth-row"><label>volume</label><input type="range" id="pad-vol" min="-30" max="0" step="1" value="-14"><span class="val">-14</span></div>
+    <div class="synth-row"><label>pan</label><input type="range" id="pad-pan" min="-1" max="1" step="0.05" value="0"><span class="val">0.00</span></div>
+  </div>
+
+  <div class="synth-tab-content" id="tab-bin">
+    <h3>Binaural Beats</h3>
+    <div class="synth-row"><label>on/off</label><button class="synth-select" id="bin-toggle" style="text-align:center">OFF</button></div>
+    <div class="synth-row"><label>mode</label><button class="synth-select" id="bin-mode" style="text-align:center">tonic</button></div>
+    <div class="synth-row"><label>beat hz</label><input type="range" id="bin-hz" min="1" max="20" step="0.5" value="4"><span class="val">4.0</span></div>
+    <div class="synth-row"><label>volume</label><input type="range" id="bin-vol" min="-36" max="-6" step="1" value="-24"><span class="val">-24</span></div>
+  </div>
 </div>
 
 <div id="start-screen">
@@ -885,6 +917,16 @@ MUZE.SynthMenu = {
     const panel = document.getElementById('synth-panel');
     document.getElementById('synth-menu-btn').addEventListener('click', () => {
       panel.classList.toggle('open');
+    });
+
+    // Tab switching
+    document.querySelectorAll('.synth-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.synth-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.synth-tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab).classList.add('active');
+      });
     });
 
     // Close panel when tapping outside
