@@ -800,8 +800,48 @@ MUZE.Audio = {
     }
   },
 
-  startRiser(){this._riserGain.gain.rampTo(0.3,2);this._riserFilter.frequency.rampTo(4000,2);},
-  stopRiser(){this._riserGain.gain.rampTo(0,0.05);this._riserFilter.frequency.rampTo(200,0.1);this.kickSynth.triggerAttackRelease('C1','4n',Tone.now(),1);},
+  _padVolPre: -14, _drumVolPre: {},
+  startRiser(){
+    // Riser noise sweep up
+    this._riserGain.gain.rampTo(0.3,2);
+    this._riserFilter.frequency.rampTo(4000,2);
+    // Duck pad + drums
+    this._padVolPre = this.padSynth.volume.value;
+    this._drumVolPre = { kick: this.kickSynth.volume.value, snare: this.snareSynth.volume.value, hat: this.hatSynth.volume.value };
+    this.padSynth.volume.rampTo(this._padVolPre - 12, 1.5);
+    this.kickSynth.volume.rampTo(this._drumVolPre.kick - 10, 1.5);
+    this.snareSynth.volume.rampTo(this._drumVolPre.snare - 10, 1.5);
+    this.hatSynth.volume.rampTo(this._drumVolPre.hat - 10, 1.5);
+  },
+  dropRiser(){
+    // Big reverb-drenched drop
+    this._riserGain.gain.rampTo(0,0.05);
+    this._riserFilter.frequency.rampTo(200,0.1);
+    this.kickSynth.triggerAttackRelease('C1','4n',Tone.now(),1);
+    // Reverb wash
+    this.reverb.wet.rampTo(0.95,0.05);
+    this._arpReverb.wet.rampTo(0.95,0.05);
+    this._melReverb.wet.rampTo(0.95,0.05);
+    setTimeout(()=>{
+      this.reverb.wet.rampTo(0.3,2);
+      this._arpReverb.wet.rampTo(this._arpReverbMax,2);
+      this._melReverb.wet.rampTo(this._melReverbMax,2);
+    },300);
+    // Snap volumes back
+    this.padSynth.volume.rampTo(this._padVolPre, 0.05);
+    this.kickSynth.volume.rampTo(this._drumVolPre.kick, 0.05);
+    this.snareSynth.volume.rampTo(this._drumVolPre.snare, 0.05);
+    this.hatSynth.volume.rampTo(this._drumVolPre.hat, 0.05);
+  },
+  cancelRiser(){
+    // Released hold without swipe up — just fade riser out, restore volumes
+    this._riserGain.gain.rampTo(0,0.3);
+    this._riserFilter.frequency.rampTo(200,0.3);
+    this.padSynth.volume.rampTo(this._padVolPre, 0.3);
+    this.kickSynth.volume.rampTo(this._drumVolPre.kick, 0.3);
+    this.snareSynth.volume.rampTo(this._drumVolPre.snare, 0.3);
+    this.hatSynth.volume.rampTo(this._drumVolPre.hat, 0.3);
+  },
   // Auto-arpeggio — loops continuously on transport
   _arpSeq: null,
   _arpNotes: [],
@@ -1369,14 +1409,21 @@ MUZE.Touch = {
     const dt=performance.now()-this._touchStart.time;
     clearTimeout(this._holdTimer);
     if(this._isHolding){
-      MUZE.Audio.stopRiser(); MUZE.State.riserActive=false;
+      // Check if swipe up while holding = riser drop
+      if(dy<-MUZE.Config.SWIPE_THRESHOLD){
+        MUZE.Audio.dropRiser();
+      } else {
+        MUZE.Audio.cancelRiser();
+      }
+      MUZE.State.riserActive=false;
       document.getElementById('riser-overlay').classList.remove('active');
       this._isHolding=false; this._touchStart=null; return;
     }
     const C=MUZE.Config, ax=Math.abs(dx), ay=Math.abs(dy);
     if(dt<C.SWIPE_MAX_TIME&&(ax>C.SWIPE_THRESHOLD||ay>C.SWIPE_THRESHOLD)){
-      if(ay>ax){if(dy<-C.SWIPE_THRESHOLD)MUZE.Audio.reverbThrow();else if(dy>C.SWIPE_THRESHOLD)MUZE.Audio.tapeStop();}
-      else{if(dx>C.SWIPE_THRESHOLD)MUZE.AutoRhythm.nextPattern();else if(dx<-C.SWIPE_THRESHOLD)MUZE.AutoRhythm.prevPattern();}
+      if(ax>ay){if(dx>C.SWIPE_THRESHOLD)MUZE.AutoRhythm.nextPattern();else if(dx<-C.SWIPE_THRESHOLD)MUZE.AutoRhythm.prevPattern();}
+      else if(dy>C.SWIPE_THRESHOLD)MUZE.Audio.tapeStop();
+      // swipe up without hold = no action (hold+swipe up = drop)
       this._touchStart=null; return;
     }
     const now=performance.now();
