@@ -1027,13 +1027,13 @@ MUZE.SynthMenu = {
 <!-- Recorder -->
 <script>
 MUZE.Recorder = {
-  _mediaRec: null, _chunks: [], _recording: false, _rafId: null,
-  _recCanvas: null, _recCtx: null, _audioDest: null,
+  _mediaRec: null, _chunks: [], _recording: false,
+  _recCanvas: null, _recCtx: null, _audioDest: null, _mimeType: null,
+  _w: 0, _h: 0,
 
   init() {
     this._recCanvas = document.getElementById('rec-canvas');
     this._recCtx = this._recCanvas.getContext('2d');
-    // Audio destination for recording
     this._audioDest = Tone.context.createMediaStreamDestination();
     Tone.getDestination().connect(this._audioDest);
 
@@ -1043,50 +1043,50 @@ MUZE.Recorder = {
   },
 
   start() {
-    const w = window.innerWidth, h = window.innerHeight;
-    const dpr = Math.min(devicePixelRatio, 2);
-    this._recCanvas.width = w * dpr;
-    this._recCanvas.height = h * dpr;
-    this._recCtx.scale(dpr, dpr);
+    // Use fixed 720p-ish resolution (no DPR) for clean recording
+    this._w = 720;
+    this._h = Math.round(720 * (window.innerHeight / window.innerWidth));
+    this._recCanvas.width = this._w;
+    this._recCanvas.height = this._h;
 
-    // Combine canvas video stream + audio
     const canvasStream = this._recCanvas.captureStream(30);
     const audioTrack = this._audioDest.stream.getAudioTracks()[0];
     if (audioTrack) canvasStream.addTrack(audioTrack);
 
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-      ? 'video/webm;codecs=vp9,opus'
-      : MediaRecorder.isTypeSupported('video/webm')
-        ? 'video/webm'
-        : 'video/mp4';
+    // Prefer mp4 for iOS camera roll compatibility
+    this._mimeType = MediaRecorder.isTypeSupported('video/mp4')
+      ? 'video/mp4'
+      : MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+        ? 'video/webm;codecs=vp9,opus'
+        : 'video/webm';
 
     this._chunks = [];
-    this._mediaRec = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: 4000000 });
+    this._mediaRec = new MediaRecorder(canvasStream, {
+      mimeType: this._mimeType, videoBitsPerSecond: 4000000
+    });
     this._mediaRec.ondataavailable = (e) => { if (e.data.size > 0) this._chunks.push(e.data); };
-    this._mediaRec.onstop = () => this._save(mimeType);
-    this._mediaRec.start(1000);
+    this._mediaRec.onstop = () => this._save();
+    this._mediaRec.start(500);
     this._recording = true;
     document.getElementById('rec-btn').classList.add('recording');
-    this._drawFrame();
   },
 
   stop() {
     this._recording = false;
-    cancelAnimationFrame(this._rafId);
     if (this._mediaRec && this._mediaRec.state === 'recording') {
       this._mediaRec.stop();
     }
     document.getElementById('rec-btn').classList.remove('recording');
   },
 
-  _drawFrame() {
+  // Called from main loop every frame
+  drawFrame() {
     if (!this._recording) return;
     const ctx = this._recCtx;
-    const w = this._recCanvas.width / Math.min(devicePixelRatio, 2);
-    const h = this._recCanvas.height / Math.min(devicePixelRatio, 2);
+    const w = this._w, h = this._h;
     const S = MUZE.State;
 
-    // Draw camera (mirrored)
+    // Camera (mirrored)
     const vid = MUZE.Camera.video;
     if (vid.readyState >= 2) {
       ctx.save();
@@ -1096,68 +1096,72 @@ MUZE.Recorder = {
       ctx.restore();
     }
 
-    // Draw overlay canvas
-    const overlay = document.getElementById('overlay');
-    ctx.drawImage(overlay, 0, 0, w, h);
+    // Overlay canvas
+    ctx.drawImage(document.getElementById('overlay'), 0, 0, w, h);
 
-    // Draw mode HUD
+    // Mode HUD
     const sc = MUZE.Music.getScaleName(S.currentScale).toUpperCase();
     const v = S.lipCorner;
+    const hudW = 180, hudH = 54, hudX = (w - hudW) / 2, hudY = h - 100;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    const hudW = 200, hudH = 60, hudX = (w - hudW) / 2, hudY = h - 110;
-    ctx.beginPath();
-    ctx.roundRect(hudX, hudY, hudW, hudH, 12);
-    ctx.fill();
+    ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 10); ctx.fill();
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 24px monospace';
+    ctx.font = 'bold 22px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(sc, w / 2, hudY + 28);
-    ctx.font = '12px monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText(sc, w / 2, hudY + 24);
+
+    // Valence bar
+    const barW = 140, barH = 5, barX = (w - barW) / 2, barY = hudY + 30;
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.beginPath(); ctx.roundRect(barX, barY, barW, barH, 2); ctx.fill();
+    const pct = (v + 1) / 2;
+    ctx.fillStyle = `hsl(${pct * 120},70%,55%)`;
+    ctx.beginPath(); ctx.roundRect(barX + pct * (barW - 12), barY, 12, barH, 2); ctx.fill();
+
+    ctx.font = '10px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.fillText('valence ' + v.toFixed(2), w / 2, hudY + 48);
 
-    // Draw valence bar
-    const barW = 160, barH = 6, barX = (w - barW) / 2, barY = hudY + 34;
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.beginPath(); ctx.roundRect(barX, barY, barW, barH, 3); ctx.fill();
-    const pct = ((v + 1) / 2);
-    const fillX = barX + pct * (barW - 14);
-    const hue = pct * 120;
-    ctx.fillStyle = `hsl(${hue},70%,55%)`;
-    ctx.beginPath(); ctx.roundRect(fillX, barY, 14, barH, 3); ctx.fill();
-
-    // Draw chord bar
-    const chordY = h - 44, chordH = 44;
+    // Chord bar
+    const chordY = h - 40, chordH = 40;
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(0, chordY, w, chordH);
     const chords = ['I', 'ii', 'iii', 'IV', 'V', 'vi'];
     const cw = w / 6;
-    ctx.font = '13px monospace';
+    ctx.font = '12px monospace';
     ctx.textAlign = 'center';
     chords.forEach((c, i) => {
-      ctx.fillStyle = i === S.chordIndex ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)';
-      ctx.fillText(c, cw * i + cw / 2, chordY + chordH / 2 + 5);
+      ctx.fillStyle = i === S.chordIndex ? '#fff' : 'rgba(255,255,255,0.3)';
+      ctx.fillText(c, cw * i + cw / 2, chordY + chordH / 2 + 4);
     });
 
-    // Rec indicator
+    // REC indicator
     ctx.fillStyle = '#f33';
-    ctx.beginPath(); ctx.arc(24, 24, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(20, 20, 5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#fff';
-    ctx.font = '11px monospace';
+    ctx.font = '10px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('REC', 36, 28);
-
-    this._rafId = requestAnimationFrame(() => this._drawFrame());
+    ctx.fillText('REC', 30, 24);
   },
 
-  _save(mimeType) {
-    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-    const blob = new Blob(this._chunks, { type: mimeType });
+  async _save() {
+    const ext = this._mimeType.includes('mp4') ? 'mp4' : 'webm';
+    const blob = new Blob(this._chunks, { type: this._mimeType });
+    const fileName = `muze-${Date.now()}.${ext}`;
+
+    // Try sharing to camera roll (iOS), fall back to download
+    if (navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: this._mimeType })] })) {
+      try {
+        await navigator.share({
+          files: [new File([blob], fileName, { type: this._mimeType })],
+          title: 'Muze Session'
+        });
+        return;
+      } catch (e) { /* user cancelled or not supported, fall through to download */ }
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `muze-${Date.now()}.${ext}`;
-    a.click();
+    a.href = url; a.download = fileName; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 };
@@ -1413,6 +1417,7 @@ MUZE.Loop = {
       if(this._prevMelodyNote!==null){MUZE.Audio.stopMelody();this._prevMelodyNote=null;}
     }
 
+    MUZE.Recorder.drawFrame();
     this._drawDebug(S);
   },
   _drawDebug(S){
