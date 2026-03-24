@@ -506,7 +506,9 @@ MUZE.Audio = {
   stopRiser(){this._riserGain.gain.rampTo(0,0.05);this._riserFilter.frequency.rampTo(200,0.1);this.kickSynth.triggerAttackRelease('C1','4n',Tone.now(),1);},
   playArpeggio() {
     const S=MUZE.State, C=MUZE.Config;
-    if(!S.currentScale||!this.leadSampler) return;
+    if(!S.currentScale) return;
+    const synth=this.leadSampler||this.padSynth;
+    if(!synth) return;
     const root=C.ROOT_NOTE;
     const up=S.currentScale.map(i=>MUZE.Music.midiToNote(root+i));
     const down=[...up].reverse().slice(1);
@@ -514,7 +516,7 @@ MUZE.Audio = {
     const gap=0.15;
     const now=Tone.now();
     notes.forEach((n,i)=>{
-      this.leadSampler.triggerAttackRelease(n,0.12,now+i*gap,0.7);
+      synth.triggerAttackRelease(n,0.12,now+i*gap,0.5);
     });
   },
   reverbThrow(){const p=this.reverb.wet.value;this.reverb.wet.rampTo(0.95,0.05);setTimeout(()=>this.reverb.wet.rampTo(p,1.5),200);},
@@ -844,7 +846,6 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     // Load samples
     document.getElementById('loading-text').textContent = 'Loading samples...';
     await MUZE.SampleLib.loadAll();
-    MUZE.Audio.setLeadSample('bottle-blow');
 
     // MediaPipe
     document.getElementById('loading-text').textContent = 'Loading face + hand models...';
