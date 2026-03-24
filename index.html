@@ -147,6 +147,53 @@
     font-size: 11px; padding: 4px 8px; border-radius: 8px;
     font-family: monospace;
   }
+  #help-btn {
+    position: fixed; top: env(safe-area-inset-top, 8px); right: 56px;
+    z-index: 20; appearance: none; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.7);
+    font-size: 18px; width: 40px; height: 40px; border-radius: 50%;
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-weight: bold;
+  }
+  #help-btn:active { background: rgba(255,255,255,0.15); }
+  #help-panel {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 25; background: rgba(5,5,5,0.95);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: env(safe-area-inset-top, 16px) 20px 40px 20px;
+    display: none;
+  }
+  #help-panel.open { display: block; }
+  #help-panel .close-help {
+    position: sticky; top: 0; text-align: right; padding: 8px 0 12px;
+  }
+  #help-panel .close-help button {
+    appearance: none; border: none; background: none;
+    color: rgba(255,255,255,0.6); font-size: 28px; cursor: pointer; padding: 4px 8px;
+  }
+  #help-panel h2 {
+    color: #fff; font-size: 20px; font-weight: 300; letter-spacing: 4px;
+    text-transform: uppercase; margin: 0 0 20px;
+  }
+  #help-panel h3 {
+    color: rgba(255,255,255,0.5); font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase; margin: 24px 0 8px; font-weight: 500;
+  }
+  #help-panel table {
+    width: 100%; border-collapse: collapse; margin: 0 0 8px;
+  }
+  #help-panel td {
+    padding: 6px 0; font-size: 12px; line-height: 1.4;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    vertical-align: top;
+  }
+  #help-panel td:first-child {
+    color: #fff; font-weight: 500; width: 35%; padding-right: 12px;
+    font-family: monospace; font-size: 11px;
+  }
+  #help-panel td:last-child { color: rgba(255,255,255,0.6); }
 </style>
 </head>
 <body>
@@ -165,6 +212,65 @@
 <div id="debug"></div>
 <div id="mode-hud"></div>
 
+<button id="help-btn">?</button>
+<div id="help-panel">
+  <div class="close-help"><button id="close-help">&times;</button></div>
+  <h2>How to Play</h2>
+
+  <h3>Face &rarr; Sound</h3>
+  <table>
+    <tr><td>Smile / Frown</td><td>Changes musical mode. Smile for bright (Lydian, Ionian), neutral for Dorian, frown for dark (Aeolian, Phrygian)</td></tr>
+    <tr><td>Open mouth</td><td>Opens the filter — sound gets brighter and more present</td></tr>
+    <tr><td>Close mouth</td><td>Closes the filter — warm, muffled, intimate</td></tr>
+    <tr><td>Raise eyebrows</td><td>Melody shifts to higher octave</td></tr>
+    <tr><td>Quick brow raise</td><td>Advances to the next chord in the progression</td></tr>
+    <tr><td>Wide eyes</td><td>More reverb (spacious, ambient)</td></tr>
+    <tr><td>Squint</td><td>Less reverb (dry, close)</td></tr>
+    <tr><td>Wide grin</td><td>More chorus (shimmery, wide)</td></tr>
+    <tr><td>Turn head L/R</td><td>More delay (echoes)</td></tr>
+  </table>
+
+  <h3>Hand &rarr; Melody</h3>
+  <table>
+    <tr><td>Show hand</td><td>Activates lead melody — hand position controls pitch</td></tr>
+    <tr><td>Hand up/down</td><td>Higher or lower notes in the current scale</td></tr>
+    <tr><td>Open hand</td><td>Legato — notes glide smoothly</td></tr>
+    <tr><td>Closed fist</td><td>Staccato — notes play short and percussive</td></tr>
+  </table>
+
+  <h3>Touch &rarr; Drums & FX</h3>
+  <table>
+    <tr><td>Tap top zone</td><td>Hi-hat</td></tr>
+    <tr><td>Tap middle zone</td><td>Snare</td></tr>
+    <tr><td>Tap bottom zone</td><td>Kick</td></tr>
+    <tr><td>Double tap</td><td>Toggle auto-rhythm on/off</td></tr>
+    <tr><td>Swipe left/right</td><td>Change drum pattern</td></tr>
+    <tr><td>Hold</td><td>Riser — building tension sweep</td></tr>
+    <tr><td>Swipe up</td><td>Reverb throw — big wash of space</td></tr>
+    <tr><td>Swipe down</td><td>Tape stop — pitch slows down</td></tr>
+  </table>
+
+  <h3>Always On</h3>
+  <table>
+    <tr><td>Pad synth</td><td>Sustained chords — follows your expression mode and chord progression</td></tr>
+    <tr><td>Lead arpeggio</td><td>Loops up and down the current scale automatically</td></tr>
+  </table>
+
+  <h3>Synth Controls</h3>
+  <table>
+    <tr><td>Gear icon &#9881;</td><td>Opens synth panel with controls for lead and pad: waveform, envelope (ADSR), harmonicity, modulation, volume</td></tr>
+  </table>
+
+  <h3>Modes (dark &rarr; bright)</h3>
+  <table>
+    <tr><td>Phrygian</td><td>Darkest — Spanish/metal tension</td></tr>
+    <tr><td>Aeolian</td><td>Dark — natural minor</td></tr>
+    <tr><td>Dorian</td><td>Neutral — jazz minor, bittersweet</td></tr>
+    <tr><td>Mixolydian</td><td>Warm — bluesy major</td></tr>
+    <tr><td>Ionian</td><td>Bright — classic major scale</td></tr>
+    <tr><td>Lydian</td><td>Brightest — dreamy, floating</td></tr>
+  </table>
+</div>
 <button id="synth-menu-btn">&#9881;</button>
 <div id="synth-panel">
   <h3>Lead Synth</h3>
@@ -912,6 +1018,8 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     // Init modules
     MUZE.Touch.init();
     MUZE.SynthMenu.init();
+    document.getElementById('help-btn').addEventListener('click', () => document.getElementById('help-panel').classList.add('open'));
+    document.getElementById('close-help').addEventListener('click', () => document.getElementById('help-panel').classList.remove('open'));
     MUZE.Loop.init();
     ss.remove();
     MUZE.Loop.start();
