@@ -92,9 +92,11 @@ MUZE.BgBlur = {
     this._blurV(this._blurBuf, arr, w, h, radius);
   },
 
+  _blurApplied: false,
+
   activate() {
     this._active = true;
-    document.getElementById('cam').style.filter = 'blur(12px) brightness(0.85)';
+    // Don't blur video yet — wait until first successful render
     const check = () => {
       const v = MUZE.Camera.video;
       if (v && v.videoWidth) {
@@ -148,6 +150,12 @@ MUZE.BgBlur = {
 
     this._bgCtx.clearRect(0, 0, w, h);
     this._bgCtx.putImageData(imgData, 0, 0);
+
+    // Apply video blur only after first successful segmentation
+    if (!this._blurApplied) {
+      document.getElementById('cam').style.filter = 'blur(12px) brightness(0.85)';
+      this._blurApplied = true;
+    }
 
     result.confidenceMasks[0].close();
   }
