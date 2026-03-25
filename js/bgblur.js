@@ -130,7 +130,7 @@ MUZE.BgBlur = {
 
     const rawMask = result.confidenceMasks[0].getAsFloat32Array();
 
-    // DEBUG: log mask stats on first frame
+    // DEBUG: show mask stats on screen
     if (!this._debugged) {
       let min = 1, max = 0, sum = 0;
       for (let i = 0; i < rawMask.length; i++) {
@@ -138,7 +138,12 @@ MUZE.BgBlur = {
         if (rawMask[i] > max) max = rawMask[i];
         sum += rawMask[i];
       }
-      console.log('BgBlur mask stats:', { len: rawMask.length, min, max, avg: sum/rawMask.length, canvasPixels: w*h });
+      const info = `mask: ${rawMask.length}px, min:${min.toFixed(3)} max:${max.toFixed(3)} avg:${(sum/rawMask.length).toFixed(3)} canvas:${w}x${h}`;
+      const el = document.createElement('div');
+      el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:999;background:red;color:#fff;padding:16px;font:14px monospace;border-radius:8px;pointer-events:none;white-space:pre-wrap;max-width:90%;text-align:center';
+      el.textContent = info;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 10000);
       this._debugged = true;
     }
 
