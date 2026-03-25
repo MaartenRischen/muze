@@ -33,7 +33,6 @@ MUZE.BgBlur = {
 
   render(video, faceLandmarks) {
     if (!this._active || !this._bgCtx || !video || video.readyState < 2) return;
-    if (!this._bgCanvas.width && MUZE.Camera.video.videoWidth) this.activate();
     const w = this._bgCanvas.width, h = this._bgCanvas.height;
     if (!w) return;
     const ctx = this._bgCtx;
