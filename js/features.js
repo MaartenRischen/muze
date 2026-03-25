@@ -4,215 +4,173 @@
    ============================================================ */
 
 // ============================================================
-// LOOP RECORDER with Overdub
-// Records using MediaRecorder + Tone.context destination stream
+// MELODY LOOP RECORDER
+// Records hand melody notes as timed events over 4 bars.
+// On playback, replays the melody via the melody synth.
+// User can overdub additional melody phrases on top.
 // ============================================================
 MUZE.LoopRecorder = {
   _state: 'empty', // empty | recording | playing | overdubbing
-  _layers: [],      // array of { player, buffer }
-  _loopDuration: 0, // ms, set on first recording
+  _layers: [],      // array of arrays of {time, note, duration} events
+  _loopDuration: 0, // ms
   _startTime: 0,
+  _playbackPart: null,
   _progressRAF: null,
-  _mediaRecorder: null,
-  _chunks: [],
-  _audioDest: null,
-  _barCount: 4,
+  _currentNote: null,
+  _noteStartTime: 0,
 
   init() {
-    const recBtn = document.getElementById('loop-rec-btn');
-    const overdubBtn = document.getElementById('loop-overdub-btn');
-    const undoBtn = document.getElementById('loop-undo-btn');
-    const clearBtn = document.getElementById('loop-clear-btn');
-
-    recBtn.addEventListener('click', () => this._onRecBtn());
-    overdubBtn.addEventListener('click', () => this._onOverdubBtn());
-    undoBtn.addEventListener('click', () => this._undoLayer());
-    clearBtn.addEventListener('click', () => this._clearAll());
-
-    // Also wire panel buttons (in synth panel Performance tab)
-    const pRec = document.getElementById('loop-rec-panel-btn');
-    const pOvr = document.getElementById('loop-overdub-panel-btn');
-    const pUndo = document.getElementById('loop-undo-panel-btn');
-    const pClear = document.getElementById('loop-clear-panel-btn');
-    if (pRec) pRec.addEventListener('click', () => this._onRecBtn());
-    if (pOvr) pOvr.addEventListener('click', () => this._onOverdubBtn());
-    if (pUndo) pUndo.addEventListener('click', () => this._undoLayer());
-    if (pClear) pClear.addEventListener('click', () => this._clearAll());
-
-    // Create a MediaStream destination from the audio context
-    this._audioDest = Tone.context.createMediaStreamDestination();
-    Tone.getDestination().connect(this._audioDest);
+    const ids = ['loop-rec-panel-btn', 'loop-overdub-panel-btn', 'loop-undo-panel-btn', 'loop-clear-panel-btn',
+                 'loop-rec-btn', 'loop-overdub-btn', 'loop-undo-btn', 'loop-clear-btn'];
+    const fns = [() => this._onRecBtn(), () => this._onOverdubBtn(), () => this._undoLayer(), () => this._clearAll()];
+    for (let i = 0; i < 4; i++) {
+      const el1 = document.getElementById(ids[i]);
+      const el2 = document.getElementById(ids[i + 4]);
+      if (el1) el1.addEventListener('click', fns[i]);
+      if (el2) el2.addEventListener('click', fns[i]);
+    }
   },
 
   _getLoopMs() {
-    // 4 bars at current BPM, 4/4 time
-    const bpm = Tone.Transport.bpm.value;
-    const beatsPerBar = 4;
-    const msPerBeat = 60000 / bpm;
-    return msPerBeat * beatsPerBar * this._barCount;
+    return (60000 / Tone.Transport.bpm.value) * 4 * 4; // 4 bars
   },
 
-  _getMimeType() {
-    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return 'audio/webm;codecs=opus';
-    if (MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
-    return 'audio/webm';
+  // Called from app.js main loop when hand melody note changes during recording
+  recordNote(midiNote) {
+    if (this._state !== 'recording' && this._state !== 'overdubbing') return;
+    const now = performance.now();
+    const elapsed = now - this._startTime;
+    const layer = this._layers[this._layers.length - 1];
+
+    // End previous note
+    if (this._currentNote !== null) {
+      const last = layer[layer.length - 1];
+      if (last && last.duration === 0) {
+        last.duration = Math.max(0.05, (elapsed - last.time) / 1000); // seconds
+      }
+    }
+
+    if (midiNote !== null) {
+      layer.push({ time: elapsed / 1000, note: MUZE.Music.midiToNote(midiNote), duration: 0 });
+    }
+    this._currentNote = midiNote;
+    this._noteStartTime = now;
+  },
+
+  // Called when hand leaves frame during recording
+  recordNoteOff() {
+    if (this._state !== 'recording' && this._state !== 'overdubbing') return;
+    const layer = this._layers[this._layers.length - 1];
+    if (layer.length > 0) {
+      const last = layer[layer.length - 1];
+      if (last.duration === 0) {
+        last.duration = Math.max(0.05, (performance.now() - this._noteStartTime) / 1000);
+      }
+    }
+    this._currentNote = null;
   },
 
   _onRecBtn() {
     switch (this._state) {
-      case 'empty':
-        this._startRecording();
-        break;
-      case 'recording':
-        this._stopRecording();
-        break;
-      case 'playing':
-        this._startOverdub();
-        break;
-      case 'overdubbing':
-        this._stopOverdub();
-        break;
+      case 'empty': this._startRecording(); break;
+      case 'recording': this._stopRecording(); break;
+      case 'playing': this._startOverdub(); break;
+      case 'overdubbing': this._stopOverdub(); break;
     }
   },
 
   _onOverdubBtn() {
-    if (this._state === 'playing') {
-      this._startOverdub();
-    } else if (this._state === 'overdubbing') {
-      this._stopOverdub();
-    }
+    if (this._state === 'playing') this._startOverdub();
+    else if (this._state === 'overdubbing') this._stopOverdub();
   },
 
   _startRecording() {
     this._state = 'recording';
     this._loopDuration = this._getLoopMs();
     this._startTime = performance.now();
+    this._layers = [[]];
+    this._currentNote = null;
     this._updateUI();
-    this._startMediaRecorder();
     this._startProgress();
 
-    // Auto-stop after loop duration
     this._autoStopTimer = setTimeout(() => {
-      if (this._state === 'recording') {
-        this._stopRecording();
-      }
+      if (this._state === 'recording') this._stopRecording();
     }, this._loopDuration);
   },
 
-  _startMediaRecorder() {
-    this._chunks = [];
-    const mime = this._getMimeType();
-    this._mediaRecorder = new MediaRecorder(this._audioDest.stream, { mimeType: mime });
-    this._mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) this._chunks.push(e.data);
-    };
-    this._mediaRecorder.start(50); // small timeslice for responsiveness
-  },
-
-  async _stopRecording() {
+  _stopRecording() {
     clearTimeout(this._autoStopTimer);
-
-    const blob = await this._stopMediaRecorder();
-    if (!blob) { this._state = 'empty'; this._updateUI(); return; }
-
-    try {
-      const arrayBuf = await blob.arrayBuffer();
-      const audioBuf = await Tone.context.decodeAudioData(arrayBuf);
-      const toneBuf = new Tone.ToneAudioBuffer().fromArray(audioBuf.getChannelData(0));
-
-      // Create looping player
-      const player = new Tone.Player({
-        url: toneBuf,
-        loop: true,
-      }).toDestination();
-      player.start();
-
-      this._layers.push({ player, buffer: toneBuf });
-      this._state = 'playing';
-      this._startTime = performance.now();
-      this._startProgress();
-    } catch (e) {
-      console.warn('Loop recording failed to decode:', e);
+    this.recordNoteOff(); // close any open note
+    if (this._layers[0].length === 0) {
+      this._layers = [];
       this._state = 'empty';
+      this._stopProgress();
+      this._updateUI();
+      return;
     }
-
+    this._state = 'playing';
+    this._buildPlayback();
     this._updateUI();
-  },
-
-  _stopMediaRecorder() {
-    return new Promise((resolve) => {
-      if (!this._mediaRecorder || this._mediaRecorder.state !== 'recording') {
-        resolve(null);
-        return;
-      }
-      this._mediaRecorder.onstop = () => {
-        const mime = this._mediaRecorder.mimeType;
-        const blob = new Blob(this._chunks, { type: mime });
-        resolve(blob);
-      };
-      this._mediaRecorder.stop();
-    });
   },
 
   _startOverdub() {
     this._state = 'overdubbing';
+    this._layers.push([]);
+    this._startTime = performance.now();
+    this._currentNote = null;
     this._updateUI();
-    this._startMediaRecorder();
 
-    // Auto-stop after one loop cycle
     this._autoStopTimer = setTimeout(() => {
-      if (this._state === 'overdubbing') {
-        this._stopOverdub();
-      }
+      if (this._state === 'overdubbing') this._stopOverdub();
     }, this._loopDuration);
   },
 
-  async _stopOverdub() {
+  _stopOverdub() {
     clearTimeout(this._autoStopTimer);
-
-    const blob = await this._stopMediaRecorder();
-    if (!blob) { this._state = 'playing'; this._updateUI(); return; }
-
-    try {
-      const arrayBuf = await blob.arrayBuffer();
-      const audioBuf = await Tone.context.decodeAudioData(arrayBuf);
-      const toneBuf = new Tone.ToneAudioBuffer().fromArray(audioBuf.getChannelData(0));
-
-      const player = new Tone.Player({
-        url: toneBuf,
-        loop: true,
-      }).toDestination();
-      player.start();
-
-      this._layers.push({ player, buffer: toneBuf });
-    } catch (e) {
-      console.warn('Overdub decode failed:', e);
-    }
-
+    this.recordNoteOff();
+    if (this._layers[this._layers.length - 1].length === 0) this._layers.pop();
     this._state = 'playing';
+    this._buildPlayback();
     this._updateUI();
+  },
+
+  _buildPlayback() {
+    if (this._playbackPart) { this._playbackPart.stop(); this._playbackPart.dispose(); this._playbackPart = null; }
+
+    // Merge all layers into one event list
+    const events = [];
+    for (const layer of this._layers) {
+      for (const evt of layer) {
+        events.push({ time: evt.time, note: evt.note, duration: evt.duration || 0.2 });
+      }
+    }
+    events.sort((a, b) => a.time - b.time);
+
+    const loopSec = this._loopDuration / 1000;
+    this._playbackPart = new Tone.Part((time, evt) => {
+      MUZE.Audio.melodySynth.triggerAttackRelease(evt.note, evt.duration, time, 0.6);
+    }, events.map(e => [e.time, { note: e.note, duration: e.duration }]));
+
+    this._playbackPart.loop = true;
+    this._playbackPart.loopEnd = loopSec;
+    this._playbackPart.start(0);
+    this._startTime = performance.now();
+    this._startProgress();
   },
 
   _undoLayer() {
     if (this._layers.length <= 0) return;
-    const last = this._layers.pop();
-    last.player.stop();
-    last.player.dispose();
-
-    if (this._layers.length === 0) {
-      this._state = 'empty';
-      this._stopProgress();
-    }
+    this._layers.pop();
+    if (this._layers.length === 0) { this._clearAll(); return; }
+    this._buildPlayback();
     this._updateUI();
   },
 
   _clearAll() {
-    for (const layer of this._layers) {
-      layer.player.stop();
-      layer.player.dispose();
-    }
+    if (this._playbackPart) { this._playbackPart.stop(); this._playbackPart.dispose(); this._playbackPart = null; }
     this._layers = [];
     this._state = 'empty';
+    this._currentNote = null;
     this._stopProgress();
     this._updateUI();
   },
@@ -220,85 +178,50 @@ MUZE.LoopRecorder = {
   _startProgress() {
     this._stopProgress();
     const fill = document.getElementById('loop-progress-fill');
-    const head = document.getElementById('loop-progress-head');
+    const bar = document.getElementById('loop-progress-bar');
+    if (bar) bar.classList.remove('hidden');
     const tick = () => {
       if (this._state === 'empty') return;
       const elapsed = (performance.now() - this._startTime) % this._loopDuration;
-      const pct = (elapsed / this._loopDuration) * 100;
-      fill.style.width = pct + '%';
-      head.style.left = pct + '%';
+      if (fill) fill.style.width = (elapsed / this._loopDuration * 100) + '%';
       this._progressRAF = requestAnimationFrame(tick);
     };
     this._progressRAF = requestAnimationFrame(tick);
   },
 
   _stopProgress() {
-    if (this._progressRAF) {
-      cancelAnimationFrame(this._progressRAF);
-      this._progressRAF = null;
-    }
+    if (this._progressRAF) { cancelAnimationFrame(this._progressRAF); this._progressRAF = null; }
     const fill = document.getElementById('loop-progress-fill');
-    const head = document.getElementById('loop-progress-head');
+    const bar = document.getElementById('loop-progress-bar');
     if (fill) fill.style.width = '0%';
-    if (head) head.style.left = '0%';
+    if (bar) bar.classList.add('hidden');
   },
 
   _updateUI() {
-    const recBtn = document.getElementById('loop-rec-btn');
-    const overdubBtn = document.getElementById('loop-overdub-btn');
-    const undoBtn = document.getElementById('loop-undo-btn');
-    const clearBtn = document.getElementById('loop-clear-btn');
-    const bar = document.getElementById('loop-bar');
-
-    // Remove all state classes
-    bar.classList.remove('state-recording', 'state-playing', 'state-overdubbing');
-
-    switch (this._state) {
-      case 'empty':
-        recBtn.innerHTML = '&#9673;'; // circle
-        recBtn.title = 'Start Loop';
-        overdubBtn.disabled = true;
-        undoBtn.disabled = true;
-        clearBtn.disabled = true;
-        break;
-      case 'recording':
-        bar.classList.add('state-recording');
-        recBtn.innerHTML = '&#9632;'; // stop square
-        recBtn.title = 'Stop Recording';
-        overdubBtn.disabled = true;
-        undoBtn.disabled = true;
-        clearBtn.disabled = true;
-        break;
-      case 'playing':
-        bar.classList.add('state-playing');
-        recBtn.innerHTML = '&#9673;'; // circle for overdub start
-        recBtn.title = 'Overdub';
-        overdubBtn.disabled = false;
-        undoBtn.disabled = this._layers.length <= 1;
-        clearBtn.disabled = false;
-        break;
-      case 'overdubbing':
-        bar.classList.add('state-overdubbing');
-        recBtn.innerHTML = '&#9632;';
-        recBtn.title = 'Stop Overdub';
-        overdubBtn.disabled = false;
-        clearBtn.disabled = false;
-        undoBtn.disabled = true;
-        break;
-    }
-    // Sync panel buttons
     const pRec = document.getElementById('loop-rec-panel-btn');
     const pOvr = document.getElementById('loop-overdub-panel-btn');
     const pUndo = document.getElementById('loop-undo-panel-btn');
     const pClear = document.getElementById('loop-clear-panel-btn');
+
+    const isRec = this._state === 'recording';
+    const isOvr = this._state === 'overdubbing';
+    const isPlay = this._state === 'playing';
+    const hasLayers = this._layers.length > 0;
+
     if (pRec) {
-      pRec.disabled = false;
-      pRec.textContent = this._state === 'recording' || this._state === 'overdubbing' ? '■ STOP' : '● REC';
-      pRec.style.color = this._state === 'recording' ? '#ef4444' : this._state === 'overdubbing' ? '#f59e0b' : '';
+      pRec.textContent = isRec || isOvr ? '■ STOP' : isPlay ? '● OVR' : '● REC';
+      pRec.style.color = isRec ? '#ef4444' : isOvr ? '#f59e0b' : '';
     }
-    if (pOvr) pOvr.disabled = overdubBtn.disabled;
-    if (pUndo) pUndo.disabled = undoBtn.disabled;
-    if (pClear) pClear.disabled = clearBtn.disabled;
+    if (pOvr) pOvr.disabled = !isPlay;
+    if (pUndo) pUndo.disabled = !hasLayers || isRec || isOvr;
+    if (pClear) pClear.disabled = !hasLayers || isRec || isOvr;
+
+    const bar = document.getElementById('loop-progress-bar');
+    if (bar) {
+      bar.classList.remove('recording', 'overdubbing');
+      if (isRec) bar.classList.add('recording');
+      if (isOvr) bar.classList.add('overdubbing');
+    }
   }
 };
 

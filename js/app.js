@@ -111,11 +111,15 @@ MUZE.Loop = {
             MUZE.Audio.startMelody(note);
           }
           this._prevMelodyNote = note;
+          // Feed melody note to loop recorder
+          if (MUZE.LoopRecorder) MUZE.LoopRecorder.recordNote(note);
         }
       } else if (this._prevMelodyNote !== null) {
         MUZE.Audio.stopMelody();
         this._prevMelodyNote = null;
         S.melodyNote = null;
+        // Tell loop recorder hand left
+        if (MUZE.LoopRecorder) MUZE.LoopRecorder.recordNoteOff();
       }
     } else {
       if (this._currentPadKey) { MUZE.Audio.releasePad(); this._currentPadKey = null; }
