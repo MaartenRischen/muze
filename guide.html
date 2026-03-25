@@ -21,87 +21,150 @@
   th { text-align: left; color: rgba(255,255,255,0.4); font-weight: 400; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
   td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); color: rgba(255,255,255,0.6); }
   td:first-child { color: rgba(255,255,255,0.8); white-space: nowrap; }
-  .emoji { font-size: 18px; margin-right: 6px; }
   .tip { background: rgba(255,255,255,0.04); border-left: 2px solid rgba(255,255,255,0.15); padding: 10px 14px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 13px; }
-  .section-icon { font-size: 24px; margin-right: 8px; vertical-align: middle; }
+  .highlight { background: rgba(232,169,72,0.06); border-left-color: rgba(232,169,72,0.4); }
+  .section-icon { font-size: 20px; margin-right: 8px; vertical-align: middle; opacity: 0.4; }
   a { color: rgba(255,255,255,0.5); }
+  .badge { display: inline-block; background: rgba(232,169,72,0.15); color: rgba(232,169,72,0.9); font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; letter-spacing: 1px; text-transform: uppercase; margin-left: 8px; vertical-align: middle; }
+  .toc { margin: 20px 0 32px; padding: 16px 20px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); }
+  .toc h3 { margin: 0 0 10px; color: rgba(255,255,255,0.5); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
+  .toc ul { list-style: none; columns: 2; column-gap: 16px; }
+  .toc li { font-size: 12px; color: rgba(255,255,255,0.4); padding: 2px 0; }
+  .toc li a { color: rgba(255,255,255,0.5); text-decoration: none; }
+  .toc li a:hover { color: rgba(255,255,255,0.8); }
+  .difficulty { display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; padding: 3px 10px; border-radius: 12px; margin-bottom: 12px; }
+  .diff-basics { background: rgba(52,211,153,0.15); color: rgba(52,211,153,0.9); }
+  .diff-intermediate { background: rgba(56,189,248,0.15); color: rgba(56,189,248,0.9); }
+  .diff-advanced { background: rgba(192,132,252,0.15); color: rgba(192,132,252,0.9); }
+  .diff-performance { background: rgba(244,114,182,0.15); color: rgba(244,114,182,0.9); }
 </style>
 </head>
 <body>
 
 <h1>Muze</h1>
-<p class="subtitle">Turn everyday sounds into music with your face, hand, and touch.</p>
+<p class="subtitle">Your body is the instrument. Create music with your face, hands, touch, and motion.</p>
 
-<h2><span class="section-icon">1.</span> Getting Started</h2>
-<p>Open MUZE on your phone (portrait mode). Tap <strong>"Touch to Begin"</strong> and allow camera access. The app loads 8 foley samples and the face/hand tracking models — this takes a few seconds on first load.</p>
-<p>Once loaded, you'll see yourself on camera with a debug panel (top-left) and sample buttons (top-right). Music starts as soon as your face is detected.</p>
+<div class="toc">
+  <h3>Contents</h3>
+  <ul>
+    <li><a href="#basics">Basics</a></li>
+    <li><a href="#face">Face Controls</a></li>
+    <li><a href="#hand">Hand Melody</a></li>
+    <li><a href="#drums">Touch Drums</a></li>
+    <li><a href="#effects">Touch Effects</a></li>
+    <li><a href="#samples">Sound Palette</a></li>
+    <li><a href="#presets">Presets & BPM</a></li>
+    <li><a href="#key-scale">Key & Scale</a></li>
+    <li><a href="#mixer">Mixer</a></li>
+    <li><a href="#synth-design">Synth Design</a></li>
+    <li><a href="#loop-recorder">Loop Recorder</a></li>
+    <li><a href="#scenes">Scenes</a></li>
+    <li><a href="#chord-advance">Chord Auto-Advance</a></li>
+    <li><a href="#beat-repeat">Beat Repeat</a></li>
+    <li><a href="#gyroscope">Gyroscope</a></li>
+    <li><a href="#recording">Recording</a></li>
+    <li><a href="#session-flow">Session Flow</a></li>
+    <li><a href="#combos">Power Combos</a></li>
+    <li><a href="#tips">Tips</a></li>
+  </ul>
+</div>
 
-<h2><span class="section-icon">2.</span> Your Face = The Instrument</h2>
-<p>Your facial expressions shape the sound in real-time. You don't need to think about it — just emote naturally.</p>
+<!-- ============================================================ -->
+<h2 id="basics"><span class="section-icon">1.</span> Getting Started</h2>
+<span class="difficulty diff-basics">Basics</span>
+<p>Open MUZE on your phone in portrait mode. Tap <strong>"Begin Session"</strong> and allow camera access. The app loads face and hand tracking models (a few seconds on first load).</p>
+<p>The app starts <strong>paused</strong>. Tap the play button (top-right) to begin. Your face starts the pad texture immediately. The music responds to everything you do.</p>
+<p>There is no wrong move. Every note is in key. Every gesture makes music. Just play.</p>
+
+<div class="tip highlight">Use headphones for the best experience. You'll hear spatial effects, binaural beats, and stereo details that speakers miss.</div>
+
+<!-- ============================================================ -->
+<h2 id="face"><span class="section-icon">2.</span> Your Face = The Instrument</h2>
+<span class="difficulty diff-basics">Basics</span>
+<p>Your facial expressions shape the sound in real-time. You don't need to think about it &mdash; just emote naturally.</p>
 
 <table>
   <tr><th>Expression</th><th>What it does</th></tr>
-  <tr><td>Tilt head up</td><td>Opens the filter — sound gets brighter, more present</td></tr>
-  <tr><td>Tilt head down</td><td>Closes the filter — warm, muffled, intimate</td></tr>
+  <tr><td>Tilt head up</td><td>Opens the filter &mdash; sound gets brighter, more present</td></tr>
+  <tr><td>Tilt head down</td><td>Closes the filter &mdash; warm, muffled, intimate</td></tr>
   <tr><td>Smile</td><td>Shifts to brighter scales (lydian, ionian, mixolydian)</td></tr>
   <tr><td>Frown</td><td>Shifts to darker scales (aeolian, phrygian)</td></tr>
-  <tr><td>Neutral face</td><td>Dorian mode — versatile, bittersweet</td></tr>
-  <tr><td>Raise eyebrows</td><td>Melody plays in higher octave</td></tr>
-  <tr><td>Quick brow raise</td><td>Advances to next chord in the progression</td></tr>
-  <tr><td>Wide eyes</td><td>More reverb — spacious, expansive sound</td></tr>
-  <tr><td>Squint</td><td>Less reverb — dry, intimate, close</td></tr>
-  <tr><td>Tilt head sideways</td><td>More chorus + shimmer — thicker, dreamier</td></tr>
-  <tr><td>Turn head L/R</td><td>More delay/echo — turn away = more trails</td></tr>
+  <tr><td>Neutral face</td><td>Dorian mode &mdash; versatile, bittersweet</td></tr>
+  <tr><td>Raise eyebrows</td><td>Melody and arp play in higher octave</td></tr>
+  <tr><td>Wide eyes</td><td>More reverb &amp; delay &mdash; spacious, expansive</td></tr>
+  <tr><td>Squint</td><td>Less reverb &mdash; dry, intimate, close</td></tr>
+  <tr><td>Tilt head sideways</td><td>More chorus &amp; shimmer on the pad</td></tr>
+  <tr><td>Turn head L/R</td><td>More delay trails (head yaw)</td></tr>
+  <tr><td>Open mouth</td><td>Opens the arp filter &mdash; brighter, more biting arpeggios</td></tr>
 </table>
 
-<div class="tip">The pad sound (sustained texture) plays automatically when your face is detected. It responds to your head movements and expressions. Just look at the camera and the music begins.</div>
+<div class="tip">The pad plays automatically when your face is detected. Your head pitch controls a resonant lowpass filter with volume compensation. Head tilt up = bright, chin down = warm. This single gesture gives you incredible dynamic range.</div>
 
-<h2><span class="section-icon">3.</span> Your Hand = The Melody</h2>
-<p>Raise your free hand into the camera frame. A melody voice activates instantly.</p>
+<!-- ============================================================ -->
+<h2 id="hand"><span class="section-icon">3.</span> Your Hand = The Melody</h2>
+<span class="difficulty diff-basics">Basics</span>
+<p>Raise your free hand into the camera frame. A melody synth activates instantly.</p>
 
 <table>
   <tr><th>Gesture</th><th>What it does</th></tr>
-  <tr><td>Hand up/down</td><td>Pitch goes up/down (quantized to the current scale — always in key)</td></tr>
-  <tr><td>Open palm</td><td>Legato — notes sustain and blend smoothly</td></tr>
-  <tr><td>Closed fist</td><td>Staccato — short, plucky, percussive notes</td></tr>
-  <tr><td>Hand leaves frame</td><td>Melody fades out</td></tr>
+  <tr><td>Hand up/down</td><td>Pitch goes up/down (always in key &mdash; quantized to current scale)</td></tr>
+  <tr><td>Open palm</td><td>Legato &mdash; notes sustain and blend smoothly</td></tr>
+  <tr><td>Closed fist</td><td>Staccato &mdash; short, plucky, percussive notes</td></tr>
+  <tr><td>Hand leaves frame</td><td>Melody fades out gracefully</td></tr>
 </table>
 
-<div class="tip">The melody is always quantized to the scale your face is choosing. You literally cannot play a wrong note. Move your hand slowly for gentle melodies, quickly for expressive runs.</div>
+<div class="tip">You literally cannot play a wrong note. The melody is always quantized to whatever scale your face is choosing. Move slowly for gentle melodies, quickly for expressive runs.</div>
 
-<h2><span class="section-icon">4.</span> Touch = Drums &amp; Effects</h2>
-<p>Your thumb on the screen controls rhythm and special effects.</p>
+<!-- ============================================================ -->
+<h2 id="drums"><span class="section-icon">4.</span> Touch = Drums</h2>
+<span class="difficulty diff-basics">Basics</span>
+<p>The screen is divided into three invisible drum zones:</p>
 
-<h3>Drum Pad (3 zones)</h3>
 <table>
   <tr><th>Screen Area</th><th>Sound</th></tr>
-  <tr><td>Top third</td><td>Hi-hat / cymbal</td></tr>
-  <tr><td>Middle third</td><td>Snare / clap</td></tr>
-  <tr><td>Bottom third</td><td>Kick drum</td></tr>
+  <tr><td>Top third</td><td>Hi-hat / cymbal (with open hat variation every 4th hit)</td></tr>
+  <tr><td>Middle third</td><td>Snare / clap (layered: noise top + pitched body)</td></tr>
+  <tr><td>Bottom third</td><td>Kick drum (layered: membrane + click transient, triggers sidechain pump)</td></tr>
 </table>
 
-<h3>Gestures</h3>
+<p>Tap velocity is dynamic &mdash; faster taps = harder hits.</p>
+
 <table>
   <tr><th>Gesture</th><th>What it does</th></tr>
   <tr><td>Single tap</td><td>Plays a drum hit in that zone</td></tr>
   <tr><td>Double-tap</td><td>Toggles auto-rhythm on/off (shows "AUTO" indicator)</td></tr>
-  <tr><td>Press &amp; hold</td><td>Riser/build effect — filtered noise sweeps up in pitch and volume</td></tr>
-  <tr><td>Release hold</td><td>The drop — everything hits at once with a kick impact</td></tr>
-  <tr><td>Swipe up</td><td>Reverb throw — sends current sound into a huge reverb wash</td></tr>
-  <tr><td>Swipe down</td><td>Tape stop — everything slows down, pitch drops, then snaps back</td></tr>
-  <tr><td>Swipe left/right</td><td>Cycle through 4 different drum patterns (when auto-rhythm is on)</td></tr>
+  <tr><td>Swipe left/right</td><td>Cycle through 6 drum patterns (Basic, Funk, Broken, Minimal, Trap, Halftime)</td></tr>
 </table>
 
-<div class="tip">The press-and-hold riser is the most satisfying gesture. Hold for 2-3 seconds to build tension, then release for the drop. Try it with a brow raise at the same moment for a chord change on the drop.</div>
+<div class="tip">Every kick hit subtly ducks the pad volume (sidechain pumping) for that classic groove feel. It happens automatically.</div>
 
-<h2><span class="section-icon">5.</span> Samples — Your Sound Palette</h2>
-<p>MUZE turns everyday sounds into playable instruments. There are two sound slots:</p>
+<!-- ============================================================ -->
+<h2 id="effects"><span class="section-icon">5.</span> Touch Effects</h2>
+<span class="difficulty diff-intermediate">Intermediate</span>
+<p>Beyond basic drums, the touch zone supports powerful performance gestures:</p>
+
+<table>
+  <tr><th>Gesture</th><th>What it does</th></tr>
+  <tr><td>Press &amp; hold (400ms+)</td><td>Riser &mdash; filtered noise sweeps up, drums duck over 4 seconds</td></tr>
+  <tr><td>Release hold + swipe up</td><td>The Drop &mdash; big kick, reverb wash on all channels, drums restore</td></tr>
+  <tr><td>Release hold (no swipe)</td><td>Cancel riser &mdash; everything fades back smoothly</td></tr>
+  <tr><td>Swipe up (quick)</td><td>Reverb throw &mdash; sends all channels into huge reverb, fades back</td></tr>
+  <tr><td>Swipe down</td><td>Tape stop &mdash; BPM drops, pitch drops 2 octaves, snaps back</td></tr>
+  <tr><td>Triple-tap</td><td>Beat repeat &mdash; 2-second stutter (8th &rarr; 16th &rarr; 32nd notes)</td></tr>
+</table>
+
+<div class="tip">The press-and-hold riser is the most satisfying gesture. Hold for 2-3 seconds to build tension, then swipe up for the drop. Try combining it with a chord change for maximum impact.</div>
+
+<!-- ============================================================ -->
+<h2 id="samples"><span class="section-icon">6.</span> Sound Palette</h2>
+<span class="difficulty diff-intermediate">Intermediate</span>
+<p>MUZE has two sound slots that can use synth engines or samples:</p>
 
 <h3>Pad (sustained texture)</h3>
-<p>The pad loops a sample as a continuous, evolving sound. It plays when your face is detected. Your expressions shape it. Best with longer, tonal sounds.</p>
+<p>The pad plays when your face is detected. Default is an FM synth with sub oscillator and detuned unison layer for width. You can switch it to any sample &mdash; it becomes a granular looping texture.</p>
 
 <h3>Lead (pitched melody)</h3>
-<p>The lead pitch-shifts a sample across the musical scale. Your hand controls which note plays. Works with any sound — short percussive hits become plucky leads, longer tones become singing melodies.</p>
+<p>The lead follows your hand position. Default is a mono synth with filter envelope and optional vibrato.</p>
 
 <h3>Pre-loaded samples</h3>
 <table>
@@ -116,50 +179,222 @@
   <tr><td>Wood knock</td><td>Lead</td><td>Marimba-like, warm, woody</td></tr>
 </table>
 
-<h3>Switching samples</h3>
-<p>Tap the <strong>"pad: ..."</strong> or <strong>"lead: ..."</strong> buttons in the top-right corner to cycle through all available samples. Any sample can be used for either slot — experiment!</p>
+<p>Tap <strong>PAD</strong> or <strong>LEAD</strong> buttons (top-right) to cycle through samples. First option is always the synth engine.</p>
 
-<h3>Recording your own</h3>
-<p>Tap <strong>"record sample"</strong> — the app captures 2 seconds from your microphone. The recording is automatically assigned as your lead sound. Try:</p>
-<ul style="margin: 8px 0 16px 20px; font-size: 13px; color: rgba(255,255,255,0.5);">
-  <li>Humming a note — becomes a vocal lead instrument</li>
-  <li>Clapping — becomes a percussive, punchy lead</li>
-  <li>Tapping a glass — becomes a crystalline bell sound</li>
-  <li>Saying "ahhh" — becomes a choir-like pad (switch to pad slot after recording)</li>
-  <li>Any ambient sound — your room, rain, traffic — becomes unique texture</li>
-</ul>
+<!-- ============================================================ -->
+<h2 id="presets"><span class="section-icon">7.</span> Presets &amp; Tempo</h2>
+<span class="difficulty diff-intermediate">Intermediate</span>
+<p>The performance bar (top-left) gives instant access to core parameters:</p>
 
-<h2><span class="section-icon">6.</span> Putting It All Together</h2>
-
-<h3>Session flow</h3>
-<p>1. Open the app, tap to begin. Your face starts the pad texture.<br>
-2. Play with expressions — tilt your head up for brightness, smile for major key.<br>
-3. Raise your hand — a melody appears. Move slowly at first.<br>
-4. Double-tap for auto-drums. Swipe left/right to find a groove you like.<br>
-5. Now you're playing: face = mood, hand = melody, thumb = rhythm.<br>
-6. Try the hold-and-release for dramatic builds. Swipe up for reverb washes.<br>
-7. Quick brow raise to change chords when it feels right.<br>
-8. Record something around you and play it as your lead.</p>
-
-<h3>Combos to try</h3>
 <table>
-  <tr><th>Combo</th><th>Effect</th></tr>
-  <tr><td>Smile + head up + high hand</td><td>Bright, soaring, euphoric melody</td></tr>
-  <tr><td>Frown + head down + low hand + fist</td><td>Dark, intimate, percussive staccato</td></tr>
-  <tr><td>Wide eyes + head tilt + slow hand</td><td>Spacious, shimmery, dreamy legato</td></tr>
-  <tr><td>Hold screen + brow raise + release</td><td>Build tension then drop with chord change</td></tr>
-  <tr><td>Turn head + swipe up</td><td>Delay trails + reverb throw = infinite space</td></tr>
-  <tr><td>Neutral face + auto-rhythm + no hand</td><td>Ambient meditation mode — just pad and beats</td></tr>
+  <tr><th>Control</th><th>What it does</th></tr>
+  <tr><td>PRESET</td><td>Cycles through 8 presets. Each crossfades smoothly over 2 seconds.</td></tr>
+  <tr><td>BPM</td><td>Opens tempo popup: slider (40-200), tap tempo, swing control (0-80%).</td></tr>
+  <tr><td>KEY</td><td>12 keys (C through B). Changes root note of everything.</td></tr>
+  <tr><td>SCALE</td><td>11 scale modes. MODAL lets your face choose. Or lock to a specific scale.</td></tr>
+  <tr><td>CHORDS</td><td>Toggle chord auto-advance (see below).</td></tr>
 </table>
 
-<div class="tip">Every session is unique because it's driven by YOUR expressions. Nobody else will create the same music you do. The system is designed so that everything always sounds good — you can't make a wrong move.</div>
+<h3>The 8 Presets</h3>
+<table>
+  <tr><th>Preset</th><th>BPM</th><th>Character</th></tr>
+  <tr><td>Default</td><td>85</td><td>Balanced starting point, all instruments active</td></tr>
+  <tr><td>Ambient Dream</td><td>65</td><td>Lush pads, no drums, heavy reverb &amp; delay, ethereal</td></tr>
+  <tr><td>Dark Techno</td><td>128</td><td>Driving kick, aggressive arp, industrial edge</td></tr>
+  <tr><td>Lo-Fi Chill</td><td>72</td><td>Key of F, swing groove, warm triangle waves, halftime feel</td></tr>
+  <tr><td>Bright Pop</td><td>110</td><td>Key of G, energetic arp pattern, upbeat major feel</td></tr>
+  <tr><td>Deep Space</td><td>55</td><td>Key of D#, massive reverb, no drums, cinematic atmosphere</td></tr>
+  <tr><td>Minimal</td><td>120</td><td>Key of D, stripped-back sine tones, percussive arp, clean</td></tr>
+  <tr><td>Future Bass</td><td>140</td><td>Key of A#, square-wave synths, trap drums, energetic</td></tr>
+</table>
 
-<h2><span class="section-icon">7.</span> Tips</h2>
+<div class="tip">Preset transitions crossfade BPM, volumes, sends, synth parameters, and arp patterns over 2 seconds. No clicks, no jumps &mdash; just smooth morphing from one vibe to another.</div>
+
+<!-- ============================================================ -->
+<h2 id="key-scale"><span class="section-icon">8.</span> Key &amp; Scale Selection</h2>
+<span class="difficulty diff-intermediate">Intermediate</span>
+<p>Tap KEY to choose from all 12 root notes. Tap SCALE to choose from 11 modes:</p>
+
+<table>
+  <tr><th>Scale</th><th>Feel</th></tr>
+  <tr><td>MODAL (face)</td><td>Your expression controls the mode in real-time (default)</td></tr>
+  <tr><td>Pentatonic Major</td><td>Simple, always consonant, folk/pop feel</td></tr>
+  <tr><td>Pentatonic Minor</td><td>Bluesy, soulful, can't go wrong</td></tr>
+  <tr><td>Harmonic Minor</td><td>Dramatic, Middle Eastern/classical tension</td></tr>
+  <tr><td>Whole Tone</td><td>Dreamy, floating, no resolution &mdash; impressionist</td></tr>
+  <tr><td>Blues</td><td>Gritty, expressive, that classic blue note</td></tr>
+</table>
+
+<p>When you select MODAL, your face controls 6 modes (Phrygian through Lydian) based on your smile/frown. Selecting any other scale locks it in &mdash; your face still controls filter, reverb, and all other parameters.</p>
+
+<!-- ============================================================ -->
+<h2 id="mixer"><span class="section-icon">9.</span> The Mixer</h2>
+<span class="difficulty diff-advanced">Advanced</span>
+<p>Tap <strong>MIX</strong> (top-right) to open a professional 8-channel mixer + master bus:</p>
+
+<p><strong>Channels:</strong> Pad, Arp, Melody, Kick, Snare, Hat, Binaural, Riser, Master</p>
+
+<p>Each channel has:</p>
+<ul style="margin: 8px 0 16px 20px; font-size: 13px; color: rgba(255,255,255,0.5);">
+  <li>Custom fader (drag to adjust volume, -60dB to +6dB)</li>
+  <li>Real-time level meter with peak hold</li>
+  <li>Pan indicator</li>
+  <li>Mute (M) and Solo (S) buttons</li>
+  <li>Tap the channel label for the detail view: 3-band EQ, reverb send, delay send, and pan</li>
+</ul>
+
+<p>The master bus has: 3-band EQ, gain, limiter threshold, tape saturation (always-on, subtle warmth), and a modulated reverb return for lush tails.</p>
+
+<div class="tip">Tonal channels (pad, arp, melody) are "face-linked" &mdash; their reverb/delay sends are modulated by your eye openness in real-time. Drum channels are fixed sends. Solo a channel to hear it isolated.</div>
+
+<!-- ============================================================ -->
+<h2 id="synth-design"><span class="section-icon">10.</span> Synth Design Panel</h2>
+<span class="difficulty diff-advanced">Advanced</span>
+<p>Tap the gear icon to open the synth design panel with 4 tabs:</p>
+
+<table>
+  <tr><th>Tab</th><th>Controls</th></tr>
+  <tr><td>Arp</td><td>Oscillator type, full ADSR envelope, arp pattern (6 types: up-down, up, down, random, up-up-down, played)</td></tr>
+  <tr><td>Melody</td><td>Portamento on/off, vibrato amount, oscillator type, full ADSR</td></tr>
+  <tr><td>Pad</td><td>Oscillator type, FM harmonicity ratio, modulation index, attack &amp; release</td></tr>
+  <tr><td>Binaural</td><td>On/off, tonic/chord-follow mode, beat frequency (1-20 Hz)</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="loop-recorder"><span class="section-icon">11.</span> Loop Recorder</h2>
+<span class="difficulty diff-advanced">Advanced</span>
+<p>The loop bar (left side) turns MUZE into a live looping instrument. It captures 4 bars of audio at the current BPM.</p>
+
+<table>
+  <tr><th>Action</th><th>What it does</th></tr>
+  <tr><td>Tap circle</td><td>Start recording. Auto-stops after 4 bars.</td></tr>
+  <tr><td>Tap again (playing)</td><td>Start overdub &mdash; new layer on top of existing loop.</td></tr>
+  <tr><td>+ button</td><td>Also starts overdub while playing.</td></tr>
+  <tr><td>Undo arrow</td><td>Remove the last overdub layer.</td></tr>
+  <tr><td>X button</td><td>Clear all layers and stop.</td></tr>
+</table>
+
+<p>The progress bar shows loop position with a smooth animated gradient and playhead. Colors change: green = playing, red = recording, amber = overdubbing.</p>
+
+<div class="tip highlight">Build a full arrangement live: record drums first, overdub pad, add melody, switch presets or keys, overdub again. Each layer stacks. This is how you go from nothing to a complete song in 30 seconds.</div>
+
+<!-- ============================================================ -->
+<h2 id="scenes"><span class="section-icon">12.</span> Scenes (4 Slots)</h2>
+<span class="difficulty diff-advanced">Advanced</span>
+<p>Save your entire instrument state and recall it instantly. Scene slots are at the bottom-left.</p>
+
+<table>
+  <tr><th>Action</th><th>What it does</th></tr>
+  <tr><td>Tap SAVE</td><td>Enter save mode (slots pulse with accent glow). Tap a slot to save.</td></tr>
+  <tr><td>Tap saved slot</td><td>Recall that scene with a smooth 2-second crossfade.</td></tr>
+</table>
+
+<p>A scene saves: BPM, key, scale, swing, chord position, all channel volumes, pans, EQ, reverb/delay sends, synth oscillator types, master volume, and preset state.</p>
+
+<div class="tip">Set up 4 different vibes (verse, chorus, bridge, drop) and switch between them live. The 2-second crossfade keeps everything musical. Active slots glow with the current accent color.</div>
+
+<!-- ============================================================ -->
+<h2 id="chord-advance"><span class="section-icon">13.</span> Chord Auto-Advance</h2>
+<span class="difficulty diff-performance">Performance</span>
+<p>Tap the <strong>CHORDS</strong> button in the performance bar to enable automatic chord progression.</p>
+
+<p>When active, chords cycle through the progression every bar: <strong>I &rarr; ii &rarr; iii &rarr; IV &rarr; V &rarr; vi &rarr; repeat</strong>.</p>
+
+<p>A small arrow indicator appears above the next chord in the progression so you always know what's coming.</p>
+
+<div class="tip">Combine chord auto-advance with a loop recording to capture a full 6-chord progression. Then disable it and play freely over your recorded harmony.</div>
+
+<!-- ============================================================ -->
+<h2 id="beat-repeat"><span class="section-icon">14.</span> Beat Repeat / Stutter</h2>
+<span class="difficulty diff-performance">Performance</span>
+<p>Triple-tap any drum zone to trigger a 2-second beat repeat effect on that drum sound.</p>
+
+<p>The stutter accelerates automatically: starts at 8th notes, speeds to 16th notes, then 32nd notes. Velocity increases as speed increases. A visual flash overlay pulses during the effect.</p>
+
+<div class="tip">Use beat repeat right before a drop for an incredible build-up. Triple-tap the kick zone, let it build for 2 seconds, then hit a chord change.</div>
+
+<!-- ============================================================ -->
+<h2 id="gyroscope"><span class="section-icon">15.</span> Gyroscope (Mobile)</h2>
+<span class="difficulty diff-performance">Performance</span>
+<p>Tap the rotation button in the toolbar to enable phone tilt control:</p>
+
+<table>
+  <tr><th>Tilt</th><th>What it does</th></tr>
+  <tr><td>Left/right</td><td>Pans arp and melody in stereo (opposite directions for width)</td></tr>
+  <tr><td>Forward/back</td><td>Modulates reverb depth on all tonal channels</td></tr>
+</table>
+
+<p>A subtle indicator appears (right side) showing tilt and pitch values. Values are smoothed for musical results.</p>
+
+<!-- ============================================================ -->
+<h2 id="recording"><span class="section-icon">16.</span> Recording Your Performance</h2>
+<span class="difficulty diff-intermediate">Intermediate</span>
+<p>Tap the record button (red circle, top-right) to capture video + audio of your session.</p>
+
+<table>
+  <tr><th>Mode</th><th>What it captures</th></tr>
+  <tr><td>STEREO</td><td>720p video with stereo audio mix &mdash; ready to share</td></tr>
+  <tr><td>MULTI</td><td>Video + separate audio files for pad, arp, melody, and drums &mdash; for further mixing in a DAW</td></tr>
+</table>
+
+<p>Toggle between modes by tapping the STEREO/MULTI label. The recording includes a HUD overlay showing mode, valence, chords, and a REC indicator.</p>
+
+<!-- ============================================================ -->
+<h2 id="session-flow"><span class="section-icon">17.</span> Session Flow</h2>
+<span class="difficulty diff-basics">Basics</span>
+
+<h3>Quick start (30 seconds)</h3>
+<p>1. Open app, tap Begin Session, tap play.<br>
+2. Your face starts the pad &mdash; tilt head, smile, frown. Music responds.<br>
+3. Raise your hand &mdash; melody appears. Move slowly.<br>
+4. Double-tap for auto-drums. You're making music.</p>
+
+<h3>Full performance (5 minutes)</h3>
+<p>1. Start with a preset (Ambient Dream for chill, Dark Techno for energy).<br>
+2. Set your key and BPM. Enable chord auto-advance.<br>
+3. Play with face expressions &mdash; find a mood.<br>
+4. Enable auto-drums, try different patterns (swipe left/right).<br>
+5. Add hand melody &mdash; explore the range.<br>
+6. Record a loop: tap the loop circle, play for 4 bars, it auto-stops.<br>
+7. Overdub: while loop plays, tap + button, add melody layer.<br>
+8. Save to Scene 1.<br>
+9. Switch preset, change key. Save to Scene 2.<br>
+10. Now perform: switch between scenes, use riser/drop, beat repeat, reverb throw.<br>
+11. Hit record to capture the whole thing.</p>
+
+<!-- ============================================================ -->
+<h2 id="combos"><span class="section-icon">18.</span> Power Combos</h2>
+<span class="difficulty diff-performance">Performance</span>
+
+<table>
+  <tr><th>Combo</th><th>Effect</th></tr>
+  <tr><td>Smile + head up + high hand</td><td>Bright, soaring, euphoric melody over a lydian pad</td></tr>
+  <tr><td>Frown + head down + fist + low hand</td><td>Dark, intimate, percussive staccato bass</td></tr>
+  <tr><td>Wide eyes + head tilt + slow hand</td><td>Spacious, shimmery, dreamy legato with max reverb</td></tr>
+  <tr><td>Hold screen + brow raise + release up</td><td>Build tension, chord change on the drop, reverb wash</td></tr>
+  <tr><td>Turn head + swipe up</td><td>Delay trails + reverb throw = infinite space</td></tr>
+  <tr><td>Triple-tap + wait + swipe up</td><td>Beat repeat build into reverb throw &mdash; transition heaven</td></tr>
+  <tr><td>Neutral face + auto-rhythm + no hand</td><td>Ambient meditation &mdash; just pad and beats, hands-free</td></tr>
+  <tr><td>Scene 1 &rarr; Scene 2 + riser</td><td>Scene crossfade during a riser for dramatic transitions</td></tr>
+  <tr><td>Gyro tilt + wide eyes</td><td>Spatial panning + reverb depth via phone movement</td></tr>
+  <tr><td>Chord auto-advance + loop record</td><td>Capture a full harmonic progression in one loop</td></tr>
+</table>
+
+<div class="tip highlight">Every session is unique because it's driven by YOUR expressions. Nobody else will create the same music you do. The system is designed so that everything always sounds good &mdash; you can't make a wrong move. Go perform.</div>
+
+<!-- ============================================================ -->
+<h2 id="tips"><span class="section-icon">19.</span> Tips</h2>
 <p><strong>Lighting:</strong> Face tracking works best in even, front-facing light. Avoid strong backlighting.</p>
-<p><strong>Distance:</strong> Keep your face roughly centered in the frame, about arm's length from the phone.</p>
+<p><strong>Distance:</strong> Keep your face roughly centered, about arm's length from the phone.</p>
 <p><strong>Hand tracking:</strong> Works best with a clear background behind your hand. Spread fingers clearly for open palm detection.</p>
-<p><strong>Headphones:</strong> Recommended for the best experience — you'll hear more detail in the effects and avoid feedback when recording samples.</p>
+<p><strong>Headphones:</strong> Strongly recommended &mdash; you'll hear stereo panning, binaural beats, spatial effects, and avoid feedback when recording.</p>
 <p><strong>Portrait mode:</strong> The app is designed for portrait orientation on mobile.</p>
+<p><strong>Background blur:</strong> The app automatically blurs your background using AI segmentation. Your face stays sharp, the background becomes a beautiful bokeh.</p>
+<p><strong>Saving:</strong> All settings auto-save to your browser. Close and reopen &mdash; your BPM, key, scale, presets, and scenes are restored.</p>
+<p><strong>Freeze mode:</strong> Tap the snowflake button next to the mode HUD to lock the current scale. Your face still controls filter, reverb, and chorus, but the scale won't change. Useful when you find a perfect mode.</p>
+
+<h3>Audio Architecture</h3>
+<p style="font-size:12px;color:rgba(255,255,255,0.35);">Signal chain: Synths &rarr; Channel EQ &rarr; Panner &rarr; Gain &rarr; Reverb/Delay sends (post-fader) | Tonal channels route through face-linked master filter | All channels &rarr; Tape Saturation (2x oversample) &rarr; Master EQ &rarr; Master Gain &rarr; Limiter &rarr; Analyser &rarr; Output. Reverb return has subtle chorus modulation for lush tails. Delay syncs to BPM via dotted-8th notation.</p>
 
 </body>
 </html>

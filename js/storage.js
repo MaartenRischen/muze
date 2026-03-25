@@ -3,7 +3,7 @@
    ============================================================ */
 
 MUZE.Storage = {
-  KEY: 'muze-settings-v1',
+  KEY: 'muze-settings-v2',
 
   _defaults: null,
 
@@ -20,6 +20,21 @@ MUZE.Storage = {
     // Save sample selections
     data['pad-sample'] = MUZE.State.padSampleId;
     data['lead-sample'] = MUZE.State.leadSampleId;
+    // Save new feature state
+    data['rootOffset'] = MUZE.State.rootOffset;
+    data['bpm'] = MUZE.State.bpm;
+    data['swing'] = MUZE.State.swing;
+    data['arpPatternIdx'] = MUZE.State.arpPatternIdx;
+    data['presetIdx'] = MUZE.State.presetIdx;
+    data['extraScaleMode'] = MUZE.State.extraScaleMode;
+    // Save chord auto-advance state
+    data['chordAutoAdvance'] = MUZE.ChordAdvance ? MUZE.ChordAdvance._active : false;
+
+    // Save scene data
+    if (MUZE.SceneManager) {
+      data['scenes'] = MUZE.SceneManager._scenes;
+      data['activeScene'] = MUZE.SceneManager._activeSlot;
+    }
 
     try {
       localStorage.setItem(this.KEY, JSON.stringify(data));
@@ -56,6 +71,56 @@ MUZE.Storage = {
       if (data['pad-sample']) MUZE.State.padSampleId = data['pad-sample'];
       if (data['lead-sample']) MUZE.State.leadSampleId = data['lead-sample'];
 
+      // Restore new features
+      if (data['rootOffset'] !== undefined) {
+        MUZE.State.rootOffset = +data['rootOffset'];
+        const keyVal = document.getElementById('key-val');
+        if (keyVal) keyVal.textContent = MUZE.Config.ROOT_NAMES[MUZE.State.rootOffset];
+      }
+      if (data['bpm'] !== undefined) {
+        MUZE.Audio.setBPM(+data['bpm']);
+        const bpmVal = document.getElementById('bpm-val');
+        if (bpmVal) bpmVal.textContent = MUZE.State.bpm;
+        const bpmSlider = document.getElementById('bpm-slider');
+        if (bpmSlider) bpmSlider.value = MUZE.State.bpm;
+      }
+      if (data['swing'] !== undefined) {
+        MUZE.Audio.setSwing(+data['swing']);
+        const swingSlider = document.getElementById('swing-slider');
+        if (swingSlider) swingSlider.value = MUZE.State.swing;
+        const swingVal = document.getElementById('swing-val');
+        if (swingVal) swingVal.textContent = MUZE.State.swing + '%';
+      }
+      if (data['arpPatternIdx'] !== undefined) {
+        MUZE.State.arpPatternIdx = +data['arpPatternIdx'];
+        const arpBtn = document.getElementById('arp-pattern');
+        if (arpBtn) arpBtn.textContent = MUZE.Config.ARP_PATTERNS[MUZE.State.arpPatternIdx];
+      }
+      if (data['extraScaleMode'] && data['extraScaleMode'] !== 'null') {
+        MUZE.State.extraScaleMode = data['extraScaleMode'];
+        MUZE.State.modeFrozen = true;
+        MUZE.State.currentScale = MUZE.Music.EXTRA_SCALES[data['extraScaleMode']];
+        const scaleVal = document.getElementById('scale-val');
+        if (scaleVal) scaleVal.textContent = data['extraScaleMode'];
+      }
+
+      // Restore chord auto-advance
+      if (data['chordAutoAdvance'] === true && MUZE.ChordAdvance) {
+        MUZE.ChordAdvance._active = true;
+        MUZE.ChordAdvance._start();
+        const btn = document.getElementById('auto-chord-btn');
+        if (btn) btn.classList.add('active');
+        const val = document.getElementById('auto-chord-val');
+        if (val) val.textContent = 'AUTO';
+      }
+
+      // Restore scenes
+      if (data['scenes'] && MUZE.SceneManager) {
+        MUZE.SceneManager._scenes = data['scenes'];
+        MUZE.SceneManager._activeSlot = data['activeScene'] || -1;
+        MUZE.SceneManager._updateSlotUI();
+      }
+
       return true;
     } catch (e) { return false; }
   },
@@ -66,6 +131,20 @@ MUZE.Storage = {
     document.getElementById('synth-panel').addEventListener('input', debouncedSave);
     document.getElementById('synth-panel').addEventListener('change', debouncedSave);
     document.getElementById('synth-panel').addEventListener('click', debouncedSave);
+    // Also save on perf bar interactions
+    const perfBar = document.getElementById('perf-bar');
+    if (perfBar) perfBar.addEventListener('click', debouncedSave);
+    // Save on popup interactions
+    document.querySelectorAll('.popup-panel').forEach(popup => {
+      popup.addEventListener('input', debouncedSave);
+      popup.addEventListener('click', debouncedSave);
+    });
+    // Save on chord advance toggle
+    const autoChordBtn = document.getElementById('auto-chord-btn');
+    if (autoChordBtn) autoChordBtn.addEventListener('click', debouncedSave);
+    // Save on scene interactions
+    const sceneBar = document.getElementById('scene-bar');
+    if (sceneBar) sceneBar.addEventListener('click', debouncedSave);
   },
 
   _debounce(fn, ms) {

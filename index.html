@@ -36,6 +36,7 @@
 
 <!-- Overlays -->
 <div id="riser-overlay"></div>
+<div id="beat-repeat-overlay"></div>
 <div id="rhythm-indicator">AUTO</div>
 
 <!-- Debug (hidden by default, tap top-left to toggle) -->
@@ -56,6 +57,31 @@
   <button class="toolbar-btn" id="help-btn" aria-label="Help" style="font-weight:bold">?</button>
   <button class="toolbar-btn" id="mixer-btn" aria-label="Mixer" style="font-size:10px;font-weight:600;letter-spacing:0.5px">MIX</button>
   <button class="toolbar-btn" id="synth-menu-btn" aria-label="Settings">&#9881;</button>
+  <button class="toolbar-btn" id="gyro-btn" aria-label="Gyroscope" style="font-size:12px">&#8635;</button>
+</div>
+
+<!-- Loop Recorder -->
+<div id="loop-bar">
+  <button id="loop-rec-btn" class="loop-btn" aria-label="Loop Record">&#9673;</button>
+  <div id="loop-progress"><div id="loop-progress-fill"></div><div id="loop-progress-head"></div></div>
+  <button id="loop-overdub-btn" class="loop-btn" aria-label="Overdub" disabled>+</button>
+  <button id="loop-undo-btn" class="loop-btn" aria-label="Undo Layer" disabled>&#8630;</button>
+  <button id="loop-clear-btn" class="loop-btn" aria-label="Clear Loop" disabled>&#10005;</button>
+</div>
+
+<!-- Scene Slots -->
+<div id="scene-bar">
+  <button class="scene-slot" data-scene="0">1</button>
+  <button class="scene-slot" data-scene="1">2</button>
+  <button class="scene-slot" data-scene="2">3</button>
+  <button class="scene-slot" data-scene="3">4</button>
+  <button id="scene-save-btn" class="scene-save">SAVE</button>
+</div>
+
+<!-- Gyroscope indicator -->
+<div id="gyro-indicator" class="hidden">
+  <div class="gyro-axis"><span>TILT</span><div class="gyro-bar"><div id="gyro-lr-fill" class="gyro-fill"></div></div></div>
+  <div class="gyro-axis"><span>PITCH</span><div class="gyro-bar"><div id="gyro-fb-fill" class="gyro-fill"></div></div></div>
 </div>
 
 <!-- Sample switcher -->
@@ -88,6 +114,41 @@
   </div>
 </div>
 
+<!-- Preset / Performance Bar -->
+<div id="perf-bar">
+  <button id="preset-btn" class="perf-btn"><span class="perf-label">PRESET</span><span id="preset-name">Default</span></button>
+  <button id="bpm-btn" class="perf-btn"><span class="perf-label">BPM</span><span id="bpm-val">85</span></button>
+  <button id="key-btn" class="perf-btn"><span class="perf-label">KEY</span><span id="key-val">C</span></button>
+  <button id="scale-btn" class="perf-btn"><span class="perf-label">SCALE</span><span id="scale-val">modal</span></button>
+  <button id="auto-chord-btn"><span class="perf-label">CHORDS</span><span id="auto-chord-val">OFF</span></button>
+</div>
+
+<!-- BPM Popup -->
+<div id="bpm-popup" class="popup-panel">
+  <div class="popup-header"><span>TEMPO</span><button class="popup-close" data-close="bpm-popup">&times;</button></div>
+  <div class="popup-body">
+    <div class="synth-row"><label>BPM</label><input type="range" id="bpm-slider" min="40" max="200" step="1" value="85"><span class="val" id="bpm-slider-val">85</span></div>
+    <button id="tap-tempo-btn" class="synth-select" style="text-align:center;margin-top:8px">TAP TEMPO</button>
+    <div class="synth-row" style="margin-top:12px"><label>swing</label><input type="range" id="swing-slider" min="0" max="80" step="1" value="0"><span class="val" id="swing-val">0%</span></div>
+  </div>
+</div>
+
+<!-- Key Popup -->
+<div id="key-popup" class="popup-panel">
+  <div class="popup-header"><span>KEY</span><button class="popup-close" data-close="key-popup">&times;</button></div>
+  <div class="popup-body">
+    <div id="key-grid"></div>
+  </div>
+</div>
+
+<!-- Scale Popup -->
+<div id="scale-popup" class="popup-panel">
+  <div class="popup-header"><span>SCALE</span><button class="popup-close" data-close="scale-popup">&times;</button></div>
+  <div class="popup-body">
+    <div id="scale-grid"></div>
+  </div>
+</div>
+
 <!-- Synth Panel -->
 <div id="synth-panel">
   <div id="synth-tabs">
@@ -104,11 +165,14 @@
     <div class="synth-row"><label>decay</label><input type="range" id="arp-dec" min="0.01" max="2" step="0.01" value="0.3"><span class="val">0.30</span></div>
     <div class="synth-row"><label>sustain</label><input type="range" id="arp-sus" min="0" max="1" step="0.01" value="0.6"><span class="val">0.60</span></div>
     <div class="synth-row"><label>release</label><input type="range" id="arp-rel" min="0.01" max="4" step="0.01" value="0.8"><span class="val">0.80</span></div>
+    <h3>Pattern</h3>
+    <div class="synth-row"><label>pattern</label><button class="synth-select" id="arp-pattern" style="text-align:center">up-down</button></div>
   </div>
 
   <div class="synth-tab-content" id="tab-mel">
     <h3>Mode</h3>
     <div class="synth-row"><label>porta</label><button class="synth-select" id="mel-porta" style="text-align:center">OFF</button></div>
+    <div class="synth-row"><label>vibrato</label><input type="range" id="mel-vib" min="0" max="1" step="0.01" value="0"><span class="val">0.00</span></div>
     <h3>Synth</h3>
     <div class="synth-row"><label>wave</label><select class="synth-select" id="mel-osc"><option>triangle</option><option>sawtooth</option><option>square</option><option>sine</option></select></div>
     <div class="synth-row"><label>attack</label><input type="range" id="mel-atk" min="0.001" max="2" step="0.01" value="0.05"><span class="val">0.05</span></div>
@@ -152,7 +216,7 @@
 <div id="start-screen">
   <h1>Muze</h1>
   <p>Your body is the instrument. Create music with your face, hands, and touch.</p>
-  <button id="start-btn">Touch to Begin</button>
+  <button id="start-btn">Begin Session</button>
   <span id="loading-text">Loading...</span>
 </div>
 
@@ -166,6 +230,7 @@
 <script src="js/visualizer.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/features.js"></script>
 <script src="js/app.js"></script>
 
 <!-- Bootstrap (ES module for MediaPipe import) -->
@@ -200,7 +265,13 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     MUZE.MixerUI.init();
     MUZE.SampleUI.init();
     MUZE.Tutorial.init();
+    MUZE.PerfBar.init();
     MUZE.Recorder.init();
+    MUZE.LoopRecorder.init();
+    MUZE.SceneManager.init();
+    MUZE.Gyroscope.init();
+    MUZE.BeatRepeat.init();
+    MUZE.ChordAdvance.init();
 
     // Restore saved settings
     MUZE.Storage.load();

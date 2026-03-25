@@ -47,6 +47,13 @@
   /* === SHADOWS === */
   --shadow-recessed: inset 0 1px 3px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.02);
   --shadow-raised: 0 1px 0 rgba(255,255,255,0.04), 0 2px 8px rgba(0,0,0,0.3);
+
+  /* === NOISE TEXTURE (reusable as var) === */
+  --noise-texture: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+
+  /* === TRANSITIONS === */
+  --transition-control: 150ms ease;
+  --transition-panel: 300ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -74,7 +81,7 @@ html, body {
   inset: 0;
   opacity: 0.03;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-image: var(--noise-texture);
   background-size: 128px 128px;
   mix-blend-mode: overlay;
   border-radius: inherit;
@@ -100,7 +107,9 @@ html, body {
   z-index: 1; pointer-events: none;
 }
 
-/* ---- Drum Touch Zone ---- */
+/* ============================================================
+   DRUM TOUCH ZONE — Dramatic hit feedback
+   ============================================================ */
 #touch-zone {
   position: fixed; bottom: 52px; left: 0;
   width: 100%; height: calc(45% - 52px); z-index: 2;
@@ -119,24 +128,34 @@ html, body {
   text-transform: uppercase;
   opacity: 0.6;
   pointer-events: none;
+  transition: opacity var(--transition-control), transform var(--transition-control);
 }
-.drum-cell.hit { transition: none; }
+.drum-cell.hit {
+  transition: none;
+}
+/* Dramatic hit feedback — flash + scale label */
+.drum-cell.hit::after {
+  opacity: 1;
+  transform: scale(1.3);
+}
 #zone-hat { border-bottom: 1px solid var(--muze-border); }
 #zone-hat.hit {
-  background: rgba(var(--muze-accent-rgb), 0.15);
-  box-shadow: inset 0 0 40px rgba(var(--muze-accent-rgb), 0.08);
+  background: rgba(var(--muze-accent-rgb), 0.18);
+  box-shadow: inset 0 0 60px rgba(var(--muze-accent-rgb), 0.10);
 }
 #zone-snare { border-bottom: 1px solid var(--muze-border); }
 #zone-snare.hit {
-  background: rgba(var(--muze-accent-rgb), 0.20);
-  box-shadow: inset 0 0 50px rgba(var(--muze-accent-rgb), 0.10);
+  background: rgba(var(--muze-accent-rgb), 0.25);
+  box-shadow: inset 0 0 80px rgba(var(--muze-accent-rgb), 0.14);
 }
 #zone-kick.hit {
-  background: rgba(var(--muze-accent-rgb), 0.25);
-  box-shadow: inset 0 0 60px rgba(var(--muze-accent-rgb), 0.12);
+  background: rgba(var(--muze-accent-rgb), 0.35);
+  box-shadow: inset 0 0 100px rgba(var(--muze-accent-rgb), 0.18);
 }
 
-/* ---- Chord Bar ---- */
+/* ============================================================
+   CHORD BAR — Satisfying active states
+   ============================================================ */
 #chord-zone {
   position: fixed; bottom: 0; left: 0; width: 100%; height: 52px;
   z-index: 3; display: flex; flex-direction: row; touch-action: none;
@@ -152,7 +171,7 @@ html, body {
   inset: 0;
   opacity: 0.03;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-image: var(--noise-texture);
   background-size: 128px 128px;
   mix-blend-mode: overlay;
   border-radius: inherit;
@@ -164,7 +183,7 @@ html, body {
   font: 600 14px/1 var(--font-ui);
   letter-spacing: 0.5px;
   border-right: 1px solid rgba(255, 255, 255, 0.03);
-  transition: color 0.2s ease-out, background 0.2s ease-out;
+  transition: color 0.2s ease-out, background 0.2s ease-out, transform var(--transition-control);
   position: relative;
   z-index: 1;
 }
@@ -186,7 +205,11 @@ html, body {
   from { opacity: 0; left: 40%; right: 40%; }
   to { opacity: 1; left: 15%; right: 15%; }
 }
-.chord-btn:active { background: var(--elevation-2); }
+.chord-btn:active {
+  background: var(--elevation-2);
+  transform: scale(0.96);
+  filter: brightness(0.92);
+}
 
 /* ---- Riser Overlay ---- */
 #riser-overlay {
@@ -209,13 +232,15 @@ html, body {
   to { opacity: 1; }
 }
 
-/* ---- Start Screen ---- */
+/* ============================================================
+   START SCREEN — Breathtaking first impression
+   ============================================================ */
 #start-screen {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   z-index: 100;
   background: var(--muze-bg);
   display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 20px;
+  align-items: center; justify-content: center; gap: 24px;
   overflow: hidden;
 }
 /* Noise texture for start screen */
@@ -225,65 +250,115 @@ html, body {
   inset: 0;
   opacity: 0.03;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-image: var(--noise-texture);
   background-size: 128px 128px;
   mix-blend-mode: overlay;
   z-index: 0;
 }
+/* Ambient glow */
 #start-screen::before {
   content: '';
   position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-  background: radial-gradient(
-    ellipse at 50% 50%,
-    rgba(var(--muze-accent-rgb), 0.06) 0%,
-    transparent 60%
-  );
-  animation: start-glow 6s ease-in-out infinite alternate;
+  background:
+    radial-gradient(
+      ellipse at 50% 45%,
+      rgba(var(--muze-accent-rgb), 0.08) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 30% 60%,
+      rgba(167, 139, 250, 0.04) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      ellipse at 70% 55%,
+      rgba(34, 211, 238, 0.03) 0%,
+      transparent 40%
+    );
+  animation: start-glow 8s ease-in-out infinite alternate;
 }
 @keyframes start-glow {
   0% { transform: scale(1) translate(0, 0); opacity: 0.5; }
-  50% { transform: scale(1.1) translate(2%, -3%); opacity: 1; }
+  33% { transform: scale(1.05) translate(2%, -2%); opacity: 0.9; }
+  66% { transform: scale(1.1) translate(-1%, 1%); opacity: 1; }
   100% { transform: scale(1) translate(-2%, 2%); opacity: 0.6; }
 }
+
+/* Title — breathtaking with subtle gradient + animation */
 #start-screen h1 {
-  color: #fff;
+  color: transparent;
   font-family: var(--font-ui);
-  font-size: 56px;
+  font-size: 64px;
   font-weight: 200;
-  letter-spacing: 20px;
+  letter-spacing: 24px;
   text-transform: uppercase;
   position: relative;
   z-index: 1;
-  text-shadow: 0 0 40px var(--muze-accent-glow);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(232, 169, 72, 0.8) 35%,
+    rgba(255, 255, 255, 0.95) 50%,
+    rgba(167, 139, 250, 0.7) 70%,
+    rgba(255, 255, 255, 0.9) 100%
+  );
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: title-shimmer 6s ease-in-out infinite;
+  text-shadow: none;
+  filter: drop-shadow(0 0 40px rgba(var(--muze-accent-rgb), 0.2));
 }
+@keyframes title-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Subtle letter spacing animation on hover */
+#start-screen h1::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(var(--muze-accent-rgb), 0.4), transparent);
+}
+
 #start-screen p {
   color: var(--muze-text-dim);
   font-family: var(--font-ui);
   font-size: 14px;
   max-width: 280px;
   text-align: center;
-  line-height: 1.6;
+  line-height: 1.7;
   position: relative; z-index: 1;
   font-weight: 300;
+  letter-spacing: 0.3px;
 }
+
+/* Start button — feels like pressing a physical hardware control */
 #start-btn {
   appearance: none;
-  border: 1px solid rgba(var(--muze-accent-rgb), 0.3);
-  background: var(--elevation-2);
+  border: 1px solid rgba(var(--muze-accent-rgb), 0.25);
+  background: linear-gradient(180deg, var(--elevation-3) 0%, var(--elevation-2) 100%);
   color: #fff;
   font-family: var(--font-ui);
-  font-size: 15px;
-  font-weight: 400;
-  padding: 16px 44px;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 16px 48px;
   border-radius: 50px;
   cursor: pointer;
-  letter-spacing: 1.5px;
-  margin-top: 24px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 28px;
   transition: all 0.2s ease;
   position: relative; z-index: 1;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.4),
     0 0 0 0 rgba(var(--muze-accent-rgb), 0.2);
   animation: btn-breathe 3s ease-in-out infinite;
   overflow: hidden;
@@ -295,26 +370,31 @@ html, body {
   inset: 0;
   opacity: 0.03;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-image: var(--noise-texture);
   background-size: 128px 128px;
   mix-blend-mode: overlay;
   border-radius: inherit;
 }
 @keyframes btn-breathe {
-  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 8px rgba(0,0,0,0.3), 0 0 0 0 rgba(var(--muze-accent-rgb), 0.2); }
-  50% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 8px rgba(0,0,0,0.3), 0 0 0 12px rgba(var(--muze-accent-rgb), 0); }
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 8px rgba(0,0,0,0.4), 0 0 0 0 rgba(var(--muze-accent-rgb), 0.2); }
+  50% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 8px rgba(0,0,0,0.4), 0 0 0 14px rgba(var(--muze-accent-rgb), 0); }
 }
 #start-btn:active {
-  background: var(--elevation-3);
-  transform: scale(0.95);
-  filter: brightness(0.9);
+  background: linear-gradient(180deg, var(--elevation-2) 0%, var(--elevation-1) 100%);
+  transform: scale(0.96);
+  filter: brightness(0.88);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  animation: none;
 }
 #start-screen.loading #start-btn { opacity: 0.3; pointer-events: none; animation: none; }
 #loading-text {
   color: var(--muze-text-dim);
   font-family: var(--font-ui);
   font-size: 12px;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
   display: none;
   position: relative; z-index: 1;
 }
@@ -328,12 +408,14 @@ html, body {
   to { opacity: 0; transform: scale(1.05); }
 }
 
-/* ---- Debug Panel ---- */
+/* ============================================================
+   DEBUG PANEL
+   ============================================================ */
 #debug {
   position: fixed;
   top: env(safe-area-inset-top, 8px); left: 8px;
   z-index: 10; pointer-events: none;
-  opacity: 0; transition: opacity 0.3s;
+  opacity: 0; transition: opacity var(--transition-panel);
 }
 #debug.visible { opacity: 1; }
 #debug-toggle {
@@ -344,7 +426,9 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ---- Mode HUD ---- */
+/* ============================================================
+   MODE HUD — Visual anchor of the performance
+   ============================================================ */
 #mode-hud-wrap {
   position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
   z-index: 10; display: flex; align-items: center; gap: 10px;
@@ -352,7 +436,7 @@ html, body {
 #freeze-btn {
   appearance: none;
   border: 1px solid var(--muze-border-emphasis);
-  background: var(--elevation-2);
+  background: linear-gradient(180deg, var(--elevation-3) 0%, var(--elevation-2) 100%);
   color: var(--muze-text-dim);
   font-size: 18px; width: 38px; height: 38px; border-radius: 50%;
   backdrop-filter: blur(var(--muze-blur)); -webkit-backdrop-filter: blur(var(--muze-blur));
@@ -373,15 +457,16 @@ html, body {
   inset: 0;
   opacity: 0.03;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-image: var(--noise-texture);
   background-size: 128px 128px;
   mix-blend-mode: overlay;
   border-radius: inherit;
 }
 #freeze-btn:active {
-  background: var(--elevation-3);
-  transform: scale(0.95);
-  filter: brightness(0.9);
+  background: var(--elevation-1);
+  transform: scale(0.93);
+  filter: brightness(0.88);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 #freeze-btn.frozen {
   border-color: rgba(var(--muze-accent-rgb), 0.6);
@@ -394,16 +479,17 @@ html, body {
 #mode-hud {
   pointer-events: none; text-align: center;
   font: 600 24px/1.2 var(--font-ui);
-  letter-spacing: 4px;
+  letter-spacing: 6px;
   text-transform: uppercase;
   color: var(--muze-text);
   background: var(--elevation-1);
-  padding: 16px 32px; border-radius: var(--muze-radius);
+  padding: 16px 36px; border-radius: var(--muze-radius);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--muze-border-subtle);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-  transition: border-color 0.3s;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  transition: border-color var(--transition-panel), box-shadow var(--transition-panel);
   position: relative;
+  overflow: hidden;
 }
 /* Noise texture for mode HUD */
 #mode-hud::after {
@@ -412,7 +498,7 @@ html, body {
   inset: 0;
   opacity: 0.03;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-image: var(--noise-texture);
   background-size: 128px 128px;
   mix-blend-mode: overlay;
   border-radius: inherit;
@@ -422,15 +508,28 @@ html, body {
   border-color: rgba(var(--muze-accent-rgb), 0.4);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(var(--muze-accent-rgb), 0.12);
 }
+
+/* Mode name — prominent with accent glow */
+#mode-hud .mode-name {
+  font: 700 26px/1.2 var(--font-ui);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: var(--muze-text);
+  text-shadow: 0 0 20px rgba(var(--muze-accent-rgb), 0.15);
+  transition: text-shadow var(--transition-panel);
+}
+
+/* Valence bar — premium segmented meter with accent color */
 #mode-hud .valence-bar {
-  margin-top: 10px; height: 6px; width: 200px;
-  background: #0A0A0E;
+  margin-top: 12px; height: 6px; width: 200px;
+  background: var(--muze-recessed);
   border-radius: 3px; position: relative; overflow: hidden;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.02);
+  box-shadow: var(--shadow-recessed);
 }
 #mode-hud .valence-bar .fill {
   position: absolute; top: 0; height: 100%; border-radius: 3px;
-  transition: left 0.2s ease-out, width 0.2s ease-out, background 0.3s ease;
+  transition: left 0.2s ease-out, width 0.2s ease-out, background var(--transition-panel);
+  box-shadow: 0 0 8px currentColor;
   /* Segmented look matching mixer meters */
   -webkit-mask-image: repeating-linear-gradient(
     to right,
@@ -448,9 +547,10 @@ html, body {
   );
 }
 #mode-hud .valence-label {
-  font: 400 11px/1 var(--font-ui);
+  font: 400 10px/1 var(--font-ui);
   color: var(--muze-text-dim);
-  margin-top: 8px; letter-spacing: 1px;
+  margin-top: 8px; letter-spacing: 2px;
+  text-transform: uppercase;
 }
 #mode-hud .valence-value {
   font: 400 10px/1 var(--font-data);
@@ -467,11 +567,13 @@ html, body {
   letter-spacing: 3px;
   text-transform: uppercase;
   pointer-events: none;
-  opacity: 0; transition: opacity 0.3s;
+  opacity: 0; transition: opacity var(--transition-panel);
 }
 #rhythm-indicator.visible { opacity: 0.7; }
 
-/* ---- Top Toolbar ---- */
+/* ============================================================
+   TOP TOOLBAR — Physical button feel
+   ============================================================ */
 .toolbar {
   position: fixed;
   top: env(safe-area-inset-top, 8px);
@@ -486,7 +588,7 @@ html, body {
 .toolbar-btn {
   appearance: none;
   border: 1px solid var(--muze-border-emphasis);
-  background: var(--elevation-2);
+  background: linear-gradient(180deg, var(--elevation-3) 0%, var(--elevation-2) 100%);
   color: var(--muze-text-dim);
   width: 36px; height: 36px; border-radius: 50%;
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
@@ -494,11 +596,11 @@ html, body {
   display: flex; align-items: center; justify-content: center;
   font-family: var(--font-ui);
   font-size: 16px;
-  transition: transform 0.15s ease, filter 0.15s ease, background 0.15s ease;
+  transition: transform var(--transition-control), filter var(--transition-control), background var(--transition-control), box-shadow var(--transition-control);
   position: relative;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 2px 6px rgba(0, 0, 0, 0.25);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.3);
 }
 /* Noise texture on toolbar buttons */
 .toolbar-btn::after {
@@ -507,15 +609,18 @@ html, body {
   inset: 0;
   opacity: 0.03;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-image: var(--noise-texture);
   background-size: 128px 128px;
   mix-blend-mode: overlay;
   border-radius: inherit;
 }
 .toolbar-btn:active {
-  background: var(--elevation-3);
-  transform: scale(0.95);
-  filter: brightness(0.9);
+  background: linear-gradient(180deg, var(--elevation-1) 0%, var(--elevation-0) 100%);
+  transform: scale(0.93);
+  filter: brightness(0.88);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.2);
 }
 .toolbar-btn.recording {
   border-color: rgba(255, 50, 50, 0.7);
@@ -544,7 +649,7 @@ html, body {
 .toolbar-label {
   appearance: none;
   border: 1px solid var(--muze-border);
-  background: var(--elevation-2);
+  background: linear-gradient(180deg, var(--elevation-3) 0%, var(--elevation-2) 100%);
   color: var(--muze-text-dim);
   font: 500 8px/1 var(--font-ui);
   letter-spacing: 0.5px;
@@ -552,18 +657,21 @@ html, body {
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s;
+  transition: all var(--transition-control);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     0 2px 4px rgba(0, 0, 0, 0.2);
 }
 .toolbar-label:active {
-  background: var(--elevation-3);
-  transform: scale(0.95);
-  filter: brightness(0.9);
+  background: var(--elevation-1);
+  transform: scale(0.93);
+  filter: brightness(0.88);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
-/* ---- Sample Switcher ---- */
+/* ============================================================
+   SAMPLE SWITCHER
+   ============================================================ */
 #sample-bar {
   position: fixed;
   top: calc(env(safe-area-inset-top, 8px) + 52px);
@@ -582,38 +690,40 @@ html, body {
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   cursor: pointer;
   text-align: left;
-  transition: all 0.15s;
+  transition: all var(--transition-control);
   max-width: 120px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
     0 2px 4px rgba(0, 0, 0, 0.2);
 }
 .sample-btn:active {
-  background: var(--elevation-3);
+  background: var(--elevation-1);
   transform: scale(0.95);
-  filter: brightness(0.9);
+  filter: brightness(0.88);
 }
 .sample-btn .label {
   display: block;
   color: var(--muze-text-muted);
-  font: 500 8px/1 var(--font-ui);
+  font: 600 8px/1 var(--font-ui);
   letter-spacing: 1px;
   text-transform: uppercase;
   margin-bottom: 2px;
 }
 
-/* ---- Synth Panel ---- */
-#synth-menu-btn { /* now in .toolbar */ }
+/* ============================================================
+   SYNTH PANEL — Hardware settings panel feel
+   ============================================================ */
 #synth-panel {
   position: fixed; top: 0; right: -300px; width: 300px; height: 100%;
   z-index: 15;
   background: var(--elevation-1);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: right var(--transition-panel);
   overflow-y: auto;
   padding: env(safe-area-inset-top, 12px) 20px 24px 20px;
   -webkit-overflow-scrolling: touch;
   border-left: 1px solid var(--muze-border);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
 }
 /* Noise texture for synth panel */
 #synth-panel::after {
@@ -622,41 +732,61 @@ html, body {
   inset: 0;
   opacity: 0.03;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-image: var(--noise-texture);
   background-size: 128px 128px;
   mix-blend-mode: overlay;
   border-radius: inherit;
   z-index: 0;
 }
 #synth-panel.open { right: 0; }
+
+/* Tab bar — segmented control look */
 #synth-tabs {
   display: flex; gap: 0;
   margin-top: 48px; margin-bottom: 16px;
-  border-bottom: 1px solid var(--muze-border);
+  background: var(--muze-recessed);
+  border-radius: 8px;
+  padding: 3px;
   position: relative; z-index: 1;
+  box-shadow: var(--shadow-recessed);
 }
 .synth-tab {
-  flex: 1; appearance: none; border: none; background: none;
+  flex: 1; appearance: none; border: none;
+  background: transparent;
   color: var(--muze-text-muted);
   font: 500 9px/1 var(--font-ui);
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  padding: 10px 4px; cursor: pointer;
-  border-bottom: 2px solid transparent;
+  padding: 8px 4px; cursor: pointer;
+  border-radius: 6px;
   transition: all 0.2s;
 }
-.synth-tab.active { color: var(--muze-accent); border-bottom-color: var(--muze-accent); }
-.synth-tab-content { display: none; position: relative; z-index: 1; }
+.synth-tab.active {
+  color: var(--muze-accent);
+  background: var(--elevation-2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+.synth-tab-content {
+  display: none; position: relative; z-index: 1;
+  animation: tab-fade-in 0.2s ease-out;
+}
 .synth-tab-content.active { display: block; }
+@keyframes tab-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 #synth-panel h3 {
   color: var(--muze-text-muted);
   font: 600 9px/1 var(--font-ui);
   letter-spacing: 2.5px;
   text-transform: uppercase;
-  margin: 16px 0 10px;
+  margin: 20px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--muze-border-subtle);
 }
 .synth-row {
-  display: flex; align-items: center; gap: 10px; margin: 8px 0;
+  display: flex; align-items: center; gap: 10px; margin: 10px 0;
   position: relative; z-index: 1;
 }
 .synth-row label {
@@ -664,36 +794,54 @@ html, body {
   font: 500 11px/1 var(--font-ui);
   width: 56px; flex-shrink: 0;
 }
+
+/* Synth panel sliders — premium fader aesthetic matching mixer */
 .synth-row input[type=range] {
-  flex: 1; height: 4px;
+  flex: 1; height: 6px;
   -webkit-appearance: none; appearance: none;
-  background: #0A0A0E;
-  border-radius: 2px; outline: none;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.03);
+  background: var(--muze-recessed);
+  border-radius: 3px; outline: none;
+  box-shadow: var(--shadow-recessed);
 }
 .synth-row input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 16px; height: 10px;
+  width: 20px; height: 12px;
   background: linear-gradient(180deg, #555 0%, #3a3a3a 40%, #2a2a2a 100%);
-  border-radius: 2px; cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 3px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.06),
-    0 2px 4px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  /* Grip lines for hardware feel */
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.04) 2px,
+    rgba(255, 255, 255, 0.04) 3px
+  );
+  transition: box-shadow var(--transition-control);
+}
+.synth-row input[type=range]::-webkit-slider-thumb:active {
+  box-shadow:
+    0 0 12px rgba(var(--muze-accent-rgb), 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+  transform: scaleX(1.05);
 }
 .synth-row input[type=range]::-moz-range-track {
-  height: 4px;
-  background: #0A0A0E;
-  border-radius: 2px;
+  height: 6px;
+  background: var(--muze-recessed);
+  border-radius: 3px;
   border: none;
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
 }
 .synth-row input[type=range]::-moz-range-thumb {
-  width: 16px; height: 10px;
+  width: 20px; height: 12px;
   background: linear-gradient(180deg, #555 0%, #3a3a3a 40%, #2a2a2a 100%);
-  border-radius: 2px; cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 3px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.10);
 }
 .synth-row .val {
   color: var(--muze-text-muted);
@@ -707,11 +855,19 @@ html, body {
   border: 1px solid var(--muze-border);
   color: var(--muze-text);
   font: 400 11px/1 var(--font-ui);
-  padding: 6px 10px; border-radius: 8px;
+  padding: 8px 10px; border-radius: 8px;
   position: relative; z-index: 1;
+  transition: all var(--transition-control);
+  box-shadow: var(--shadow-raised);
+}
+.synth-select:active {
+  background: var(--elevation-1);
+  transform: scale(0.97);
 }
 
-/* ---- Tutorial Picker ---- */
+/* ============================================================
+   TUTORIAL PICKER
+   ============================================================ */
 #tut-picker {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   z-index: 30;
@@ -735,7 +891,7 @@ html, body {
 .tut-choice {
   appearance: none;
   border: 1px solid rgba(var(--muze-accent-rgb), 0.3);
-  background: var(--elevation-2);
+  background: linear-gradient(180deg, var(--elevation-3) 0%, var(--elevation-2) 100%);
   color: #fff;
   font-family: var(--font-ui);
   font-size: 14px;
@@ -747,9 +903,10 @@ html, body {
     0 2px 8px rgba(0, 0, 0, 0.3);
 }
 .tut-choice:active {
-  background: var(--elevation-3);
+  background: var(--elevation-1);
   transform: scale(0.95);
-  filter: brightness(0.9);
+  filter: brightness(0.88);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 .tut-choice small {
   display: block; color: var(--muze-text-dim);
@@ -761,9 +918,13 @@ html, body {
   font-family: var(--font-ui);
   font-size: 13px;
   cursor: pointer; margin-top: 8px; letter-spacing: 1px;
+  transition: color var(--transition-control);
 }
+#tut-close-pick:active { color: var(--muze-text-dim); }
 
-/* ---- Tutorial Overlay Step ---- */
+/* ============================================================
+   TUTORIAL OVERLAY STEP
+   ============================================================ */
 #tut-overlay {
   position: fixed; bottom: 0; left: 0; width: 100%;
   z-index: 28; pointer-events: none; display: none;
@@ -777,6 +938,7 @@ html, body {
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-radius: 16px; padding: 22px; text-align: center;
   position: relative;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 /* Noise texture for tutorial cards */
 #tut-card::after {
@@ -785,7 +947,7 @@ html, body {
   inset: 0;
   opacity: 0.03;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-image: var(--noise-texture);
   background-size: 128px 128px;
   mix-blend-mode: overlay;
   border-radius: inherit;
@@ -819,19 +981,21 @@ html, body {
 #tut-card .tut-nav button {
   appearance: none;
   border: 1px solid var(--muze-border-emphasis);
-  background: var(--elevation-2); color: #fff;
+  background: linear-gradient(180deg, var(--elevation-3) 0%, var(--elevation-2) 100%);
+  color: #fff;
   font-family: var(--font-ui);
   font-size: 13px;
   padding: 8px 22px; border-radius: 20px; cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-control);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     0 2px 4px rgba(0, 0, 0, 0.2);
 }
 #tut-card .tut-nav button:active {
-  background: var(--elevation-3);
+  background: var(--elevation-1);
   transform: scale(0.95);
-  filter: brightness(0.9);
+  filter: brightness(0.88);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 #tut-card .tut-nav .tut-skip {
   border-color: transparent; color: var(--muze-text-muted);
@@ -857,8 +1021,830 @@ body::after {
 }
 
 /* ============================================================
-   MIXER PANEL — Styles moved to css/mixer.css
+   PERFORMANCE BAR — Presets, BPM, Key, Scale
    ============================================================ */
+#perf-bar {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 8px) + 2px);
+  left: 8px;
+  z-index: 20;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 200px);
+}
 
-/* ---- Utility ---- */
+.perf-btn {
+  appearance: none;
+  border: 1px solid var(--muze-border);
+  background: var(--elevation-2);
+  color: var(--muze-text-dim);
+  font: 400 10px/1.3 var(--font-ui);
+  padding: 5px 8px;
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-control);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 2px 4px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 50px;
+}
+
+.perf-btn:active {
+  background: var(--elevation-1);
+  transform: scale(0.95);
+  filter: brightness(0.88);
+}
+
+.perf-label {
+  color: var(--muze-text-muted);
+  font: 600 7px/1 var(--font-ui);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.perf-btn span:last-child {
+  color: var(--muze-text);
+  font: 500 11px/1 var(--font-ui);
+  font-feature-settings: 'tnum';
+}
+
+/* ============================================================
+   POPUP PANELS — For BPM, Key, Scale selection
+   ============================================================ */
+.popup-panel {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 8px) + 42px);
+  left: 8px;
+  z-index: 21;
+  background: var(--elevation-1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--muze-border);
+  border-radius: var(--muze-radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  min-width: 240px;
+  max-width: 300px;
+  display: none;
+  overflow: hidden;
+  /* Smooth enter/exit via animation */
+}
+
+.popup-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: var(--noise-texture);
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+  z-index: 0;
+}
+
+.popup-panel.open {
+  display: block;
+  animation: popup-in 0.2s ease-out;
+}
+
+@keyframes popup-in {
+  from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  position: relative;
+  z-index: 1;
+}
+
+.popup-header span {
+  color: var(--muze-text);
+  font: 700 9px/1 var(--font-ui);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.popup-close {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--muze-text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  min-width: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.popup-body {
+  padding: 12px 14px 16px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Key grid */
+#key-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.key-option {
+  appearance: none;
+  border: 1px solid var(--muze-border);
+  background: var(--elevation-2);
+  color: var(--muze-text-dim);
+  font: 600 12px/1 var(--font-ui);
+  padding: 10px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+
+.key-option:active {
+  transform: scale(0.93);
+}
+
+.key-option.active {
+  background: rgba(var(--muze-accent-rgb), 0.15);
+  border-color: rgba(var(--muze-accent-rgb), 0.4);
+  color: var(--muze-accent);
+  box-shadow: 0 0 8px rgba(var(--muze-accent-rgb), 0.15);
+}
+
+/* Scale grid */
+#scale-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.scale-option {
+  appearance: none;
+  border: 1px solid var(--muze-border);
+  background: var(--elevation-2);
+  color: var(--muze-text-dim);
+  font: 500 10px/1 var(--font-ui);
+  letter-spacing: 0.5px;
+  padding: 10px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+
+.scale-option:active {
+  transform: scale(0.93);
+}
+
+.scale-option.active {
+  background: rgba(var(--muze-accent-rgb), 0.15);
+  border-color: rgba(var(--muze-accent-rgb), 0.4);
+  color: var(--muze-accent);
+  box-shadow: 0 0 8px rgba(var(--muze-accent-rgb), 0.15);
+}
+
+/* HUD meta line (root + BPM) */
+#mode-hud .hud-meta {
+  font: 400 10px/1 var(--font-data);
+  font-feature-settings: 'tnum';
+  color: var(--muze-text-dim);
+  letter-spacing: 2px;
+  margin-top: 4px;
+}
+
+/* Tap tempo button override */
+#tap-tempo-btn {
+  width: 100%;
+  padding: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+/* ============================================================
+   LOOP RECORDER BAR
+   ============================================================ */
+#loop-bar {
+  position: fixed;
+  left: 8px;
+  bottom: calc(55% + 16px);
+  /* Place above drum zone, near center */
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--elevation-1);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--muze-border);
+  border-radius: 24px;
+  padding: 4px 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+#loop-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: var(--noise-texture);
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+  z-index: 0;
+}
+
+/* Loop state visual feedback */
+#loop-bar.state-recording {
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.2), 0 4px 16px rgba(0, 0, 0, 0.3);
+  animation: loop-rec-pulse 1.2s ease-in-out infinite;
+}
+
+#loop-bar.state-playing {
+  border-color: rgba(52, 211, 153, 0.4);
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+#loop-bar.state-overdubbing {
+  border-color: rgba(251, 191, 36, 0.5);
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.2), 0 4px 16px rgba(0, 0, 0, 0.3);
+  animation: loop-overdub-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes loop-rec-pulse {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.5); }
+  50% { border-color: rgba(239, 68, 68, 0.15); }
+}
+
+@keyframes loop-overdub-pulse {
+  0%, 100% { border-color: rgba(251, 191, 36, 0.5); }
+  50% { border-color: rgba(251, 191, 36, 0.15); }
+}
+
+.loop-btn {
+  appearance: none;
+  border: 1px solid var(--muze-border-emphasis);
+  background: linear-gradient(180deg, var(--elevation-3) 0%, var(--elevation-2) 100%);
+  color: var(--muze-text-dim);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all var(--transition-control);
+  position: relative;
+  z-index: 1;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+.loop-btn:active {
+  transform: scale(0.9);
+  filter: brightness(0.85);
+}
+
+.loop-btn:disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+#loop-rec-btn {
+  color: #EF4444;
+  font-size: 18px;
+}
+
+.state-recording #loop-rec-btn {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #EF4444;
+}
+
+.state-overdubbing #loop-rec-btn {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #FBBF24;
+}
+
+/* Loop progress bar */
+#loop-progress {
+  width: 60px;
+  height: 6px;
+  background: var(--muze-recessed);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-recessed);
+  z-index: 1;
+}
+
+#loop-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  border-radius: 3px;
+  background: var(--mixer-green-bright, #2DD4BF);
+  transition: none;
+  will-change: width;
+}
+
+.state-recording #loop-progress-fill {
+  background: #EF4444;
+}
+
+.state-overdubbing #loop-progress-fill {
+  background: #FBBF24;
+}
+
+#loop-progress-head {
+  position: absolute;
+  top: -2px;
+  left: 0%;
+  width: 3px;
+  height: 10px;
+  background: #fff;
+  border-radius: 1px;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+  z-index: 2;
+}
+
+/* ============================================================
+   SCENE SLOTS
+   ============================================================ */
+#scene-bar {
+  position: fixed;
+  left: 8px;
+  bottom: 58px;
+  z-index: 10;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.scene-slot {
+  appearance: none;
+  border: 1px solid var(--muze-border);
+  background: var(--elevation-2);
+  color: var(--muze-text-muted);
+  font: 700 11px/1 var(--font-ui);
+  width: 32px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  position: relative;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.scene-slot:active {
+  transform: scale(0.9);
+  filter: brightness(0.85);
+}
+
+.scene-slot.has-scene {
+  border-color: rgba(var(--muze-accent-rgb), 0.3);
+  color: var(--muze-text-dim);
+}
+
+.scene-slot.has-scene::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--muze-accent);
+  opacity: 0.5;
+}
+
+.scene-slot.active {
+  background: rgba(var(--muze-accent-rgb), 0.15);
+  border-color: rgba(var(--muze-accent-rgb), 0.5);
+  color: var(--muze-accent);
+  box-shadow: 0 0 8px rgba(var(--muze-accent-rgb), 0.15);
+}
+
+.scene-slot.save-mode {
+  animation: scene-save-pulse 0.8s ease-in-out infinite;
+}
+
+.scene-slot.saved-flash {
+  animation: scene-saved 0.4s ease-out;
+}
+
+@keyframes scene-save-pulse {
+  0%, 100% { border-color: rgba(var(--muze-accent-rgb), 0.3); }
+  50% { border-color: rgba(var(--muze-accent-rgb), 0.8); box-shadow: 0 0 12px rgba(var(--muze-accent-rgb), 0.3); }
+}
+
+@keyframes scene-saved {
+  0% { transform: scale(1.3); background: rgba(var(--muze-accent-rgb), 0.3); }
+  100% { transform: scale(1); }
+}
+
+.scene-save {
+  appearance: none;
+  border: 1px solid var(--muze-border);
+  background: var(--elevation-2);
+  color: var(--muze-text-muted);
+  font: 600 7px/1 var(--font-ui);
+  letter-spacing: 1px;
+  padding: 0 6px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.scene-save:active {
+  transform: scale(0.93);
+}
+
+.scene-save.active {
+  background: rgba(var(--muze-accent-rgb), 0.15);
+  border-color: rgba(var(--muze-accent-rgb), 0.5);
+  color: var(--muze-accent);
+}
+
+/* ============================================================
+   GYROSCOPE INDICATOR
+   ============================================================ */
+#gyro-indicator {
+  position: fixed;
+  right: 8px;
+  bottom: calc(55% + 16px);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--elevation-1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--muze-border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.gyro-axis {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gyro-axis span {
+  color: var(--muze-text-muted);
+  font: 600 7px/1 var(--font-ui);
+  letter-spacing: 1px;
+  width: 30px;
+}
+
+.gyro-bar {
+  width: 50px;
+  height: 4px;
+  background: var(--muze-recessed);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-recessed);
+}
+
+.gyro-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--muze-accent);
+  border-radius: 2px;
+  transition: width 0.1s, left 0.1s;
+  width: 0%;
+  left: 50%;
+}
+
+/* Active feature button state */
+.toolbar-btn.active-feature {
+  border-color: rgba(var(--muze-accent-rgb), 0.5);
+  color: var(--muze-accent);
+  box-shadow:
+    0 0 8px rgba(var(--muze-accent-rgb), 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ============================================================
+   CHORD AUTO-ADVANCE INDICATOR
+   ============================================================ */
+#chord-zone .chord-btn.next-chord::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid rgba(var(--muze-accent-rgb), 0.5);
+  opacity: 0.8;
+  z-index: 2;
+}
+
+#auto-chord-btn {
+  appearance: none;
+  border: 1px solid var(--muze-border);
+  background: var(--elevation-2);
+  color: var(--muze-text-muted);
+  font: 600 7px/1 var(--font-ui);
+  letter-spacing: 1px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 50px;
+  transition: all var(--transition-control);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#auto-chord-btn:active {
+  background: var(--elevation-1);
+  transform: scale(0.95);
+  filter: brightness(0.88);
+}
+
+#auto-chord-btn.active {
+  border-color: rgba(var(--muze-accent-rgb), 0.5);
+  color: var(--muze-accent);
+  background: rgba(var(--muze-accent-rgb), 0.08);
+  box-shadow:
+    0 0 8px rgba(var(--muze-accent-rgb), 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* ============================================================
+   BEAT REPEAT FLASH
+   ============================================================ */
+.beat-repeat-active #touch-zone {
+  border: 2px solid rgba(var(--muze-accent-rgb), 0.4);
+  box-shadow: inset 0 0 40px rgba(var(--muze-accent-rgb), 0.08);
+}
+
+@keyframes stutter-flash {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.15; }
+}
+
+#beat-repeat-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(var(--muze-accent-rgb), 0.15) 0%,
+    transparent 70%
+  );
+  transition: opacity 0.1s;
+}
+
+#beat-repeat-overlay.active {
+  opacity: 1;
+  animation: stutter-flash 0.1s ease-in-out infinite;
+}
+
+/* ============================================================
+   SCENE SLOTS — Active glow with channel accent colors
+   ============================================================ */
+.scene-slot.active {
+  background: rgba(var(--muze-accent-rgb), 0.18);
+  border-color: rgba(var(--muze-accent-rgb), 0.6);
+  color: var(--muze-accent);
+  box-shadow:
+    0 0 12px rgba(var(--muze-accent-rgb), 0.25),
+    0 0 24px rgba(var(--muze-accent-rgb), 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ============================================================
+   LOOP PROGRESS — Smooth animated gradient
+   ============================================================ */
+#loop-progress-fill {
+  background: linear-gradient(
+    90deg,
+    var(--mixer-green, #0D9488),
+    var(--mixer-green-bright, #2DD4BF)
+  ) !important;
+  box-shadow: 0 0 6px rgba(45, 212, 191, 0.3);
+}
+
+.state-recording #loop-progress-fill {
+  background: linear-gradient(
+    90deg,
+    #DC2626,
+    #EF4444
+  ) !important;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.4) !important;
+}
+
+.state-overdubbing #loop-progress-fill {
+  background: linear-gradient(
+    90deg,
+    #D97706,
+    #FBBF24
+  ) !important;
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.4) !important;
+}
+
+#loop-progress-head {
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.6), 0 0 12px rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================================
+   GYROSCOPE — More elegant, subtle
+   ============================================================ */
+#gyro-indicator {
+  opacity: 0.85;
+  transition: opacity 0.3s, display 0.3s;
+}
+
+.gyro-fill {
+  background: linear-gradient(90deg, var(--muze-accent), rgba(var(--muze-accent-rgb), 0.6));
+  box-shadow: 0 0 4px rgba(var(--muze-accent-rgb), 0.3);
+}
+
+/* ============================================================
+   RESPONSIVE LAYOUT — 375px minimum
+   ============================================================ */
+@media (max-width: 400px) {
+  /* Performance bar: smaller items */
+  .perf-btn {
+    padding: 4px 6px;
+    min-width: 42px;
+  }
+  .perf-label {
+    font-size: 6px;
+  }
+  .perf-btn span:last-child {
+    font-size: 10px;
+  }
+  #perf-bar {
+    max-width: calc(100% - 170px);
+  }
+
+  /* Toolbar: smaller gap */
+  .toolbar {
+    gap: 3px;
+    max-width: calc(100% - 50px);
+  }
+  .toolbar-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+  .toolbar-label {
+    height: 32px;
+    font-size: 7px;
+    padding: 0 6px;
+  }
+
+  /* Loop bar: narrower */
+  #loop-bar {
+    padding: 3px 6px;
+    gap: 4px;
+  }
+  .loop-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  #loop-progress {
+    width: 45px;
+  }
+
+  /* Scene bar: smaller slots */
+  .scene-slot {
+    width: 28px;
+    height: 24px;
+    font-size: 10px;
+  }
+  .scene-save {
+    height: 24px;
+    font-size: 6px;
+  }
+
+  /* Mode HUD: narrower */
+  #mode-hud {
+    padding: 12px 24px;
+  }
+  #mode-hud .mode-name {
+    font-size: 22px;
+    letter-spacing: 4px;
+  }
+  #mode-hud .valence-bar {
+    width: 160px;
+  }
+  #freeze-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 16px;
+  }
+
+  /* Chord bar: ensure 44px touch targets */
+  #chord-zone {
+    height: 48px;
+  }
+  .chord-btn {
+    font-size: 13px;
+  }
+
+  /* Sample bar */
+  #sample-bar {
+    top: calc(env(safe-area-inset-top, 8px) + 42px);
+  }
+  .sample-btn {
+    padding: 5px 8px;
+    font-size: 9px;
+    max-width: 100px;
+  }
+
+  /* Gyro indicator: compact */
+  .gyro-bar { width: 40px; }
+  .gyro-axis span { width: 24px; font-size: 6px; }
+}
+
+@media (max-width: 340px) {
+  /* Ultra-small screens */
+  #perf-bar {
+    max-width: calc(100% - 140px);
+    gap: 2px;
+  }
+  .perf-btn {
+    padding: 3px 5px;
+    min-width: 38px;
+  }
+}
+
+/* ============================================================
+   POPUP PANELS — Consistent mobile sizing
+   ============================================================ */
+@media (max-width: 400px) {
+  .popup-panel {
+    min-width: 200px;
+    max-width: 260px;
+  }
+  .popup-body {
+    padding: 10px 12px 14px;
+  }
+  .key-option {
+    padding: 8px 2px;
+    font-size: 11px;
+  }
+  .scale-option {
+    padding: 8px 6px;
+    font-size: 9px;
+  }
+}
+
+/* ============================================================
+   UTILITY
+   ============================================================ */
 .hidden { display: none !important; }

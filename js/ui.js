@@ -109,7 +109,7 @@ MUZE.Touch = {
           const el = document.getElementById('zone-' + drum);
           if (el) {
             el.classList.add('hit');
-            setTimeout(() => el.classList.remove('hit'), 120);
+            setTimeout(() => el.classList.remove('hit'), 180);
           }
         }
       }
@@ -148,12 +148,23 @@ MUZE.SynthMenu = {
     this._bind('arp-sus', (v) => MUZE.Audio.leadSynth.set({ envelope: { sustain: +v } }));
     this._bind('arp-rel', (v) => MUZE.Audio.leadSynth.set({ envelope: { release: +v } }));
 
+    // Arp pattern cycle button
+    const arpPatBtn = document.getElementById('arp-pattern');
+    if (arpPatBtn) {
+      arpPatBtn.addEventListener('click', function() {
+        MUZE.State.arpPatternIdx = (MUZE.State.arpPatternIdx + 1) % MUZE.Config.ARP_PATTERNS.length;
+        this.textContent = MUZE.Config.ARP_PATTERNS[MUZE.State.arpPatternIdx];
+      });
+    }
+
     // Melody synth
     document.getElementById('mel-porta').addEventListener('click', function() {
       MUZE.State.portamentoMode = !MUZE.State.portamentoMode;
       this.textContent = MUZE.State.portamentoMode ? 'ON' : 'OFF';
       MUZE.Audio.setPortamento(MUZE.State.portamentoMode);
     });
+    // Vibrato slider
+    this._bind('mel-vib', (v) => MUZE.Audio.setVibratoAmount(+v));
     this._bind('mel-osc', (v) => MUZE.Audio.melodySynth.set({ oscillator: { type: v } }), true);
     this._bind('mel-atk', (v) => MUZE.Audio.melodySynth.set({ envelope: { attack: +v } }));
     this._bind('mel-dec', (v) => MUZE.Audio.melodySynth.set({ envelope: { decay: +v } }));
@@ -172,12 +183,27 @@ MUZE.SynthMenu = {
     });
     this._bind('bin-hz', (v) => MUZE.Audio.setBinauralBeatHz(+v));
 
-    // Pad synth
-    this._bind('pad-osc', (v) => MUZE.Audio.padSynth.set({ oscillator: { type: v } }), true);
-    this._bind('pad-harm', (v) => MUZE.Audio.padSynth.set({ harmonicity: +v }));
-    this._bind('pad-mod', (v) => MUZE.Audio.padSynth.set({ modulationIndex: +v }));
-    this._bind('pad-atk', (v) => MUZE.Audio.padSynth.set({ envelope: { attack: +v } }));
-    this._bind('pad-rel', (v) => MUZE.Audio.padSynth.set({ envelope: { release: +v } }));
+    // Pad synth (update both layers)
+    this._bind('pad-osc', (v) => {
+      MUZE.Audio.padSynth.set({ oscillator: { type: v } });
+      MUZE.Audio._padDetune2.set({ oscillator: { type: v } });
+    }, true);
+    this._bind('pad-harm', (v) => {
+      MUZE.Audio.padSynth.set({ harmonicity: +v });
+      MUZE.Audio._padDetune2.set({ harmonicity: +v });
+    });
+    this._bind('pad-mod', (v) => {
+      MUZE.Audio.padSynth.set({ modulationIndex: +v });
+      MUZE.Audio._padDetune2.set({ modulationIndex: +v });
+    });
+    this._bind('pad-atk', (v) => {
+      MUZE.Audio.padSynth.set({ envelope: { attack: +v } });
+      MUZE.Audio._padDetune2.set({ envelope: { attack: +v } });
+    });
+    this._bind('pad-rel', (v) => {
+      MUZE.Audio.padSynth.set({ envelope: { release: +v } });
+      MUZE.Audio._padDetune2.set({ envelope: { release: +v } });
+    });
   },
 
   _bind(id, fn, isSelect) {
@@ -192,6 +218,176 @@ MUZE.SynthMenu = {
         if (valEl) valEl.textContent = parseFloat(el.value).toFixed(el.step.includes('.') ? el.step.split('.')[1].length : 0);
       });
     }
+  }
+};
+
+// ============================================================
+// PERFORMANCE BAR — Presets, BPM, Key, Scale
+// ============================================================
+MUZE.PerfBar = {
+  _tapTimes: [],
+
+  init() {
+    // Preset cycling
+    document.getElementById('preset-btn').addEventListener('click', () => {
+      const idx = (MUZE.State.presetIdx + 1) % MUZE.Config.PRESETS.length;
+      MUZE.Audio.applyPreset(idx);
+      document.getElementById('preset-name').textContent = MUZE.Config.PRESETS[idx].name;
+      // Update BPM display
+      document.getElementById('bpm-val').textContent = MUZE.State.bpm;
+      document.getElementById('bpm-slider').value = MUZE.State.bpm;
+      document.getElementById('bpm-slider-val').textContent = MUZE.State.bpm;
+      // Update key display
+      document.getElementById('key-val').textContent = MUZE.Config.ROOT_NAMES[MUZE.State.rootOffset];
+      // Update swing display
+      document.getElementById('swing-slider').value = MUZE.State.swing;
+      document.getElementById('swing-val').textContent = MUZE.State.swing + '%';
+    });
+
+    // BPM popup
+    document.getElementById('bpm-btn').addEventListener('click', () => {
+      this._togglePopup('bpm-popup');
+    });
+
+    // BPM slider
+    const bpmSlider = document.getElementById('bpm-slider');
+    bpmSlider.addEventListener('input', () => {
+      const val = +bpmSlider.value;
+      MUZE.Audio.setBPM(val);
+      document.getElementById('bpm-slider-val').textContent = val;
+      document.getElementById('bpm-val').textContent = val;
+    });
+
+    // Tap tempo
+    document.getElementById('tap-tempo-btn').addEventListener('click', () => {
+      const now = performance.now();
+      this._tapTimes.push(now);
+      // Keep last 5 taps
+      if (this._tapTimes.length > 5) this._tapTimes.shift();
+      // Reset if gap > 2 seconds
+      if (this._tapTimes.length >= 2) {
+        const last = this._tapTimes[this._tapTimes.length - 1];
+        const prev = this._tapTimes[this._tapTimes.length - 2];
+        if (last - prev > 2000) {
+          this._tapTimes = [now];
+          return;
+        }
+      }
+      if (this._tapTimes.length >= 2) {
+        let total = 0;
+        for (let i = 1; i < this._tapTimes.length; i++) {
+          total += this._tapTimes[i] - this._tapTimes[i - 1];
+        }
+        const avgMs = total / (this._tapTimes.length - 1);
+        const bpm = Math.round(60000 / avgMs);
+        const clamped = Math.max(40, Math.min(200, bpm));
+        MUZE.Audio.setBPM(clamped);
+        document.getElementById('bpm-slider').value = clamped;
+        document.getElementById('bpm-slider-val').textContent = clamped;
+        document.getElementById('bpm-val').textContent = clamped;
+      }
+    });
+
+    // Swing slider
+    const swingSlider = document.getElementById('swing-slider');
+    swingSlider.addEventListener('input', () => {
+      const val = +swingSlider.value;
+      MUZE.Audio.setSwing(val);
+      document.getElementById('swing-val').textContent = val + '%';
+    });
+
+    // Key popup
+    document.getElementById('key-btn').addEventListener('click', () => {
+      this._togglePopup('key-popup');
+    });
+    this._buildKeyGrid();
+
+    // Scale popup
+    document.getElementById('scale-btn').addEventListener('click', () => {
+      this._togglePopup('scale-popup');
+    });
+    this._buildScaleGrid();
+
+    // Close buttons for all popups
+    document.querySelectorAll('.popup-close').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const popupId = btn.dataset.close;
+        document.getElementById(popupId).classList.remove('open');
+      });
+    });
+
+    // Close popups on outside tap/click
+    const closePopupsOutside = (e) => {
+      document.querySelectorAll('.popup-panel.open').forEach(popup => {
+        if (!popup.contains(e.target) && !e.target.closest('#perf-bar')) {
+          popup.classList.remove('open');
+        }
+      });
+    };
+    document.addEventListener('touchstart', closePopupsOutside);
+    document.addEventListener('mousedown', closePopupsOutside);
+  },
+
+  _togglePopup(id) {
+    // Close all popups first
+    document.querySelectorAll('.popup-panel').forEach(p => {
+      if (p.id !== id) p.classList.remove('open');
+    });
+    document.getElementById(id).classList.toggle('open');
+  },
+
+  _buildKeyGrid() {
+    const grid = document.getElementById('key-grid');
+    const names = MUZE.Config.ROOT_NAMES;
+    names.forEach((name, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'key-option' + (i === MUZE.State.rootOffset ? ' active' : '');
+      btn.textContent = name;
+      btn.addEventListener('click', () => {
+        MUZE.State.rootOffset = i;
+        document.getElementById('key-val').textContent = name;
+        grid.querySelectorAll('.key-option').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        // Force pad retrigger
+        MUZE.Loop._currentPadKey = null;
+      });
+      grid.appendChild(btn);
+    });
+  },
+
+  _buildScaleGrid() {
+    const grid = document.getElementById('scale-grid');
+    // "Modal" = face-controlled (default)
+    const modalBtn = document.createElement('button');
+    modalBtn.className = 'scale-option active';
+    modalBtn.textContent = 'MODAL (face)';
+    modalBtn.addEventListener('click', () => {
+      MUZE.State.extraScaleMode = null;
+      MUZE.State.modeFrozen = false;
+      document.getElementById('scale-val').textContent = 'modal';
+      grid.querySelectorAll('.scale-option').forEach(b => b.classList.remove('active'));
+      modalBtn.classList.add('active');
+    });
+    grid.appendChild(modalBtn);
+
+    // Extra scales
+    const extras = Object.keys(MUZE.Music.EXTRA_SCALES);
+    extras.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'scale-option';
+      btn.textContent = name.toUpperCase();
+      btn.addEventListener('click', () => {
+        MUZE.State.extraScaleMode = name;
+        MUZE.State.modeFrozen = true; // freeze mode when using extra scale
+        MUZE.State.currentScale = MUZE.Music.EXTRA_SCALES[name];
+        document.getElementById('scale-val').textContent = name;
+        grid.querySelectorAll('.scale-option').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        // Force pad retrigger
+        MUZE.Loop._currentPadKey = null;
+      });
+      grid.appendChild(btn);
+    });
   }
 };
 
@@ -855,22 +1051,31 @@ MUZE.Tutorial = {
     { title: 'Show Your Hand', desc: 'Hold your hand up to the camera. A melody synth appears \u2014 move up and down to change pitch.' },
     { title: 'Open vs Closed', desc: 'Open palm = legato. Closed fist = staccato. Toggle portamento in the gear menu for smooth glides.' },
     { title: 'Eyes = Reverb', desc: 'Open your eyes wide for more reverb and delay. Squint to dry things out. The ring visualization responds too.' },
+    { title: 'Presets & BPM', desc: 'Top-left: tap PRESET to cycle through 8 sound presets. Tap BPM to set tempo, use TAP TEMPO for live timing. KEY and SCALE let you choose any key and mode.' },
+    { title: 'Loop Recorder', desc: 'Left side: the loop bar. Tap the circle to record a 4-bar loop. When playing, tap again or + to overdub new layers. The undo arrow removes the last layer.' },
+    { title: 'Scenes', desc: 'Bottom-left: 4 scene slots. Tap SAVE then a slot to snapshot your current settings. Tap any saved slot to crossfade smoothly to that vibe in 2 seconds.' },
+    { title: 'Chord Auto-Advance', desc: 'Tap CHORDS in the performance bar to auto-cycle through I-ii-iii-IV-V-vi every bar. An arrow shows the next chord. Great for building full progressions.' },
     { title: 'You\'re Ready!', desc: 'Use the record button to capture performances. Tap ? again for the advanced tutorial.' },
   ],
 
   ADVANCED: [
     { title: 'Six Modes', desc: 'Smile controls the mode: Phrygian (dark) \u2192 Aeolian \u2192 Dorian \u2192 Mixolydian \u2192 Ionian \u2192 Lydian (bright). Each has its own color.' },
     { title: 'Filter (Head Pitch)', desc: 'Chin down = lowpass closes. Chin up = opens. Volume-compensated. Affects pad, melody, and arpeggio.' },
-    { title: 'Reverb + Delay', desc: 'Eye openness scales reverb/delay. Wide = full wet, squint = dry. Gear menu sliders set the max.' },
+    { title: 'Reverb + Delay', desc: 'Eye openness scales reverb/delay. Wide = full wet, squint = dry. The reverb has subtle modulation for a lush tail.' },
     { title: 'Chorus (Head Roll)', desc: 'Tilt sideways for chorus depth \u2014 shimmer and stereo widening.' },
     { title: 'Octave (Brows)', desc: 'Raise eyebrows to shift melody and arpeggio up an octave.' },
     { title: 'Riser (Hold + Release)', desc: 'Hold finger 400ms+: noise sweep builds, drums duck. Swipe up to drop (big kick + reverb wash). Release without swipe to cancel.' },
     { title: 'Swipe Effects', desc: 'Swipe down: tape stop. Swipe up (no hold): reverb throw. Swipe left/right: cycle drum patterns.' },
-    { title: 'Synth Panel', desc: 'Gear icon: Arp, Melody, Pad, Drums, Binaural tabs. Full ADSR, FX, volume, pan controls.' },
-    { title: 'Pad Samples', desc: 'Tap the PAD button (top-right) to cycle through sample-based pads. FM Synth is the default.' },
-    { title: 'Velocity', desc: 'Drum velocity responds to tap speed. Quick taps = hard hits. Slower taps = softer.' },
-    { title: 'Settings Persist', desc: 'All your synth settings are saved automatically. They\'ll be restored next time you open MUZE.' },
-    { title: 'Go Perform', desc: 'Layer face, hands, and touch. Every parameter stacks. There are no wrong moves.' },
+    { title: 'Synth Panel', desc: 'Gear icon: Arp, Melody, Pad, Binaural tabs. Full ADSR, FX controls. Presets crossfade smoothly over 2 seconds.' },
+    { title: 'Loop Recorder', desc: 'Record a 4-bar loop, then overdub layers on top. Undo removes the last layer. This is how you build a full arrangement live.' },
+    { title: 'Scenes (4 Slots)', desc: 'Save your entire instrument state (BPM, key, volumes, sends, synth params) to 4 slots. Recall any scene with a smooth 2-second crossfade between settings.' },
+    { title: 'Gyroscope', desc: 'Tap the rotation arrow button to enable phone tilt control. Left/right tilt pans the arp and melody. Forward/back tilt modulates reverb depth.' },
+    { title: 'Beat Repeat', desc: 'Triple-tap any drum zone for a 2-second stutter effect. It accelerates from 8th to 16th to 32nd notes. Amazing for build-ups right before a drop.' },
+    { title: 'Chord Auto-Advance', desc: 'Tap CHORDS to auto-cycle through the I-ii-iii-IV-V-vi progression every bar. Combine with loop recording to capture harmonic movement.' },
+    { title: 'Sidechain Pump', desc: 'Every kick hit subtly ducks the pad volume for that classic pumping groove feel. It creates space and movement automatically.' },
+    { title: 'Swing', desc: 'In the BPM popup, drag the swing slider to add shuffle feel. Works great with lo-fi and halftime presets.' },
+    { title: 'Key & Scale', desc: '12 keys (C through B) and 11 scales including pentatonic, harmonic minor, whole tone, and blues. MODAL mode lets your face choose the scale.' },
+    { title: 'Go Perform', desc: 'Layer face, hands, touch, loops, scenes, chord advance, and beat repeat. Switch between 4 vibes live. Every parameter stacks. There are no wrong moves.' },
   ],
 
   init() {

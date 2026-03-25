@@ -1,5 +1,6 @@
 /* ============================================================
    MUZE — Audio Engine (Send/Return Bus Architecture)
+   Sprint 2: Professional audio quality + new features
    ============================================================ */
 
 MUZE.Audio = {
@@ -10,6 +11,30 @@ MUZE.Audio = {
   _binauralL: null, _binauralR: null,
   _binauralActive: false, _binauralFollowChord: false,
   _binauralBeatHz: 4, _binauralBaseFreq: 110,
+
+  // Sub oscillator for pad
+  _padSub: null,
+
+  // Kick click layer
+  _kickClick: null,
+
+  // Snare body layer
+  _snareBody: null,
+
+  // Open hat
+  _openHatSynth: null, _openHatFilter: null,
+
+  // Arp filter
+  _arpFilter: null, _arpFilterEnv: null,
+
+  // Arp stereo widener (ping-pong)
+  _arpPingPong: null,
+
+  // Melody vibrato LFO
+  _melodyVibrato: null, _melodyVibratoGain: null,
+
+  // Master tape saturation
+  _masterSaturation: null,
 
   // Channel strip nodes: { eq, panner, gain, reverbSend, delaySend }
   _nodes: {},
@@ -33,6 +58,7 @@ MUZE.Audio = {
 
   // Arpeggio
   _arpSeq: null, _arpNotes: [], _arpIdx: 0,
+  _arpPatternType: 'up-down',
 
   async init() {
     // Force iOS audio route to Bluetooth
@@ -46,7 +72,7 @@ MUZE.Audio = {
     Tone.Transport.bpm.value = MUZE.Config.BPM_DEFAULT;
 
     // ============================================================
-    // MASTER CHAIN: Filter → EQ → Gain → Limiter → Analyser → Out
+    // MASTER CHAIN: Saturation → Filter → EQ → Gain → Limiter → Analyser → Out
     // ============================================================
     this.analyser = new Tone.Analyser('waveform', 256);
     this._limiter = new Tone.Limiter(MUZE.Mixer.master.limiterThreshold);
@@ -57,23 +83,43 @@ MUZE.Audio = {
     this._masterMeter = new Tone.Meter();
     this._masterGain.connect(this._masterMeter);
     this._masterEQ = new Tone.EQ3(0, 0, 0).connect(this._masterGain);
-    this._masterFilterGain = new Tone.Gain(1).connect(this._masterEQ);
+
+    // Tape saturation — very subtle warmth on the master bus
+    this._masterSaturation = new Tone.Distortion({
+      distortion: 0.08,
+      wet: 0.15,
+      oversample: '2x'
+    });
+    this._masterSaturation.connect(this._masterEQ);
+
+    this._masterFilterGain = new Tone.Gain(1).connect(this._masterSaturation);
     this._masterFilter = new Tone.Filter({ frequency: 2000, type: 'lowpass', rolloff: -24, Q: 1.2 }).connect(this._masterFilterGain);
 
     // ============================================================
     // SEND BUSES (shared reverb + delay, returns bypass face filter)
     // ============================================================
-    this._reverbBus = new Tone.Reverb({ decay: 2.5, preDelay: 0.01 }).connect(this._masterEQ);
+    // Subtle modulation on reverb tail for lushness
+    this._reverbMod = new Tone.Chorus({
+      frequency: 0.3,
+      delayTime: 3.5,
+      depth: 0.15,
+      wet: 0.3
+    });
+    this._reverbMod.start();
+    this._reverbMod.connect(this._masterSaturation);
+
+    this._reverbBus = new Tone.Reverb({ decay: 3.2, preDelay: 0.035 }).connect(this._reverbMod);
     await this._reverbBus.ready;
     this._reverbBus.wet.value = 1; // fully wet — send level controls amount
 
-    this._delayBus = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.3, wet: 1 }).connect(this._masterEQ);
+    this._delayBus = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.3, wet: 1 }).connect(this._masterSaturation);
 
     // ============================================================
-    // SYNTHS (same as before, but wired through channel strips)
+    // SYNTHS — Professional quality
     // ============================================================
 
-    // ---- Pad synth → Chorus (insert) → Channel Strip ----
+    // ---- PAD SYNTH: FM + detuning + sub oscillator ----
+    // Main pad with ±5 cent detuning for width
     this.padSynth = new Tone.PolySynth(Tone.FMSynth, {
       maxPolyphony: 6,
       voice: {
@@ -84,51 +130,151 @@ MUZE.Audio = {
         modulationEnvelope: { attack: 0.6, decay: 0.3, sustain: 0.7, release: 2.0 }
       }
     });
-    this._padChorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0, wet: 0.5 });
+    // Detune for stereo width (±5 cents spread)
+    this.padSynth.set({ detune: 5 });
+
+    // Sub oscillator: one octave down, sine, subtle
+    this._padSub = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 6,
+      oscillator: { type: 'sine' },
+      envelope: { attack: 1.2, decay: 0.5, sustain: 0.9, release: 3.0 },
+    });
+    this._padSub.volume.value = -20; // subtle sub presence
+
+    // Chorus insert for pad (enhanced: slightly higher rate for shimmer)
+    this._padChorus = new Tone.Chorus({ frequency: 1.2, delayTime: 4.0, depth: 0, wet: 0.5 });
     this._padChorus.start();
+
+    // Second detuned pad layer for unison width (detuned -5 cents)
+    this._padDetune2 = new Tone.PolySynth(Tone.FMSynth, {
+      maxPolyphony: 6,
+      voice: {
+        harmonicity: 2, modulationIndex: 1.2,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 1.0, decay: 0.4, sustain: 0.85, release: 2.5 },
+        modulation: { type: 'triangle' },
+        modulationEnvelope: { attack: 0.6, decay: 0.3, sustain: 0.7, release: 2.0 }
+      }
+    });
+    this._padDetune2.set({ detune: -5 });
+    this._padDetune2.volume.value = -6; // slightly quieter for depth
+
+    // Wire all pad layers through chorus
     this.padSynth.connect(this._padChorus);
+    this._padSub.connect(this._padChorus);
+    this._padDetune2.connect(this._padChorus);
     this._createChannelStrip('pad', this._padChorus);
 
-    // ---- Arpeggio synth → Channel Strip ----
+    // ---- ARPEGGIO SYNTH: Filter envelope + stereo ping-pong ----
     this.leadSynth = new Tone.PolySynth(Tone.Synth, {
       maxPolyphony: 8,
       oscillator: { type: 'sawtooth' },
       envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.8 },
     });
-    this._createChannelStrip('arp', this.leadSynth);
 
-    // ---- Melody synth → Channel Strip ----
+    // Filter with envelope for the arp — gives it that classic analog pluck
+    this._arpFilter = new Tone.Filter({
+      frequency: 2000,
+      type: 'lowpass',
+      rolloff: -24,
+      Q: 2
+    });
+
+    // Stereo ping-pong delay (insert, very subtle for width)
+    this._arpPingPong = new Tone.PingPongDelay({
+      delayTime: '16n',
+      feedback: 0.15,
+      wet: 0.2
+    });
+
+    this.leadSynth.connect(this._arpFilter);
+    this._arpFilter.connect(this._arpPingPong);
+    this._createChannelStrip('arp', this._arpPingPong);
+
+    // ---- MELODY SYNTH: Expressive filter envelope + vibrato ----
     this.melodySynth = new Tone.MonoSynth({
       oscillator: { type: 'triangle' },
       envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 0.4 },
-      filterEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.5, release: 0.3, baseFrequency: 300, octaves: 3 },
+      filterEnvelope: {
+        attack: 0.02, decay: 0.3, sustain: 0.3, release: 0.5,
+        baseFrequency: 200, octaves: 4.5, exponent: 2
+      },
+      filter: { type: 'lowpass', rolloff: -24, Q: 2 }
     });
+
+    // Vibrato LFO for melody expressiveness
+    this._melodyVibrato = new Tone.LFO({
+      frequency: 5, // 5 Hz vibrato
+      min: -15,     // ±15 cents
+      max: 15,
+      type: 'sine'
+    });
+    this._melodyVibratoGain = new Tone.Gain(0); // starts off, user can enable
+    this._melodyVibrato.connect(this._melodyVibratoGain);
+    this._melodyVibratoGain.connect(this.melodySynth.detune);
+    this._melodyVibrato.start();
+
     this._createChannelStrip('melody', this.melodySynth);
 
-    // ---- Drums → Individual Channel Strips ----
+    // ---- DRUMS — Layered for professional sound ----
+
+    // KICK: MembraneSynth + click transient (short noise burst)
     this.kickSynth = new Tone.MembraneSynth({
       pitchDecay: 0.06, octaves: 7, oscillator: { type: 'sine' },
       envelope: { attack: 0.002, decay: 0.5, sustain: 0, release: 0.5 }
     });
-    this._createChannelStrip('kick', this.kickSynth);
+    // Click transient: short filtered noise burst for definition
+    this._kickClick = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: { attack: 0.001, decay: 0.015, sustain: 0, release: 0.01 }
+    });
+    this._kickClickFilter = new Tone.Filter({ frequency: 3500, type: 'bandpass', Q: 1.5 });
+    this._kickClick.connect(this._kickClickFilter);
+    // Mix kick layers
+    const kickMix = new Tone.Gain(1);
+    this.kickSynth.connect(kickMix);
+    this._kickClickFilter.connect(kickMix);
+    this._kickClick.volume.value = -12; // subtle click
+    this._createChannelStrip('kick', kickMix);
 
+    // SNARE: NoiseSynth (top) + short tonal body (bottom)
     this.snareSynth = new Tone.NoiseSynth({
       noise: { type: 'white' },
       envelope: { attack: 0.002, decay: 0.18, sustain: 0, release: 0.18 }
     });
-    this._createChannelStrip('snare', this.snareSynth);
+    // Snare body: short pitched sine for "thwack"
+    this._snareBody = new Tone.MembraneSynth({
+      pitchDecay: 0.03, octaves: 3, oscillator: { type: 'sine' },
+      envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.06 }
+    });
+    this._snareBody.volume.value = -8;
+    const snareMix = new Tone.Gain(1);
+    this.snareSynth.connect(snareMix);
+    this._snareBody.connect(snareMix);
+    this._createChannelStrip('snare', snareMix);
 
-    // Hat: NoiseSynth + highpass filter (MetalSynth has routing issues with EQ3)
+    // HAT: Closed hat (crisp) + open hat variation
+    // Closed hat: short, crisp
     this.hatSynth = new Tone.NoiseSynth({
       noise: { type: 'white' },
-      envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 }
+      envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.03 }
     });
-    this._hatFilter = new Tone.Filter({ frequency: 8000, type: 'highpass', rolloff: -12 });
-    this.hatSynth.connect(this._hatFilter);
-    this._createChannelStrip('hat', this._hatFilter);
+    this._hatFilter = new Tone.Filter({ frequency: 9000, type: 'highpass', rolloff: -24 });
+    // Open hat: longer decay
+    this._openHatSynth = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: { attack: 0.001, decay: 0.25, sustain: 0.05, release: 0.2 }
+    });
+    this._openHatFilter = new Tone.Filter({ frequency: 8000, type: 'highpass', rolloff: -12 });
+    this._openHatSynth.connect(this._openHatFilter);
 
-    // ---- Binaural → Channel Strip ----
-    // Hard L/R panning is internal; channel strip panner stays at 0
+    const hatMix = new Tone.Gain(1);
+    this.hatSynth.connect(this._hatFilter);
+    this._hatFilter.connect(hatMix);
+    this._openHatFilter.connect(hatMix);
+    this._createChannelStrip('hat', hatMix);
+
+    // ---- Binaural -> Channel Strip ----
     const binLPan = new Tone.Panner(-1);
     const binRPan = new Tone.Panner(1);
     const binMix = new Tone.Gain(1);
@@ -138,7 +284,7 @@ MUZE.Audio = {
     binRPan.connect(binMix);
     this._createChannelStrip('binaural', binMix);
 
-    // ---- Riser → Channel Strip ----
+    // ---- Riser -> Channel Strip ----
     this._riserFilter = new Tone.Filter({ frequency: 200, type: 'bandpass', Q: 2 });
     this._riserGain = new Tone.Gain(0).connect(this._riserFilter);
     this.riserSynth = new Tone.Noise('pink').connect(this._riserGain);
@@ -166,14 +312,14 @@ MUZE.Audio = {
     const reverbSend = new Tone.Gain(ch.reverbSend);
     const delaySend = new Tone.Gain(ch.delaySend);
 
-    // Wire: Source → EQ → Panner → Gain
+    // Wire: Source -> EQ -> Panner -> Gain
     source.connect(eq);
     eq.connect(panner);
     panner.connect(gain);
 
-    // Dry path: face-linked channels go through master filter, others bypass to master EQ
+    // Dry path: face-linked channels go through master filter, others bypass to master saturation
     const faceLinked = MUZE.Mixer.channels[name].faceLinked;
-    gain.connect(faceLinked ? this._masterFilter : this._masterEQ);
+    gain.connect(faceLinked ? this._masterFilter : this._masterSaturation);
 
     // Send paths (post-fader)
     gain.connect(reverbSend);
@@ -213,6 +359,13 @@ MUZE.Audio = {
     const rollN = Math.min(1, Math.abs(state.headRoll) / 0.35);
     this._padChorus.depth = C.CHORUS_DEPTH_MIN + rollN * (C.CHORUS_DEPTH_MAX - C.CHORUS_DEPTH_MIN);
 
+    // Arp filter envelope simulation: mouth openness opens the filter
+    if (this._arpFilter) {
+      const mouthN = Math.max(0, Math.min(1, state.mouthOpenness));
+      const arpFilterFreq = 800 + mouthN * 6000;
+      this._arpFilter.frequency.rampTo(arpFilterFreq, 0.08);
+    }
+
     // Mode color update
     const modeName = MUZE.Music.getScaleName(state.currentScale);
     if (modeName !== state.currentModeName) {
@@ -227,10 +380,26 @@ MUZE.Audio = {
   },
 
   // ============================================================
-  // PAD
+  // PAD (triggers all layers)
   // ============================================================
-  triggerPad(notes) { this.padSynth.releaseAll(); this.padSynth.triggerAttack(notes, Tone.now(), 0.4); },
-  releasePad() { this.padSynth.releaseAll(); },
+  triggerPad(notes) {
+    this.padSynth.releaseAll();
+    this._padDetune2.releaseAll();
+    this._padSub.releaseAll();
+    this.padSynth.triggerAttack(notes, Tone.now(), 0.4);
+    this._padDetune2.triggerAttack(notes, Tone.now(), 0.35);
+    // Sub: one octave down
+    const subNotes = notes.map(n => {
+      const freq = Tone.Frequency(n).toFrequency();
+      return Tone.Frequency(freq / 2).toNote();
+    });
+    this._padSub.triggerAttack(subNotes, Tone.now(), 0.3);
+  },
+  releasePad() {
+    this.padSynth.releaseAll();
+    this._padDetune2.releaseAll();
+    this._padSub.releaseAll();
+  },
 
   // ============================================================
   // HAND MELODY
@@ -253,21 +422,43 @@ MUZE.Audio = {
   },
   setPortamento(on) { if (this.melodySynth) this.melodySynth.portamento = on ? 0.3 : 0; },
 
-  // ============================================================
-  // DRUMS
-  // ============================================================
-  triggerDrum(type, velocity) {
-    const vel = velocity || 0.7;
-    const now = Tone.now();
-    switch (type) {
-      case 'kick': this.kickSynth.triggerAttackRelease('C1', '8n', now, vel); break;
-      case 'snare': this.snareSynth.triggerAttackRelease('8n', now, vel); break;
-      case 'hat': this.hatSynth.triggerAttackRelease('32n', now); break;
+  // Vibrato control
+  setVibratoAmount(amount) {
+    // amount: 0-1
+    if (this._melodyVibratoGain) {
+      this._melodyVibratoGain.gain.rampTo(amount, 0.1);
     }
   },
 
   // ============================================================
-  // RISER (hold → build → drop)
+  // DRUMS (layered)
+  // ============================================================
+  triggerDrum(type, velocity, isOpenHat) {
+    const vel = velocity || 0.7;
+    const now = Tone.now();
+    switch (type) {
+      case 'kick':
+        this.kickSynth.triggerAttackRelease('C1', '8n', now, vel);
+        this._kickClick.triggerAttackRelease('32n', now, vel * 0.6);
+        // Sidechain: duck the pad
+        if (MUZE.Sidechain) MUZE.Sidechain.duck();
+        break;
+      case 'snare':
+        this.snareSynth.triggerAttackRelease('8n', now, vel);
+        this._snareBody.triggerAttackRelease('E3', '16n', now, vel * 0.5);
+        break;
+      case 'hat':
+        if (isOpenHat) {
+          this._openHatSynth.triggerAttackRelease('8n', now, vel * 0.5);
+        } else {
+          this.hatSynth.triggerAttackRelease('32n', now, vel);
+        }
+        break;
+    }
+  },
+
+  // ============================================================
+  // RISER (hold -> build -> drop)
   // ============================================================
   _preRiserGains: {},
 
@@ -289,6 +480,7 @@ MUZE.Audio = {
     this._riserFilter.frequency.rampTo(200, 0.1);
     // Big kick hit
     this.kickSynth.triggerAttackRelease('C1', '4n', Tone.now(), 1);
+    this._kickClick.triggerAttackRelease('32n', Tone.now(), 0.8);
     // Reverb wash: temporarily max all reverb sends
     for (const ch of MUZE.Mixer.CHANNEL_ORDER) {
       const node = this._nodes[ch];
@@ -326,7 +518,7 @@ MUZE.Audio = {
   },
 
   // ============================================================
-  // ARPEGGIO
+  // ARPEGGIO (multiple pattern types)
   // ============================================================
   startArpeggio() {
     if (this._arpSeq) return;
@@ -335,15 +527,60 @@ MUZE.Audio = {
       if (!this._arpNotes.length || !this.leadSynth) return;
       const note = this._arpNotes[this._arpIdx % this._arpNotes.length];
       this.leadSynth.triggerAttackRelease(note, '8n', time, 0.5);
+
+      // Animate arp filter for each note (pluck effect)
+      if (this._arpFilter) {
+        this._arpFilter.frequency.setValueAtTime(6000, time);
+        this._arpFilter.frequency.exponentialRampToValueAtTime(1200, time + 0.15);
+      }
+
       this._arpIdx++;
     }, '8n');
     this._arpSeq.start(0);
   },
+
   updateArpNotes(scale, root) {
-    const up = scale.map(i => MUZE.Music.midiToNote(root + i));
-    const down = [...up].reverse().slice(1);
-    this._arpNotes = [...up, ...down];
+    const baseNotes = scale.map(i => MUZE.Music.midiToNote(root + i));
+    const pattern = MUZE.Config.ARP_PATTERNS[MUZE.State.arpPatternIdx] || 'up-down';
+
+    switch (pattern) {
+      case 'up':
+        this._arpNotes = [...baseNotes];
+        break;
+      case 'down':
+        this._arpNotes = [...baseNotes].reverse();
+        break;
+      case 'random': {
+        // Fisher-Yates shuffle but keep stable within a cycle
+        const shuffled = [...baseNotes];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        this._arpNotes = shuffled;
+        break;
+      }
+      case 'up-up-down': {
+        const up1 = [...baseNotes];
+        const up2 = [...baseNotes];
+        const down = [...baseNotes].reverse().slice(1);
+        this._arpNotes = [...up1, ...up2, ...down];
+        break;
+      }
+      case 'played':
+        // Just play in scale order (like 'up' but wraps at chord tones)
+        this._arpNotes = [...baseNotes];
+        break;
+      case 'up-down':
+      default: {
+        const up = [...baseNotes];
+        const down = [...baseNotes].reverse().slice(1);
+        this._arpNotes = [...up, ...down];
+        break;
+      }
+    }
   },
+
   stopArpeggio() {
     if (this._arpSeq) { this._arpSeq.stop(); this._arpSeq.dispose(); this._arpSeq = null; }
     this._arpNotes = [];
@@ -403,15 +640,141 @@ MUZE.Audio = {
   tapeStop() {
     const orig = Tone.Transport.bpm.value;
     Tone.Transport.bpm.rampTo(20, 0.4);
-    [this.padSynth, this.leadSynth, this.melodySynth].forEach(s => {
+    [this.padSynth, this._padDetune2, this._padSub, this.leadSynth, this.melodySynth].forEach(s => {
       if (s) { s.set({ detune: 0 }); s.set({ detune: -2400 }); }
     });
     setTimeout(() => {
       Tone.Transport.bpm.rampTo(orig, 0.15);
-      [this.padSynth, this.leadSynth, this.melodySynth].forEach(s => {
+      [this.padSynth, this._padDetune2, this.leadSynth, this.melodySynth].forEach(s => {
         if (s) s.set({ detune: 0 });
       });
+      // Restore pad detuning
+      this.padSynth.set({ detune: 5 });
+      this._padDetune2.set({ detune: -5 });
+      this._padSub.set({ detune: 0 });
     }, 500);
+  },
+
+  // ============================================================
+  // BPM CONTROL
+  // ============================================================
+  setBPM(bpm) {
+    const clamped = Math.max(MUZE.Config.BPM_MIN, Math.min(MUZE.Config.BPM_MAX, bpm));
+    MUZE.State.bpm = clamped;
+    Tone.Transport.bpm.rampTo(clamped, 0.1);
+  },
+
+  getBPM() {
+    return Math.round(Tone.Transport.bpm.value);
+  },
+
+  // ============================================================
+  // SWING CONTROL
+  // ============================================================
+  setSwing(amount) {
+    // amount: 0-100 percentage
+    MUZE.State.swing = amount;
+    // Tone.js swing: 0-1 range, applied to 8th notes
+    Tone.Transport.swing = amount / 100;
+    Tone.Transport.swingSubdivision = '8n';
+  },
+
+  // ============================================================
+  // PRESET SYSTEM
+  // ============================================================
+  applyPreset(presetIdx) {
+    const P = MUZE.Config.PRESETS[presetIdx];
+    if (!P) return;
+    MUZE.State.presetIdx = presetIdx;
+
+    const FADE = 2; // 2-second crossfade for smooth transitions
+
+    // BPM — smooth ramp
+    Tone.Transport.bpm.rampTo(P.bpm, FADE);
+    MUZE.State.bpm = P.bpm;
+
+    // Root note
+    MUZE.State.rootOffset = P.rootOffset;
+
+    // Pad synth params — oscillator types switch immediately, envelopes ramp
+    this.padSynth.set({
+      oscillator: { type: P.padOsc },
+      harmonicity: P.padHarm,
+      modulationIndex: P.padMod,
+      envelope: { attack: P.padAttack, release: P.padRelease }
+    });
+    this._padDetune2.set({
+      oscillator: { type: P.padOsc },
+      harmonicity: P.padHarm,
+      modulationIndex: P.padMod,
+      envelope: { attack: P.padAttack, release: P.padRelease }
+    });
+
+    // Arp synth params
+    this.leadSynth.set({
+      oscillator: { type: P.arpOsc },
+      envelope: { attack: P.arpAttack, decay: P.arpDecay, sustain: P.arpSustain, release: P.arpRelease }
+    });
+
+    // Melody synth params
+    this.melodySynth.set({
+      oscillator: { type: P.melOsc },
+      envelope: { attack: P.melAttack, decay: P.melDecay, sustain: P.melSustain, release: P.melRelease }
+    });
+
+    // Volumes — crossfade using gain ramps instead of hard-setting
+    const rampVol = (ch, db) => {
+      const node = MUZE.Audio._nodes[ch];
+      if (node) {
+        node.gain.gain.rampTo(Tone.dbToGain(db), FADE);
+        MUZE.Mixer.channels[ch].volume = db;
+      }
+    };
+    rampVol('pad', P.padVolume);
+    rampVol('arp', P.arpVolume);
+    rampVol('melody', P.melodyVolume);
+    rampVol('kick', P.kickVolume);
+    rampVol('snare', P.snareVolume);
+    rampVol('hat', P.hatVolume);
+
+    // Sends — crossfade
+    const rampSend = (ch, type, val) => {
+      const node = MUZE.Audio._nodes[ch];
+      if (!node) return;
+      if (type === 'reverb') {
+        node.reverbSend.gain.rampTo(val, FADE);
+        MUZE.Mixer.channels[ch].reverbSend = val;
+      } else {
+        node.delaySend.gain.rampTo(val, FADE);
+        MUZE.Mixer.channels[ch].delaySend = val;
+      }
+    };
+    rampSend('pad', 'reverb', P.padReverb);
+    rampSend('pad', 'delay', P.padDelay);
+    rampSend('arp', 'reverb', P.arpReverb);
+    rampSend('arp', 'delay', P.arpDelay);
+
+    // Reverb decay & delay feedback
+    if (this._reverbBus) {
+      try {
+        this._reverbBus.decay = P.reverbDecay;
+      } catch(e) { /* may not be ramp-able */ }
+    }
+    if (this._delayBus) {
+      this._delayBus.feedback.rampTo(P.delayFeedback, FADE);
+    }
+
+    // Arp pattern
+    MUZE.State.arpPatternIdx = MUZE.Config.ARP_PATTERNS.indexOf(P.arpPattern);
+    if (MUZE.State.arpPatternIdx < 0) MUZE.State.arpPatternIdx = 0;
+
+    // Rhythm pattern
+    if (MUZE.AutoRhythm._active) {
+      MUZE.AutoRhythm._patIdx = P.rhythmPattern;
+    }
+
+    // Swing — smooth transition
+    this.setSwing(P.swing);
   },
 
   // ============================================================
@@ -425,6 +788,8 @@ MUZE.Audio = {
     if (!this._padSampleMode) {
       this._padSampleMode = true;
       this.padSynth.volume.rampTo(-60, 0.3);
+      this._padDetune2.volume.rampTo(-60, 0.3);
+      this._padSub.volume.rampTo(-60, 0.3);
       this._padGrain.volume.rampTo(-14, 0.3);
       this._padGrain.start();
     }
@@ -433,6 +798,8 @@ MUZE.Audio = {
     this._padSampleMode = false;
     MUZE.State.padSampleId = null;
     this.padSynth.volume.rampTo(-14, 0.3);
+    this._padDetune2.volume.rampTo(-6, 0.3);
+    this._padSub.volume.rampTo(-20, 0.3);
     this._padGrain.volume.rampTo(-60, 0.3);
     setTimeout(() => { try { this._padGrain.stop(); } catch(e) {} }, 400);
   },
@@ -476,7 +843,7 @@ MUZE.MicRecorder = {
 };
 
 // ============================================================
-// AUTO RHYTHM
+// AUTO RHYTHM (with swing support)
 // ============================================================
 MUZE.AutoRhythm = {
   _seq: null, _active: false, _patIdx: 0,
@@ -487,7 +854,11 @@ MUZE.AutoRhythm = {
       const p = MUZE.Config.RHYTHM_PATTERNS[this._patIdx];
       if (p.kick[s]) MUZE.Audio.triggerDrum('kick', 0.7);
       if (p.snare[s]) MUZE.Audio.triggerDrum('snare', 0.6);
-      if (p.hat[s]) MUZE.Audio.triggerDrum('hat', 0.4);
+      if (p.hat[s]) {
+        // Every 4th hat hit has a chance to be open hat (adds variation)
+        const isOpen = (s % 8 === 6);
+        MUZE.Audio.triggerDrum('hat', 0.4, isOpen);
+      }
     }, [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15], '16n');
     this._seq.start(0);
   },

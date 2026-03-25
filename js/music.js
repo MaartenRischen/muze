@@ -5,8 +5,21 @@
 MUZE.Music = {
   NOTE_NAMES: ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
 
+  // Extra scales map (name -> intervals)
+  EXTRA_SCALES: {
+    'pent. major':  [0,2,4,7,9],
+    'pent. minor':  [0,3,5,7,10],
+    'harm. minor':  [0,2,3,5,7,8,11],
+    'whole tone':   [0,2,4,6,8,10],
+    'blues':        [0,3,5,6,7,10],
+  },
+
   selectScale(lipCorner) {
     const C = MUZE.Config;
+    // If an extra scale mode is selected, always return that
+    if (MUZE.State.extraScaleMode) {
+      return this.EXTRA_SCALES[MUZE.State.extraScaleMode] || C.SCALE_DORIAN;
+    }
     if (lipCorner > 0.80) return C.SCALE_LYDIAN;
     if (lipCorner > 0.60) return C.SCALE_IONIAN;
     if (lipCorner > 0.40) return C.SCALE_MIXOLYDIAN;
@@ -43,7 +56,18 @@ MUZE.Music = {
     if (scale === C.SCALE_DORIAN) return 'dorian';
     if (scale === C.SCALE_AEOLIAN) return 'aeolian';
     if (scale === C.SCALE_PHRYGIAN) return 'phrygian';
+    // Check extra scales by comparing interval arrays
+    for (const [name, intervals] of Object.entries(this.EXTRA_SCALES)) {
+      if (scale.length === intervals.length && scale.every((v, i) => v === intervals[i])) {
+        return name;
+      }
+    }
     return '?';
+  },
+
+  // Get the effective root note (C4 base + offset)
+  getEffectiveRoot() {
+    return 60 + MUZE.State.rootOffset;
   }
 };
 
