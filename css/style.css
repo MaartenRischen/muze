@@ -102,8 +102,8 @@ html, body {
 #mood-gradient-overlay {
   position: fixed; inset: 0;
   pointer-events: none; z-index: 1;
-  /* Opacity reacts to energy + breath: silent = barely visible, loud = noticeable */
-  opacity: calc(0.04 + var(--mood-energy, 0) * 0.06 + var(--mood-breath, 0.3) * 0.03);
+  /* Keep very subtle so camera stays visible */
+  opacity: calc(0.02 + var(--mood-energy, 0) * 0.02 + var(--mood-breath, 0.3) * 0.01);
   transition: background 1.5s ease;
   will-change: opacity;
 }
@@ -141,11 +141,11 @@ html, body {
   position: fixed; inset: 0;
   pointer-events: none; z-index: 1;
   will-change: opacity;
-  /* Base opacity from breath, boosted by beat accent (+15% on hit) */
+  /* Edge glow: subtle so camera stays visible */
   opacity: calc(
-    var(--mood-breath, 0.3) * 0.45
-    + var(--mood-energy, 0) * 0.15
-    + var(--mood-beat, 0) * 0.15
+    var(--mood-breath, 0.3) * 0.20
+    + var(--mood-energy, 0) * 0.08
+    + var(--mood-beat, 0) * 0.08
   );
   background:
     /* Bottom glow — strongest, wide spread (Ambilight primary) */
@@ -185,11 +185,11 @@ html, body {
   position: fixed; inset: 0;
   pointer-events: none; z-index: 1;
   will-change: opacity;
-  /* Inner is brighter but more affected by beat */
+  /* Inner: subtle */
   opacity: calc(
-    var(--mood-breath, 0.3) * 0.35
-    + var(--mood-energy, 0) * 0.20
-    + var(--mood-beat, 0) * 0.25
+    var(--mood-breath, 0.3) * 0.15
+    + var(--mood-energy, 0) * 0.10
+    + var(--mood-beat, 0) * 0.12
   );
   background:
     /* Bottom inner — tight, bright */
@@ -220,11 +220,11 @@ html, body {
   transform-origin: bottom center;
   /* Scale subtly with breath: 0.96 to 1.04 range */
   transform: scaleY(calc(0.96 + var(--mood-breath, 0.3) * 0.08));
-  /* Opacity combines breath + energy */
+  /* Breath bar: reduced */
   opacity: calc(
-    var(--mood-breath, 0.3) * 0.50
-    + var(--mood-energy, 0) * 0.25
-    + var(--mood-beat, 0) * 0.10
+    var(--mood-breath, 0.3) * 0.25
+    + var(--mood-energy, 0) * 0.12
+    + var(--mood-beat, 0) * 0.05
   );
   background:
     /* Primary bottom wash */
@@ -1073,8 +1073,8 @@ html, body {
    MODE HUD — Visual anchor of the performance
    ============================================================ */
 #mode-hud-wrap {
-  position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
-  z-index: 10; display: flex; align-items: center; gap: 10px;
+  position: fixed; top: env(safe-area-inset-top, 12px); left: 12px;
+  z-index: 10; display: flex; align-items: center; gap: 8px;
 }
 #freeze-btn {
   appearance: none;
@@ -1120,85 +1120,39 @@ html, body {
     0 0 24px rgba(var(--muze-accent-rgb), 0.12);
 }
 #mode-hud {
-  pointer-events: none; text-align: center;
-  font: 600 24px/1.2 var(--font-ui);
-  letter-spacing: 6px;
-  text-transform: uppercase;
+  pointer-events: none; text-align: left;
   color: var(--muze-text);
-  background: var(--elevation-1);
-  padding: 16px 36px; border-radius: var(--muze-radius);
-  /* PERF: Removed backdrop-filter */
-  border: 1px solid var(--muze-border-subtle);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.03) inset;
-  transition: border-color var(--transition-panel), box-shadow var(--transition-panel);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 8px 14px; border-radius: 8px;
+  border: none;
+  box-shadow: none;
+  transition: color var(--transition-panel);
   position: relative;
   overflow: hidden;
 }
-/* Noise texture for mode HUD */
-#mode-hud::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: 0.03;
-  pointer-events: none;
-  background-image: var(--noise-texture);
-  background-size: 128px 128px;
-  mix-blend-mode: overlay;
-  border-radius: inherit;
-  z-index: 1;
-}
-#mode-hud.frozen {
-  border-color: rgba(var(--muze-accent-rgb), 0.4);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(var(--muze-accent-rgb), 0.12);
+#mode-hud.frozen .mode-name {
+  color: rgba(var(--muze-accent-rgb), 0.7);
 }
 
-/* Mode name — prominent with accent glow */
+/* Mode name — clean, top-left, just the word */
 #mode-hud .mode-name {
-  font: 700 26px/1.2 var(--font-ui);
-  letter-spacing: 6px;
+  font: 500 16px/1 var(--font-ui);
+  letter-spacing: 3px;
   text-transform: uppercase;
-  color: var(--muze-text);
-  text-shadow: 0 0 20px rgba(var(--muze-accent-rgb), 0.15);
-  transition: text-shadow var(--transition-panel);
+  color: var(--muze-accent);
+  transition: color var(--transition-panel);
 }
 
-/* Valence bar — premium segmented meter with accent color */
-#mode-hud .valence-bar {
-  margin-top: 12px; height: 6px; width: 200px;
-  background: var(--muze-recessed);
-  border-radius: 3px; position: relative; overflow: hidden;
-  box-shadow: var(--shadow-recessed);
+/* Valence bar — tiny, just a subtle indicator under the mode name */
+.valence-bar-mini {
+  margin-top: 4px; height: 2px; width: 80px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 1px; position: relative; overflow: hidden;
 }
-#mode-hud .valence-bar .fill {
-  position: absolute; top: 0; height: 100%; border-radius: 3px;
+.valence-bar-mini .fill {
+  position: absolute; top: 0; height: 100%; border-radius: 1px;
   transition: left 0.2s ease-out, width 0.2s ease-out, background var(--transition-panel);
-  box-shadow: 0 0 8px currentColor;
-  /* Segmented look matching mixer meters */
-  -webkit-mask-image: repeating-linear-gradient(
-    to right,
-    black 0px,
-    black 3px,
-    transparent 3px,
-    transparent 4px
-  );
-  mask-image: repeating-linear-gradient(
-    to right,
-    black 0px,
-    black 3px,
-    transparent 3px,
-    transparent 4px
-  );
-}
-#mode-hud .valence-label {
-  font: 400 10px/1 var(--font-ui);
-  color: var(--muze-text-dim);
-  margin-top: 8px; letter-spacing: 2px;
-  text-transform: uppercase;
-}
-#mode-hud .valence-value {
-  font: 400 10px/1 var(--font-data);
-  font-feature-settings: 'tnum';
-  color: var(--muze-text-muted);
+  box-shadow: 0 0 4px currentColor;
 }
 
 /* ---- Rhythm Indicator ---- */

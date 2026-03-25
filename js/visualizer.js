@@ -258,8 +258,8 @@ MUZE.Visualizer = {
       document.getElementById('cam').style.filter = grades[currentMode] || 'none';
     }
 
-    // ---- Edge vignette energy pulse ----
-    const vignetteOpacity = 0.15 + energy * 0.3;
+    // ---- Edge vignette energy pulse (subtle — camera must stay visible) ----
+    const vignetteOpacity = 0.08 + energy * 0.12;
     document.body.style.setProperty('--vignette-opacity', vignetteOpacity);
 
     // ---- Advance geometry phase ----

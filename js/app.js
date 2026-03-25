@@ -184,9 +184,7 @@ MUZE.Loop = {
     }
     this._modeHudEl.innerHTML =
       `<div class="mode-name">${modeName}</div>` +
-      `<div class="hud-meta">${rootName} &middot; ${bpm} BPM${loopInfo}</div>` +
-      `<div class="valence-bar"><div class="fill" style="left:${left}%;width:${barW}%;background:${accent}"></div></div>` +
-      `<div class="valence-label">valence <span class="valence-value">${vRounded}</span></div>`;
+      `<div class="valence-bar-mini"><div class="fill" style="left:${left}%;width:${barW}%;background:${accent}"></div></div>`;
 
     // Debug (only update if visible)
     if (S.debugVisible) {
