@@ -87,12 +87,6 @@ html, body {
   width: 100%; height: 100%;
   object-fit: cover; transform: scaleX(-1); z-index: 0;
 }
-#bg-canvas {
-  position: fixed; top: 0; left: 0;
-  width: 100%; height: 100%;
-  object-fit: cover; transform: scaleX(-1);
-  z-index: 1; pointer-events: none;
-}
 #overlay {
   position: fixed; top: 0; left: 0;
   width: 100%; height: 100%;
@@ -121,10 +115,19 @@ html, body {
 }
 .drum-cell.hit { transition: none; }
 #zone-hat { border-bottom: 1px solid var(--muze-border); }
-#zone-hat.hit { background: rgba(var(--muze-accent-rgb), 0.15); }
+#zone-hat.hit {
+  background: rgba(var(--muze-accent-rgb), 0.15);
+  box-shadow: inset 0 0 40px rgba(var(--muze-accent-rgb), 0.08);
+}
 #zone-snare { border-bottom: 1px solid var(--muze-border); }
-#zone-snare.hit { background: rgba(var(--muze-accent-rgb), 0.20); }
-#zone-kick.hit { background: rgba(var(--muze-accent-rgb), 0.25); }
+#zone-snare.hit {
+  background: rgba(var(--muze-accent-rgb), 0.20);
+  box-shadow: inset 0 0 50px rgba(var(--muze-accent-rgb), 0.10);
+}
+#zone-kick.hit {
+  background: rgba(var(--muze-accent-rgb), 0.25);
+  box-shadow: inset 0 0 60px rgba(var(--muze-accent-rgb), 0.12);
+}
 
 /* ---- Chord Bar ---- */
 #chord-zone {
@@ -132,8 +135,22 @@ html, body {
   z-index: 3; display: flex; flex-direction: row; touch-action: none;
   background: var(--elevation-1);
   backdrop-filter: blur(var(--muze-blur)); -webkit-backdrop-filter: blur(var(--muze-blur));
-  border-top: 1px solid var(--muze-border-subtle);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  position: relative;
+}
+/* Noise texture for chord bar */
+#chord-zone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+  z-index: 0;
 }
 .chord-btn {
   flex: 1; display: flex; align-items: center; justify-content: center;
@@ -141,25 +158,27 @@ html, body {
   font: 600 14px/1 var(--font-ui);
   letter-spacing: 0.5px;
   border-right: 1px solid rgba(255, 255, 255, 0.03);
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.2s ease-out, background 0.2s ease-out;
   position: relative;
+  z-index: 1;
 }
 .chord-btn:last-child { border-right: none; }
 .chord-btn.active {
   color: var(--muze-accent);
-  background: var(--muze-accent-subtle);
+  background: rgba(var(--muze-accent-rgb), 0.10);
+  text-shadow: 0 0 12px var(--muze-accent-glow);
 }
 .chord-btn.active::after {
   content: '';
-  position: absolute; bottom: 0; left: 20%; right: 20%;
+  position: absolute; bottom: 0; left: 15%; right: 15%;
   height: 2px; border-radius: 1px;
   background: var(--muze-accent);
-  box-shadow: 0 0 8px var(--muze-accent-glow);
-  animation: chord-glow 0.3s ease-out;
+  box-shadow: 0 0 10px var(--muze-accent-glow), 0 0 20px rgba(var(--muze-accent-rgb), 0.15);
+  animation: chord-glow 0.2s ease-out;
 }
 @keyframes chord-glow {
   from { opacity: 0; left: 40%; right: 40%; }
-  to { opacity: 1; left: 20%; right: 20%; }
+  to { opacity: 1; left: 15%; right: 15%; }
 }
 .chord-btn:active { background: var(--elevation-2); }
 
@@ -243,8 +262,8 @@ html, body {
 }
 #start-btn {
   appearance: none;
-  border: 1px solid rgba(var(--muze-accent-rgb), 0.4);
-  background: rgba(var(--muze-accent-rgb), 0.06);
+  border: 1px solid rgba(var(--muze-accent-rgb), 0.3);
+  background: var(--elevation-2);
   color: #fff;
   font-family: var(--font-ui);
   font-size: 15px;
@@ -254,17 +273,35 @@ html, body {
   cursor: pointer;
   letter-spacing: 1.5px;
   margin-top: 24px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   position: relative; z-index: 1;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    0 0 0 0 rgba(var(--muze-accent-rgb), 0.2);
   animation: btn-breathe 3s ease-in-out infinite;
+  overflow: hidden;
+}
+/* Noise texture on start button */
+#start-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
 }
 @keyframes btn-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--muze-accent-rgb), 0.2); }
-  50% { box-shadow: 0 0 0 12px rgba(var(--muze-accent-rgb), 0); }
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 8px rgba(0,0,0,0.3), 0 0 0 0 rgba(var(--muze-accent-rgb), 0.2); }
+  50% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 8px rgba(0,0,0,0.3), 0 0 0 12px rgba(var(--muze-accent-rgb), 0); }
 }
 #start-btn:active {
-  background: rgba(var(--muze-accent-rgb), 0.15);
-  transform: scale(0.97);
+  background: var(--elevation-3);
+  transform: scale(0.95);
+  filter: brightness(0.9);
 }
 #start-screen.loading #start-btn { opacity: 0.3; pointer-events: none; animation: none; }
 #loading-text {
@@ -309,7 +346,7 @@ html, body {
 #freeze-btn {
   appearance: none;
   border: 1px solid var(--muze-border-emphasis);
-  background: var(--elevation-1);
+  background: var(--elevation-2);
   color: var(--muze-text-dim);
   font-size: 18px; width: 38px; height: 38px; border-radius: 50%;
   backdrop-filter: blur(var(--muze-blur)); -webkit-backdrop-filter: blur(var(--muze-blur));
@@ -317,12 +354,36 @@ html, body {
   display: flex; align-items: center; justify-content: center;
   pointer-events: auto;
   transition: all 0.2s;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.25);
+  position: relative;
+  overflow: hidden;
 }
-#freeze-btn:active { background: var(--elevation-2); }
+/* Noise texture for freeze button */
+#freeze-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+}
+#freeze-btn:active {
+  background: var(--elevation-3);
+  transform: scale(0.95);
+  filter: brightness(0.9);
+}
 #freeze-btn.frozen {
   border-color: rgba(var(--muze-accent-rgb), 0.6);
   color: var(--muze-accent);
-  box-shadow: 0 0 12px var(--muze-accent-glow);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 12px var(--muze-accent-glow),
+    0 0 24px rgba(var(--muze-accent-rgb), 0.12);
 }
 #mode-hud {
   pointer-events: none; text-align: center;
@@ -351,21 +412,44 @@ html, body {
   border-radius: inherit;
   z-index: 1;
 }
-#mode-hud.frozen { border-color: rgba(var(--muze-accent-rgb), 0.3); }
+#mode-hud.frozen {
+  border-color: rgba(var(--muze-accent-rgb), 0.4);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(var(--muze-accent-rgb), 0.12);
+}
 #mode-hud .valence-bar {
-  margin-top: 10px; height: 3px; width: 200px;
-  background: var(--muze-recessed);
-  border-radius: 2px; position: relative; overflow: hidden;
-  box-shadow: var(--shadow-recessed);
+  margin-top: 10px; height: 6px; width: 200px;
+  background: #0A0A0E;
+  border-radius: 3px; position: relative; overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.02);
 }
 #mode-hud .valence-bar .fill {
-  position: absolute; top: 0; height: 100%; border-radius: 2px;
-  transition: left 0.2s ease, width 0.2s ease, background 0.3s ease;
+  position: absolute; top: 0; height: 100%; border-radius: 3px;
+  transition: left 0.2s ease-out, width 0.2s ease-out, background 0.3s ease;
+  /* Segmented look matching mixer meters */
+  -webkit-mask-image: repeating-linear-gradient(
+    to right,
+    black 0px,
+    black 3px,
+    transparent 3px,
+    transparent 4px
+  );
+  mask-image: repeating-linear-gradient(
+    to right,
+    black 0px,
+    black 3px,
+    transparent 3px,
+    transparent 4px
+  );
 }
 #mode-hud .valence-label {
   font: 400 11px/1 var(--font-ui);
   color: var(--muze-text-dim);
-  margin-top: 6px; letter-spacing: 1px;
+  margin-top: 8px; letter-spacing: 1px;
+}
+#mode-hud .valence-value {
+  font: 400 10px/1 var(--font-data);
+  font-feature-settings: 'tnum';
+  color: var(--muze-text-muted);
 }
 
 /* ---- Rhythm Indicator ---- */
@@ -396,15 +480,19 @@ html, body {
 .toolbar-btn {
   appearance: none;
   border: 1px solid var(--muze-border-emphasis);
-  background: var(--elevation-1);
+  background: var(--elevation-2);
   color: var(--muze-text-dim);
   width: 36px; height: 36px; border-radius: 50%;
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-ui);
   font-size: 16px;
   transition: transform 0.15s ease, filter 0.15s ease, background 0.15s ease;
   position: relative;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.25);
 }
 /* Noise texture on toolbar buttons */
 .toolbar-btn::after {
@@ -419,13 +507,18 @@ html, body {
   border-radius: inherit;
 }
 .toolbar-btn:active {
-  background: var(--elevation-2);
+  background: var(--elevation-3);
   transform: scale(0.95);
   filter: brightness(0.9);
 }
 .toolbar-btn.recording {
   border-color: rgba(255, 50, 50, 0.7);
   background: rgba(255, 0, 0, 0.12);
+  animation: rec-glow-pulse 1.5s ease-in-out infinite;
+}
+@keyframes rec-glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 50, 50, 0), 0 0 8px rgba(255, 50, 50, 0.2); }
+  50% { box-shadow: 0 0 0 4px rgba(255, 50, 50, 0.1), 0 0 16px rgba(255, 50, 50, 0.4); }
 }
 .toolbar-btn.recording::after {
   content: ''; position: absolute; top: 6px; right: 6px;
@@ -445,7 +538,7 @@ html, body {
 .toolbar-label {
   appearance: none;
   border: 1px solid var(--muze-border);
-  background: var(--elevation-1);
+  background: var(--elevation-2);
   color: var(--muze-text-dim);
   font: 500 8px/1 var(--font-ui);
   letter-spacing: 0.5px;
@@ -454,8 +547,15 @@ html, body {
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 4px rgba(0, 0, 0, 0.2);
 }
-.toolbar-label:active { background: var(--elevation-2); }
+.toolbar-label:active {
+  background: var(--elevation-3);
+  transform: scale(0.95);
+  filter: brightness(0.9);
+}
 
 /* ---- Sample Switcher ---- */
 #sample-bar {
@@ -468,7 +568,7 @@ html, body {
 .sample-btn {
   appearance: none;
   border: 1px solid var(--muze-border);
-  background: var(--elevation-1);
+  background: var(--elevation-2);
   color: var(--muze-text-dim);
   font: 400 10px/1.3 var(--font-ui);
   padding: 6px 10px;
@@ -478,8 +578,15 @@ html, body {
   text-align: left;
   transition: all 0.15s;
   max-width: 120px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 2px 4px rgba(0, 0, 0, 0.2);
 }
-.sample-btn:active { background: var(--elevation-2); }
+.sample-btn:active {
+  background: var(--elevation-3);
+  transform: scale(0.95);
+  filter: brightness(0.9);
+}
 .sample-btn .label {
   display: block;
   color: var(--muze-text-muted);
@@ -552,17 +659,35 @@ html, body {
   width: 56px; flex-shrink: 0;
 }
 .synth-row input[type=range] {
-  flex: 1; height: 3px;
+  flex: 1; height: 4px;
   -webkit-appearance: none; appearance: none;
-  background: var(--elevation-2);
+  background: #0A0A0E;
   border-radius: 2px; outline: none;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.03);
 }
 .synth-row input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px; height: 14px;
-  background: var(--muze-accent);
-  border-radius: 50%; cursor: pointer;
-  box-shadow: 0 0 8px var(--muze-accent-glow);
+  width: 16px; height: 10px;
+  background: linear-gradient(180deg, #555 0%, #3a3a3a 40%, #2a2a2a 100%);
+  border-radius: 2px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.synth-row input[type=range]::-moz-range-track {
+  height: 4px;
+  background: #0A0A0E;
+  border-radius: 2px;
+  border: none;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
+}
+.synth-row input[type=range]::-moz-range-thumb {
+  width: 16px; height: 10px;
+  background: linear-gradient(180deg, #555 0%, #3a3a3a 40%, #2a2a2a 100%);
+  border-radius: 2px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 .synth-row .val {
   color: var(--muze-text-muted);
@@ -584,8 +709,8 @@ html, body {
 #tut-picker {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   z-index: 30;
-  background: rgba(14, 14, 17, 0.92);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  background: rgba(8, 8, 11, 0.95);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
   display: none; flex-direction: column;
   align-items: center; justify-content: center; gap: 20px;
 }
@@ -603,16 +728,23 @@ html, body {
 }
 .tut-choice {
   appearance: none;
-  border: 1px solid rgba(var(--muze-accent-rgb), 0.25);
-  background: rgba(var(--muze-accent-rgb), 0.04);
+  border: 1px solid rgba(var(--muze-accent-rgb), 0.3);
+  background: var(--elevation-2);
   color: #fff;
   font-family: var(--font-ui);
   font-size: 14px;
   padding: 14px 32px; border-radius: 30px; cursor: pointer;
   letter-spacing: 1px; width: 220px; text-align: center;
   transition: all 0.2s;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 8px rgba(0, 0, 0, 0.3);
 }
-.tut-choice:active { background: rgba(var(--muze-accent-rgb), 0.12); }
+.tut-choice:active {
+  background: var(--elevation-3);
+  transform: scale(0.95);
+  filter: brightness(0.9);
+}
 .tut-choice small {
   display: block; color: var(--muze-text-dim);
   font-size: 11px; margin-top: 4px;
@@ -681,19 +813,42 @@ html, body {
 #tut-card .tut-nav button {
   appearance: none;
   border: 1px solid var(--muze-border-emphasis);
-  background: transparent; color: #fff;
+  background: var(--elevation-2); color: #fff;
   font-family: var(--font-ui);
   font-size: 13px;
   padding: 8px 22px; border-radius: 20px; cursor: pointer;
   transition: all 0.15s;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 4px rgba(0, 0, 0, 0.2);
 }
-#tut-card .tut-nav button:active { background: var(--elevation-2); }
+#tut-card .tut-nav button:active {
+  background: var(--elevation-3);
+  transform: scale(0.95);
+  filter: brightness(0.9);
+}
 #tut-card .tut-nav .tut-skip {
   border-color: transparent; color: var(--muze-text-muted);
 }
 
 /* ---- Recording Canvas (hidden) ---- */
 #rec-canvas { display: none; }
+
+/* ============================================================
+   GLOBAL VIGNETTE — Subtle edge darkening for cinematic depth
+   ============================================================ */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    transparent 55%,
+    rgba(0, 0, 0, 0.25) 100%
+  );
+}
 
 /* ============================================================
    MIXER PANEL — Styles moved to css/mixer.css

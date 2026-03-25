@@ -8,7 +8,7 @@ MUZE.Visualizer = {
   _width: 0,
   _height: 0,
   _particles: [],
-  _maxParticles: 40,
+  _maxParticles: 80,
 
   init() {
     this._canvas = document.getElementById('overlay');
@@ -55,9 +55,25 @@ MUZE.Visualizer = {
     const baseRadius = Math.min(w, h) * 0.18;
     const radius = baseRadius + energy * 80;
 
+    // Outer glow ring (drawn first, behind the waveform)
+    if (energy > 0.015) {
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(${accentRgb}, ${energy * 0.08})`;
+      ctx.lineWidth = 12;
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(${accentRgb}, ${energy * 0.12})`;
+      ctx.lineWidth = 4;
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Waveform ring — thin and precise
     ctx.beginPath();
-    ctx.strokeStyle = `rgba(${accentRgb}, ${0.15 + energy * 0.4})`;
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = `rgba(${accentRgb}, ${0.18 + energy * 0.5})`;
+    ctx.lineWidth = 1;
 
     for (let i = 0; i < waveform.length; i++) {
       const angle = (i / waveform.length) * Math.PI * 2 - Math.PI / 2;
@@ -71,15 +87,6 @@ MUZE.Visualizer = {
     ctx.closePath();
     ctx.stroke();
 
-    // Glow ring
-    if (energy > 0.02) {
-      ctx.beginPath();
-      ctx.strokeStyle = `rgba(${accentRgb}, ${energy * 0.15})`;
-      ctx.lineWidth = 8;
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
     // ---- Floating particles ----
     this._updateParticles(energy, accentRgb, cx, cy, radius);
     this._drawParticles(ctx, accentRgb);
@@ -89,17 +96,19 @@ MUZE.Visualizer = {
   },
 
   _updateParticles(energy, accentRgb, cx, cy, radius) {
-    // Spawn particles based on energy
-    if (energy > 0.03 && this._particles.length < this._maxParticles && Math.random() < energy * 3) {
+    // Spawn particles based on energy — more numerous, smaller
+    const spawnCount = energy > 0.03 ? Math.min(3, Math.floor(energy * 8)) : 0;
+    for (let s = 0; s < spawnCount; s++) {
+      if (this._particles.length >= this._maxParticles) break;
       const angle = Math.random() * Math.PI * 2;
       this._particles.push({
         x: cx + Math.cos(angle) * radius,
         y: cy + Math.sin(angle) * radius,
-        vx: (Math.random() - 0.5) * 1.5,
-        vy: -Math.random() * 2 - 0.5,
+        vx: (Math.random() - 0.5) * 1.2,
+        vy: -Math.random() * 1.5 - 0.3,
         life: 1,
-        decay: 0.008 + Math.random() * 0.012,
-        size: 1 + Math.random() * 2
+        decay: 0.006 + Math.random() * 0.010,
+        size: 0.5 + Math.random() * 1.2
       });
     }
 
@@ -116,8 +125,9 @@ MUZE.Visualizer = {
 
   _drawParticles(ctx, accentRgb) {
     for (const p of this._particles) {
+      const alpha = p.life * p.life * 0.4; // quadratic falloff for softer fade
       ctx.beginPath();
-      ctx.fillStyle = `rgba(${accentRgb}, ${p.life * 0.5})`;
+      ctx.fillStyle = `rgba(${accentRgb}, ${alpha})`;
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
       ctx.fill();
     }
@@ -125,6 +135,9 @@ MUZE.Visualizer = {
 
   _drawFreqBars(ctx, waveform, w, h, accentRgb, energy) {
     if (energy < 0.01) return;
+    // Use turquoise meter color (matching mixer meters) instead of accent
+    const meterRgb = '13, 148, 136';
+    const meterBrightRgb = '45, 212, 191';
     const barCount = 32;
     const barWidth = w / barCount;
     const step = Math.floor(waveform.length / barCount);
@@ -132,8 +145,10 @@ MUZE.Visualizer = {
     for (let i = 0; i < barCount; i++) {
       const val = Math.abs(waveform[i * step]) * 60;
       const barHeight = Math.max(1, val);
-      const alpha = 0.04 + (val / 60) * 0.08;
-      ctx.fillStyle = `rgba(${accentRgb}, ${alpha})`;
+      const alpha = 0.05 + (val / 60) * 0.10;
+      // Blend from turquoise to bright turquoise based on intensity
+      const rgb = val > 30 ? meterBrightRgb : meterRgb;
+      ctx.fillStyle = `rgba(${rgb}, ${alpha})`;
       ctx.fillRect(
         i * barWidth + 1,
         h - barHeight - 53,

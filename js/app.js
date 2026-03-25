@@ -55,9 +55,6 @@ MUZE.Loop = {
         S.handY = MUZE.Smooth.update('handY', r.handY, C.SMOOTH_HAND);
         S.handOpen = r.handOpen;
       } else { S.handPresent = false; }
-
-      // Background blur
-      MUZE.BgBlur.render(video, ts + 2);
     }
 
     // Audio logic
@@ -123,16 +120,18 @@ MUZE.Loop = {
     this._modeHudEl.innerHTML =
       `<div>${modeName}</div>` +
       `<div class="valence-bar"><div class="fill" style="left:${left}%;width:${barW}%;background:hsl(${hue},70%,55%)"></div></div>` +
-      `<div class="valence-label">valence ${v.toFixed(2)}</div>`;
+      `<div class="valence-label">valence <span class="valence-value">${v.toFixed(2)}</span></div>`;
 
     // Debug (only update if visible)
     if (S.debugVisible) {
       const n = S.melodyNote ? MUZE.Music.midiToNote(S.melodyNote) : '-';
       const sc = MUZE.Music.getScaleName(S.currentScale);
       this._debugEl.innerHTML =
-        '<div style="font:10px/1.5 monospace;color:rgba(255,255,255,0.6);' +
-        'background:rgba(0,0,0,0.35);padding:5px 8px;border-radius:6px;' +
-        'backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">' +
+        `<div style="font:10px/1.5 var(--font-data, 'SF Mono', monospace);font-feature-settings:'tnum';color:rgba(255,255,255,0.6);` +
+        `background:var(--elevation-1, #161619);padding:6px 10px;border-radius:8px;` +
+        `border:1px solid rgba(255,255,255,0.05);` +
+        `backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);` +
+        `box-shadow:0 2px 8px rgba(0,0,0,0.3)">` +
         `${S.faceDetected?'face':'...'} | ${sc} | chord ${S.chordIndex}<br>` +
         `smile:${S.lipCorner.toFixed(2)} brow:${S.browHeight.toFixed(2)} eyes:${S.eyeOpenness.toFixed(2)}<br>` +
         `pitch:${S.headPitch.toFixed(2)} yaw:${S.headYaw.toFixed(2)} roll:${S.headRoll.toFixed(2)}<br>` +
