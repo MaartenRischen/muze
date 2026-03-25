@@ -7,317 +7,22 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <title>MUZE</title>
+<link rel="stylesheet" href="css/style.css">
 <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
-
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body {
-    width: 100%; height: 100%;
-    overflow: hidden;
-    background: #000;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    touch-action: none;
-    -webkit-user-select: none; user-select: none;
-  }
-  #cam {
-    position: fixed; top: 0; left: 0;
-    width: 100%; height: 100%;
-    object-fit: cover; transform: scaleX(-1); z-index: 0;
-  }
-  #bg-canvas {
-    position: fixed; top: 0; left: 0;
-    width: 100%; height: 100%;
-    z-index: 0; pointer-events: none;
-  }
-  #cam.hidden { opacity: 0; }
-  #overlay {
-    position: fixed; top: 0; left: 0;
-    width: 100%; height: 100%;
-    z-index: 1; pointer-events: none;
-  }
-  #touch-zone {
-    position: fixed; bottom: 44px; left: 0;
-    width: 100%; height: calc(45% - 44px); z-index: 2;
-    display: flex; flex-direction: column; touch-action: none;
-  }
-  .drum-cell {
-    flex: 1; display: flex; align-items: center; justify-content: center;
-    transition: background 0.1s ease-out;
-  }
-  .drum-cell.hit { transition: none; }
-  #zone-hat { border-bottom: 1px solid rgba(255,255,255,0.05); }
-  #zone-hat.hit { background: rgba(200,220,255,0.2); }
-  #zone-snare { border-bottom: 1px solid rgba(255,255,255,0.05); }
-  #zone-snare.hit { background: rgba(255,200,150,0.2); }
-  #zone-kick.hit { background: rgba(255,100,100,0.15); }
-  #chord-zone {
-    position: fixed; bottom: 0; left: 0; width: 100%; height: 44px;
-    z-index: 3; display: flex; flex-direction: row; touch-action: none;
-    background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    border-top: 1px solid rgba(255,255,255,0.06);
-  }
-  .chord-btn {
-    flex: 1; display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,0.35); font: 13px/1 monospace;
-    border-right: 1px solid rgba(255,255,255,0.04);
-    transition: background 0.1s ease-out;
-  }
-  .chord-btn:last-child { border-right: none; }
-  .chord-btn.active { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.08); }
-  .chord-btn:active { background: rgba(255,255,255,0.12); }
-
-  #riser-overlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    z-index: 3; pointer-events: none; opacity: 0; transition: opacity 0.1s;
-  }
-  #riser-overlay.active {
-    opacity: 1;
-    background: radial-gradient(circle at center, rgba(255,255,255,0.08) 0%, rgba(255,200,100,0.12) 100%);
-  }
-
-  #start-screen {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    z-index: 100; background: #0a0a0a;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
-  }
-  #start-screen h1 { color: #fff; font-size: 48px; font-weight: 200; letter-spacing: 16px; text-transform: uppercase; }
-  #start-screen p { color: rgba(255,255,255,0.4); font-size: 14px; max-width: 260px; text-align: center; line-height: 1.5; }
-  #start-btn {
-    appearance: none; border: 1px solid rgba(255,255,255,0.25);
-    background: transparent; color: #fff; font-size: 16px;
-    padding: 16px 40px; border-radius: 50px; cursor: pointer;
-    letter-spacing: 1px; margin-top: 16px; transition: all 0.2s;
-  }
-  #start-btn:active { background: rgba(255,255,255,0.15); transform: scale(0.97); }
-  #start-screen.loading #start-btn { opacity: 0.4; pointer-events: none; }
-  #loading-text { color: rgba(255,255,255,0.5); font-size: 13px; display: none; }
-  #start-screen.loading #loading-text { display: block; }
-
-  #debug { position: fixed; top: env(safe-area-inset-top, 8px); left: 8px; z-index: 10; pointer-events: none; }
-  #mode-hud-wrap {
-    position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
-    z-index: 10; display: flex; align-items: center; gap: 8px;
-  }
-  #freeze-btn {
-    appearance: none; border: 1px solid rgba(255,255,255,0.2);
-    background: rgba(0,0,0,0.5); color: rgba(255,255,255,0.5);
-    font-size: 18px; width: 36px; height: 36px; border-radius: 50%;
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    pointer-events: auto;
-  }
-  #freeze-btn:active { background: rgba(255,255,255,0.15); }
-  #freeze-btn.frozen { border-color: rgba(100,200,255,0.6); color: rgba(100,200,255,0.9); }
-  #mode-hud {
-    pointer-events: none; text-align: center;
-    font: bold 32px/1.2 monospace; color: #fff;
-    background: rgba(0,0,0,0.5); padding: 12px 24px; border-radius: 12px;
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  }
-  #mode-hud.frozen { border: 1px solid rgba(100,200,255,0.3); }
-  #mode-hud .valence-bar {
-    margin-top: 8px; height: 12px; width: 240px; background: rgba(255,255,255,0.15);
-    border-radius: 6px; position: relative; overflow: hidden;
-  }
-  #mode-hud .valence-bar .fill {
-    position: absolute; top: 0; height: 100%; border-radius: 6px;
-    transition: left 0.15s, width 0.15s, background 0.15s;
-  }
-  #mode-hud .valence-label {
-    font-size: 14px; font-weight: normal; color: rgba(255,255,255,0.7); margin-top: 4px;
-  }
-  #rhythm-indicator {
-    position: fixed; bottom: 46%; left: 50%; transform: translateX(-50%);
-    z-index: 5; color: rgba(255,255,255,0.5); font-size: 11px; letter-spacing: 2px;
-    pointer-events: none; opacity: 0; transition: opacity 0.3s;
-  }
-  #rhythm-indicator.visible { opacity: 1; }
-
-  /* Synth menu */
-  #synth-menu-btn {
-    position: fixed; top: env(safe-area-inset-top, 8px); right: 8px;
-    z-index: 20; appearance: none; border: 1px solid rgba(255,255,255,0.2);
-    background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.7);
-    font-size: 18px; width: 40px; height: 40px; border-radius: 50%;
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-  }
-  #synth-menu-btn:active { background: rgba(255,255,255,0.15); }
-  #synth-panel {
-    position: fixed; top: 0; right: -280px; width: 280px; height: 100%;
-    z-index: 15; background: rgba(10,10,10,0.92);
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    transition: right 0.25s ease; overflow-y: auto;
-    padding: env(safe-area-inset-top, 12px) 16px 24px 16px;
-    -webkit-overflow-scrolling: touch;
-  }
-  #synth-panel.open { right: 0; }
-  #synth-tabs {
-    display: flex; gap: 0; margin-top: 48px; margin-bottom: 12px;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-  }
-  .synth-tab {
-    flex: 1; appearance: none; border: none; background: none;
-    color: rgba(255,255,255,0.35); font-size: 10px; letter-spacing: 1px;
-    text-transform: uppercase; padding: 8px 4px; cursor: pointer;
-    border-bottom: 2px solid transparent; font-family: monospace;
-  }
-  .synth-tab.active { color: #fff; border-bottom-color: #fff; }
-  .synth-tab-content { display: none; }
-  .synth-tab-content.active { display: block; }
-  #synth-panel h3 {
-    color: rgba(255,255,255,0.5); font-size: 10px; letter-spacing: 2px;
-    text-transform: uppercase; margin: 12px 0 10px; font-weight: 500;
-  }
-  .synth-row {
-    display: flex; align-items: center; gap: 8px; margin: 6px 0;
-  }
-  .synth-row label {
-    color: rgba(255,255,255,0.6); font-size: 11px; width: 60px;
-    flex-shrink: 0; font-family: monospace;
-  }
-  .synth-row input[type=range] {
-    flex: 1; height: 4px; -webkit-appearance: none; appearance: none;
-    background: rgba(255,255,255,0.15); border-radius: 2px; outline: none;
-  }
-  .synth-row input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 16px; height: 16px;
-    background: #fff; border-radius: 50%; cursor: pointer;
-  }
-  .synth-row .val {
-    color: rgba(255,255,255,0.4); font-size: 10px; width: 32px;
-    text-align: right; font-family: monospace;
-  }
-  .synth-select {
-    flex: 1; appearance: none; background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.15); color: #fff;
-    font-size: 11px; padding: 4px 8px; border-radius: 8px;
-    font-family: monospace;
-  }
-  #rec-multitrack {
-    position: fixed; top: env(safe-area-inset-top, 8px); right: 200px;
-    z-index: 20; appearance: none; border: 1px solid rgba(255,255,255,0.2);
-    background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.5);
-    font: 8px/1 monospace; padding: 0 6px; height: 40px; border-radius: 20px;
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    cursor: pointer; letter-spacing: 0.5px;
-  }
-  #rec-multitrack:active { background: rgba(255,255,255,0.15); }
-  #rec-btn {
-    position: fixed; top: env(safe-area-inset-top, 8px); right: 152px;
-    z-index: 20; appearance: none; border: 1px solid rgba(255,255,255,0.2);
-    background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.7);
-    font-size: 16px; width: 40px; height: 40px; border-radius: 50%;
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-  }
-  #rec-btn:active { background: rgba(255,255,255,0.15); }
-  #rec-btn.recording { border-color: rgba(255,50,50,0.7); background: rgba(255,0,0,0.15); }
-  #rec-btn.recording::after {
-    content: ''; position: absolute; top: 6px; right: 6px;
-    width: 8px; height: 8px; border-radius: 50%; background: #f33;
-    animation: rec-blink 1s infinite;
-  }
-  @keyframes rec-blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-  #rec-canvas { display: none; }
-  #pause-btn {
-    position: fixed; top: env(safe-area-inset-top, 8px); right: 104px;
-    z-index: 20; appearance: none; border: 1px solid rgba(255,255,255,0.2);
-    background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.7);
-    font-size: 12px; width: 40px; height: 40px; border-radius: 50%;
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-  }
-  #pause-btn:active { background: rgba(255,255,255,0.15); }
-  #pause-btn.paused { border-color: rgba(255,100,100,0.5); color: rgba(255,100,100,0.8); }
-  #help-btn {
-    position: fixed; top: env(safe-area-inset-top, 8px); right: 56px;
-    z-index: 20; appearance: none; border: 1px solid rgba(255,255,255,0.2);
-    background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.7);
-    font-size: 18px; width: 40px; height: 40px; border-radius: 50%;
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    font-weight: bold;
-  }
-  #help-btn:active { background: rgba(255,255,255,0.15); }
-
-  /* Tutorial picker */
-  #tut-picker {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    z-index: 30; background: rgba(0,0,0,0.85);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
-  }
-  #tut-picker.open { display: flex; }
-  #tut-picker h2 {
-    color: #fff; font-size: 22px; font-weight: 300; letter-spacing: 4px;
-    text-transform: uppercase;
-  }
-  #tut-picker p { color: rgba(255,255,255,0.4); font-size: 13px; max-width: 240px; text-align: center; line-height: 1.5; }
-  .tut-choice {
-    appearance: none; border: 1px solid rgba(255,255,255,0.2);
-    background: rgba(255,255,255,0.05); color: #fff; font-size: 14px;
-    padding: 14px 32px; border-radius: 30px; cursor: pointer;
-    letter-spacing: 1px; width: 220px; text-align: center;
-    transition: background 0.15s;
-  }
-  .tut-choice:active { background: rgba(255,255,255,0.15); }
-  .tut-choice small { display: block; color: rgba(255,255,255,0.4); font-size: 11px; margin-top: 4px; }
-  #tut-close-pick {
-    appearance: none; border: none; background: none;
-    color: rgba(255,255,255,0.4); font-size: 13px; cursor: pointer;
-    margin-top: 8px; letter-spacing: 1px;
-  }
-
-  /* Tutorial overlay step */
-  #tut-overlay {
-    position: fixed; bottom: 0; left: 0; width: 100%;
-    z-index: 28; pointer-events: none; display: none;
-    padding: 0 16px env(safe-area-inset-bottom, 16px);
-  }
-  #tut-overlay.active { display: block; }
-  #tut-card {
-    pointer-events: auto; max-width: 360px; margin: 0 auto;
-    background: rgba(10,10,10,0.88); border: 1px solid rgba(255,255,255,0.1);
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    border-radius: 16px; padding: 20px; text-align: center;
-  }
-  #tut-card .tut-step-label {
-    color: rgba(255,255,255,0.3); font-size: 10px; letter-spacing: 2px;
-    text-transform: uppercase; margin-bottom: 8px;
-  }
-  #tut-card .tut-title {
-    color: #fff; font-size: 18px; font-weight: 500; margin-bottom: 6px;
-  }
-  #tut-card .tut-desc {
-    color: rgba(255,255,255,0.6); font-size: 13px; line-height: 1.5; margin-bottom: 16px;
-  }
-  #tut-card .tut-nav {
-    display: flex; gap: 10px; justify-content: center;
-  }
-  #tut-card .tut-nav button {
-    appearance: none; border: 1px solid rgba(255,255,255,0.2);
-    background: transparent; color: #fff; font-size: 13px;
-    padding: 8px 20px; border-radius: 20px; cursor: pointer;
-  }
-  #tut-card .tut-nav button:active { background: rgba(255,255,255,0.1); }
-  #tut-card .tut-nav .tut-skip {
-    border-color: transparent; color: rgba(255,255,255,0.4);
-  }
-</style>
 </head>
 <body>
 
 <video id="cam" autoplay playsinline muted></video>
-<canvas id="bg-canvas"></canvas>
 <canvas id="overlay"></canvas>
 
+<!-- Drum touch zones -->
 <div id="touch-zone">
-  <div id="zone-hat" class="drum-cell" data-drum="hat"></div>
-  <div id="zone-snare" class="drum-cell" data-drum="snare"></div>
-  <div id="zone-kick" class="drum-cell" data-drum="kick"></div>
+  <div id="zone-hat" class="drum-cell" data-drum="hat" data-label="hat"></div>
+  <div id="zone-snare" class="drum-cell" data-drum="snare" data-label="snare"></div>
+  <div id="zone-kick" class="drum-cell" data-drum="kick" data-label="kick"></div>
 </div>
+
+<!-- Chord bar -->
 <div id="chord-zone">
   <div class="chord-btn" data-chord="0">I</div>
   <div class="chord-btn" data-chord="1">ii</div>
@@ -327,19 +32,40 @@
   <div class="chord-btn" data-chord="5">vi</div>
 </div>
 
+<!-- Overlays -->
 <div id="riser-overlay"></div>
 <div id="rhythm-indicator">AUTO</div>
+
+<!-- Debug (hidden by default, tap top-left to toggle) -->
+<button id="debug-toggle" aria-label="Toggle debug"></button>
 <div id="debug"></div>
+
+<!-- Mode HUD -->
 <div id="mode-hud-wrap">
   <button id="freeze-btn">&#10052;</button>
   <div id="mode-hud"></div>
 </div>
 
+<!-- Toolbar -->
+<div class="toolbar">
+  <button class="toolbar-label" id="rec-multitrack">STEREO</button>
+  <button class="toolbar-btn" id="rec-btn" aria-label="Record">&#9679;</button>
+  <button class="toolbar-btn" id="pause-btn" aria-label="Pause">&#10074;&#10074;</button>
+  <button class="toolbar-btn" id="help-btn" aria-label="Help" style="font-weight:bold">?</button>
+  <button class="toolbar-btn" id="mixer-btn" aria-label="Mixer" style="font-size:12px;font-weight:600;font-family:monospace">MIX</button>
+  <button class="toolbar-btn" id="synth-menu-btn" aria-label="Settings">&#9881;</button>
+</div>
+
+<!-- Sample switcher -->
+<div id="sample-bar">
+  <button class="sample-btn" id="pad-sample-btn"><span class="label">PAD</span>FM Synth</button>
+  <button class="sample-btn" id="lead-sample-btn"><span class="label">LEAD</span>Synth</button>
+</div>
+
+<!-- Recording canvas -->
 <canvas id="rec-canvas"></canvas>
-<button id="rec-multitrack">STEREO</button>
-<button id="rec-btn">&#9679;</button>
-<button id="pause-btn">&#10074;&#10074;</button>
-<button id="help-btn">?</button>
+
+<!-- Tutorial -->
 <div id="tut-picker">
   <h2>Tutorial</h2>
   <p>Learn to play Muze step by step while the app is running</p>
@@ -359,13 +85,13 @@
     </div>
   </div>
 </div>
-<button id="synth-menu-btn">&#9881;</button>
+
+<!-- Synth Panel -->
 <div id="synth-panel">
   <div id="synth-tabs">
     <button class="synth-tab active" data-tab="tab-arp">Arp</button>
     <button class="synth-tab" data-tab="tab-mel">Melody</button>
     <button class="synth-tab" data-tab="tab-pad">Pad</button>
-    <button class="synth-tab" data-tab="tab-drums">Drums</button>
     <button class="synth-tab" data-tab="tab-bin">Binaural</button>
   </div>
 
@@ -376,12 +102,6 @@
     <div class="synth-row"><label>decay</label><input type="range" id="arp-dec" min="0.01" max="2" step="0.01" value="0.3"><span class="val">0.30</span></div>
     <div class="synth-row"><label>sustain</label><input type="range" id="arp-sus" min="0" max="1" step="0.01" value="0.6"><span class="val">0.60</span></div>
     <div class="synth-row"><label>release</label><input type="range" id="arp-rel" min="0.01" max="4" step="0.01" value="0.8"><span class="val">0.80</span></div>
-    <h3>Mix</h3>
-    <div class="synth-row"><label>volume</label><input type="range" id="arp-vol" min="-30" max="0" step="1" value="-8"><span class="val">-8</span></div>
-    <div class="synth-row"><label>pan</label><input type="range" id="arp-pan" min="-1" max="1" step="0.05" value="0.3"><span class="val">0.30</span></div>
-    <h3>FX (eye-linked)</h3>
-    <div class="synth-row"><label>reverb</label><input type="range" id="arp-reverb" min="0" max="1" step="0.01" value="0.35"><span class="val">0.35</span></div>
-    <div class="synth-row"><label>delay</label><input type="range" id="arp-delay" min="0" max="0.8" step="0.01" value="0.25"><span class="val">0.25</span></div>
   </div>
 
   <div class="synth-tab-content" id="tab-mel">
@@ -393,12 +113,6 @@
     <div class="synth-row"><label>decay</label><input type="range" id="mel-dec" min="0.01" max="2" step="0.01" value="0.2"><span class="val">0.20</span></div>
     <div class="synth-row"><label>sustain</label><input type="range" id="mel-sus" min="0" max="1" step="0.01" value="0.7"><span class="val">0.70</span></div>
     <div class="synth-row"><label>release</label><input type="range" id="mel-rel" min="0.01" max="4" step="0.01" value="0.4"><span class="val">0.40</span></div>
-    <h3>Mix</h3>
-    <div class="synth-row"><label>volume</label><input type="range" id="mel-vol" min="-30" max="0" step="1" value="-6"><span class="val">-6</span></div>
-    <div class="synth-row"><label>pan</label><input type="range" id="mel-pan" min="-1" max="1" step="0.05" value="-0.3"><span class="val">-0.30</span></div>
-    <h3>FX (eye-linked)</h3>
-    <div class="synth-row"><label>reverb</label><input type="range" id="mel-reverb" min="0" max="1" step="0.01" value="0.3"><span class="val">0.30</span></div>
-    <div class="synth-row"><label>delay</label><input type="range" id="mel-delay" min="0" max="0.8" step="0.01" value="0.2"><span class="val">0.20</span></div>
   </div>
 
   <div class="synth-tab-content" id="tab-pad">
@@ -408,16 +122,6 @@
     <div class="synth-row"><label>mod idx</label><input type="range" id="pad-mod" min="0" max="10" step="0.1" value="1.2"><span class="val">1.2</span></div>
     <div class="synth-row"><label>attack</label><input type="range" id="pad-atk" min="0.01" max="4" step="0.01" value="1.0"><span class="val">1.00</span></div>
     <div class="synth-row"><label>release</label><input type="range" id="pad-rel" min="0.1" max="8" step="0.1" value="2.5"><span class="val">2.5</span></div>
-    <h3>Mix</h3>
-    <div class="synth-row"><label>volume</label><input type="range" id="pad-vol" min="-30" max="0" step="1" value="-14"><span class="val">-14</span></div>
-    <div class="synth-row"><label>pan</label><input type="range" id="pad-pan" min="-1" max="1" step="0.05" value="0"><span class="val">0.00</span></div>
-  </div>
-
-  <div class="synth-tab-content" id="tab-drums">
-    <h3>Volume</h3>
-    <div class="synth-row"><label>kick</label><input type="range" id="drum-kick-vol" min="-30" max="0" step="1" value="-6"><span class="val">-6</span></div>
-    <div class="synth-row"><label>snare</label><input type="range" id="drum-snare-vol" min="-30" max="0" step="1" value="-10"><span class="val">-10</span></div>
-    <div class="synth-row"><label>hat</label><input type="range" id="drum-hat-vol" min="-30" max="0" step="1" value="-16"><span class="val">-16</span></div>
   </div>
 
   <div class="synth-tab-content" id="tab-bin">
@@ -425,1387 +129,42 @@
     <div class="synth-row"><label>on/off</label><button class="synth-select" id="bin-toggle" style="text-align:center">OFF</button></div>
     <div class="synth-row"><label>mode</label><button class="synth-select" id="bin-mode" style="text-align:center">tonic</button></div>
     <div class="synth-row"><label>beat hz</label><input type="range" id="bin-hz" min="1" max="20" step="0.5" value="4"><span class="val">4.0</span></div>
-    <div class="synth-row"><label>volume</label><input type="range" id="bin-vol" min="-36" max="-6" step="1" value="-24"><span class="val">-24</span></div>
   </div>
 </div>
 
-<div id="start-screen">
-  <h1>Muze</h1>
-  <p>Create music with your face, hand, and touch. Everyday sounds become your instruments.</p>
-  <button id="start-btn">Touch to Begin</button>
-  <span id="loading-text">Loading samples...</span>
+<!-- Mixer Panel (slides up from bottom) -->
+<div id="mixer-panel">
+  <div id="mixer-header">
+    <span>Mixer</span>
+    <button id="mixer-close">&times;</button>
+  </div>
+  <div id="mixer-strips">
+    <!-- Populated by MixerUI.init() -->
+  </div>
 </div>
 
-<script>window.MUZE = {};</script>
-
-<!-- Config -->
-<script>
-const SAMPLE_BASE = 'https://ffwbirepsanifejscguz.supabase.co/storage/v1/object/public/Samples/';
-
-MUZE.Config = Object.freeze({
-  CAM_WIDTH: 640, CAM_HEIGHT: 480,
-  SMOOTH_FAST: 0.35, SMOOTH_SLOW: 0.15, SMOOTH_HAND: 0.30,
-
-  MOUTH_OPEN_MIN: 0.015, MOUTH_OPEN_MAX: 0.09,
-  LIP_SMILE_MIN: -0.025, LIP_SMILE_MAX: 0.025,
-  BROW_MIN: 0.100, BROW_MAX: 0.143,
-  EYE_OPEN_MIN: 0.012, EYE_OPEN_MAX: 0.055,
-  MOUTH_WIDTH_MIN: 0.28, MOUTH_WIDTH_MAX: 0.38,
-
-  FILTER_FREQ_MIN: 800, FILTER_FREQ_MAX: 10000,
-  REVERB_WET_MIN: 0.0, REVERB_WET_MAX: 0.75, REVERB_DECAY: 2.5,
-  DELAY_WET_MIN: 0.0, DELAY_WET_MAX: 0.4,
-  CHORUS_DEPTH_MIN: 0.0, CHORUS_DEPTH_MAX: 0.7,
-
-  SCALE_LYDIAN: [0,2,4,6,7,9,11], SCALE_IONIAN: [0,2,4,5,7,9,11],
-  SCALE_MIXOLYDIAN: [0,2,4,5,7,9,10], SCALE_DORIAN: [0,2,3,5,7,9,10],
-  SCALE_AEOLIAN: [0,2,3,5,7,8,10], SCALE_PHRYGIAN: [0,1,3,5,7,8,10],
-
-  ROOT_NOTE: 60, OCTAVE_RANGE: 2, BPM_DEFAULT: 85,
-  CHORD_DEGREES: [0, 3, 4, 2, 5, 0],
-  BROW_SPIKE_THRESHOLD: 0.25, BROW_SPIKE_COOLDOWN: 600,
-  DETECT_INTERVAL: 33,
-  SWIPE_THRESHOLD: 50, SWIPE_MAX_TIME: 300, DOUBLE_TAP_TIME: 300, HOLD_TIME: 400,
-
-  RHYTHM_PATTERNS: [
-    { kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
-    { kick:[1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0], snare:[0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0], hat:[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1] },
-    { kick:[1,0,0,1,0,0,1,0,1,0,0,1,0,0,1,0], snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1], hat:[1,0,1,0,1,0,1,0,1,0,1,1,1,0,1,0] },
-    { kick:[1,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0], snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], hat:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0] },
-  ],
-
-  // Sample library
-  SAMPLES: [
-    { id: 'singing-bowl', name: 'singing bowl',
-      url: SAMPLE_BASE + '240934__the_very_real_horst__neptun-solo-07-tibetan-singing-bowl.wav' },
-    { id: 'water-drop', name: 'water drop',
-      url: SAMPLE_BASE + '273868__beskhu__water-drop-3.aiff' },
-    { id: 'bottle-blow', name: 'bottle blow',
-      url: SAMPLE_BASE + '352796__cabled_mess__bottle-blown-08.wav' },
-    { id: 'wind-chime', name: 'wind chime',
-      url: SAMPLE_BASE + '398492__anthousai__wind-chimes-single-03.wav' },
-    { id: 'keys-jingle', name: 'keys jingle',
-      url: SAMPLE_BASE + '565909__fenodyrie__keys-jingling.wav' },
-    { id: 'wood-knock', name: 'wood knock',
-      url: SAMPLE_BASE + '573835__trp__door-knocks-wood-close-77mel-191026.wav' },
-    { id: 'humming', name: 'humming',
-      url: SAMPLE_BASE + '646179__mayatakeda__woman-humming-softly-mp3.mp3' },
-    { id: 'finger-snap', name: 'finger snap',
-      url: SAMPLE_BASE + '824674__bassimat__finger-snaps-001.wav' },
-  ],
-});
-</script>
-
-<!-- State -->
-<script>
-MUZE.State = {
-  mouthOpenness: 0, lipCorner: 0, browHeight: 0, eyeOpenness: 0.5,
-  mouthWidth: 0, headPitch: 0, headYaw: 0, headRoll: 0, faceDetected: false,
-  handPresent: false, handY: 0.5, handX: 0.5, handOpen: true,
-  currentScale: [0,2,3,5,7,9,10], melodyNote: null, chordIndex: 0,
-  autoRhythm: false, riserActive: false, modeFrozen: false, portamentoMode: false,
-  audioReady: false, _browRaw: 0,
-};
-</script>
-
-<!-- Smooth -->
-<script>
-MUZE.Smooth = {
-  _prev: {},
-  update(key, raw, alpha) {
-    if (!(key in this._prev)) { this._prev[key] = raw; return raw; }
-    const s = alpha * raw + (1 - alpha) * this._prev[key];
-    this._prev[key] = s; return s;
-  },
-  reset() { this._prev = {}; }
-};
-</script>
-
-<!-- Camera -->
-<script>
-MUZE.Camera = {
-  video: null, stream: null,
-  async init() {
-    this.video = document.getElementById('cam');
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
-      audio: false
-    });
-    this.video.srcObject = this.stream;
-    await new Promise(r => { this.video.onloadedmetadata = r; });
-    await this.video.play();
-  }
-};
-</script>
-
-<!-- FaceTracker -->
-<script>
-MUZE.FaceTracker = {
-  landmarker: null,
-  async init(FL, vision) {
-    this.landmarker = await FL.createFromOptions(vision, {
-      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task', delegate: 'GPU' },
-      runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: false, outputFacialTransformationMatrixes: false
-    });
-  },
-  detect(v, ts) { if (!this.landmarker) return null; try { return this.landmarker.detectForVideo(v, ts); } catch(e) { return null; } }
-};
-</script>
-
-<!-- HandTracker -->
-<script>
-MUZE.HandTracker = {
-  landmarker: null,
-  async init(HL, vision) {
-    this.landmarker = await HL.createFromOptions(vision, {
-      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task', delegate: 'GPU' },
-      runningMode: 'VIDEO', numHands: 1, minHandDetectionConfidence: 0.5, minTrackingConfidence: 0.5
-    });
-  },
-  detect(v, ts) { if (!this.landmarker) return null; try { return this.landmarker.detectForVideo(v, ts); } catch(e) { return null; } }
-};
-</script>
-
-<!-- FaceFeatures -->
-<script>
-MUZE.FaceFeatures = {
-  LM: { UPPER_LIP:13, LOWER_LIP:14, LEFT_MOUTH:61, RIGHT_MOUTH:291,
-    R_EYE_TOP:159, R_EYE_BOT:145, L_EYE_TOP:386, L_EYE_BOT:374,
-    R_BROW:105, L_BROW:334, NOSE_TIP:1, FOREHEAD:10, CHIN:152, L_EAR:234, R_EAR:454 },
-  extract(lm) {
-    const L=this.LM, C=MUZE.Config;
-    const fH=this._d(lm[L.FOREHEAD],lm[L.CHIN]); if(fH<0.001) return null;
-    const mO=this._c01(this._r(this._d(lm[L.UPPER_LIP],lm[L.LOWER_LIP])/fH,C.MOUTH_OPEN_MIN,C.MOUTH_OPEN_MAX));
-    const mMY=(lm[L.UPPER_LIP].y+lm[L.LOWER_LIP].y)/2;
-    const lC=this._cl(this._r(((mMY-lm[L.LEFT_MOUTH].y)+(mMY-lm[L.RIGHT_MOUTH].y))/2/fH,C.LIP_SMILE_MIN,C.LIP_SMILE_MAX),-1,1);
-    const bN=(Math.abs(lm[L.R_BROW].y-lm[L.R_EYE_TOP].y)+Math.abs(lm[L.L_BROW].y-lm[L.L_EYE_TOP].y))/2/fH;
-    MUZE.State._browRaw=bN;
-    const bH=this._c01(this._r(bN,C.BROW_MIN,C.BROW_MAX));
-    const eO=this._c01(this._r((this._d(lm[L.R_EYE_TOP],lm[L.R_EYE_BOT])+this._d(lm[L.L_EYE_TOP],lm[L.L_EYE_BOT]))/2/fH,C.EYE_OPEN_MIN,C.EYE_OPEN_MAX));
-    const mW=this._c01(this._r(this._d2(lm[L.LEFT_MOUTH],lm[L.RIGHT_MOUTH])/fH,C.MOUTH_WIDTH_MIN,C.MOUTH_WIDTH_MAX));
-    const hY=Math.atan2(this._d2(lm[L.NOSE_TIP],lm[L.L_EAR])-this._d2(lm[L.NOSE_TIP],lm[L.R_EAR]),fH);
-    const hP=(lm[L.NOSE_TIP].y-(lm[L.FOREHEAD].y+lm[L.CHIN].y)/2)/fH*Math.PI*0.5;
-    const hR=Math.atan2(lm[L.L_EAR].y-lm[L.R_EAR].y,lm[L.L_EAR].x-lm[L.R_EAR].x);
-    return {mouthOpenness:mO,lipCorner:lC,browHeight:bH,eyeOpenness:eO,mouthWidth:mW,headPitch:hP,headYaw:hY,headRoll:hR};
-  },
-  _d(a,b){return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2+((a.z||0)-(b.z||0))**2);},
-  _d2(a,b){return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2);},
-  _r(v,mn,mx){return(v-mn)/(mx-mn);}, _c01(v){return Math.max(0,Math.min(1,v));},
-  _cl(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
-};
-</script>
-
-<!-- HandFeatures -->
-<script>
-MUZE.HandFeatures = {
-  extract(lm) {
-    if(!lm||!lm.length) return {handPresent:false,handY:0.5,handX:0.5,handOpen:true};
-    const l=lm[0], hX=(l[0].x+l[9].x)/2, hY=(l[0].y+l[9].y)/2;
-    const pS=this._d(l[0],l[9]);
-    const aT=(this._d(l[8],l[0])+this._d(l[12],l[0])+this._d(l[16],l[0])+this._d(l[20],l[0]))/4;
-    return {handPresent:true, handX:1-hX, handY:hY, handOpen:(aT/pS)>1.7};
-  },
-  _d(a,b){return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2+((a.z||0)-(b.z||0))**2);}
-};
-</script>
-
-<!-- Background Blur -->
-<script>
-MUZE.BgBlur = {
-  _segmenter: null, _active: false,
-  _bgCanvas: null, _bgCtx: null,
-  _sharpCanvas: null, _sharpCtx: null,
-  _blurCanvas: null, _blurCtx: null,
-
-  async init(ImageSegmenter, vision) {
-    this._bgCanvas = document.getElementById('bg-canvas');
-    this._bgCtx = this._bgCanvas.getContext('2d', { willReadFrequently: true });
-    this._sharpCanvas = document.createElement('canvas');
-    this._sharpCtx = this._sharpCanvas.getContext('2d', { willReadFrequently: true });
-    this._blurCanvas = document.createElement('canvas');
-    this._blurCtx = this._blurCanvas.getContext('2d');
-
-    this._segmenter = await ImageSegmenter.createFromOptions(vision, {
-      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite', delegate: 'GPU' },
-      runningMode: 'VIDEO',
-      outputCategoryMask: false,
-      outputConfidenceMasks: true
-    });
-  },
-
-  resize() {
-    // Use video's native resolution — no mismatch with segmenter
-    const video = MUZE.Camera.video;
-    const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
-    this._w = vw; this._h = vh;
-    [this._bgCanvas, this._sharpCanvas, this._blurCanvas].forEach(c => {
-      c.width = vw; c.height = vh;
-    });
-    this._bgCanvas.style.width = '100%';
-    this._bgCanvas.style.height = '100%';
-    this._bgCanvas.style.objectFit = 'cover';
-    this._bgCanvas.style.transform = 'scaleX(-1)';
-  },
-
-  toggle() {
-    this._active = !this._active;
-    document.getElementById('cam').classList.toggle('hidden', this._active);
-    if (this._active) {
-      // Defer resize until video has dimensions
-      const check = () => {
-        if (MUZE.Camera.video.videoWidth) this.resize();
-        else setTimeout(check, 100);
-      };
-      check();
-    }
-    return this._active;
-  },
-
-  render(video, ts) {
-    if (!this._active || !this._segmenter || video.readyState < 2) return;
-    if (!this._w) this.resize();
-    const w = this._w, h = this._h;
-
-    // Draw video (not mirrored — CSS handles mirror)
-    this._sharpCtx.drawImage(video, 0, 0, w, h);
-
-    // Blurred version
-    this._blurCtx.filter = 'blur(14px)';
-    this._blurCtx.drawImage(this._sharpCanvas, 0, 0);
-    this._blurCtx.filter = 'none';
-
-    // Segment at native video resolution
-    let result;
-    try { result = this._segmenter.segmentForVideo(video, ts); } catch(e) { return; }
-    if (!result || !result.confidenceMasks || !result.confidenceMasks.length) return;
-    const conf = result.confidenceMasks[0].getAsFloat32Array();
-
-    // Get pixel data
-    const sharp = this._sharpCtx.getImageData(0, 0, w, h);
-    const blur = this._blurCtx.getImageData(0, 0, w, h);
-    const sd = sharp.data, bd = blur.data;
-    const pixels = Math.min(conf.length, sd.length / 4);
-
-    // Blend per-pixel
-    for (let i = 0; i < pixels; i++) {
-      const p = i * 4;
-      const a = conf[i]; // 0=bg, 1=person
-      const b = 1 - a;
-      sd[p]     = sd[p]     * a + bd[p]     * b | 0;
-      sd[p + 1] = sd[p + 1] * a + bd[p + 1] * b | 0;
-      sd[p + 2] = sd[p + 2] * a + bd[p + 2] * b | 0;
-    }
-
-    this._bgCtx.putImageData(sharp, 0, 0);
-    result.confidenceMasks[0].close();
-  }
-};
-</script>
-
-<!-- Music -->
-<script>
-MUZE.Music = {
-  NN:['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
-  selectScale(lc) {
-    const C=MUZE.Config;
-    if(lc>0.80) return C.SCALE_LYDIAN;
-    if(lc>0.60) return C.SCALE_IONIAN;
-    if(lc>0.40) return C.SCALE_MIXOLYDIAN;
-    if(lc>0.20) return C.SCALE_DORIAN;
-    if(lc>0.00) return C.SCALE_AEOLIAN;
-    return C.SCALE_PHRYGIAN;
-  },
-  quantize(v,s,r,o){const t=s.length*o,c=Math.max(0,Math.min(t-1,Math.round(v*(t-1))));return r+Math.floor(c/s.length)*12+s[c%s.length];},
-  midiToNote(m){return this.NN[m%12]+(Math.floor(m/12)-1);},
-  getPadVoicing(r,s,d){const dd=d%s.length;return[r+s[dd]-12,r+s[(dd+4)%s.length],r+s[(dd+2)%s.length]+12].map(n=>this.midiToNote(n));},
-  getScaleName(s){const C=MUZE.Config;if(!s)return'-';if(s===C.SCALE_LYDIAN)return'lydian';if(s===C.SCALE_IONIAN)return'ionian';if(s===C.SCALE_MIXOLYDIAN)return'mixolydian';if(s===C.SCALE_DORIAN)return'dorian';if(s===C.SCALE_AEOLIAN)return'aeolian';if(s===C.SCALE_PHRYGIAN)return'phrygian';return'?';}
-};
-</script>
-
-<!-- SampleLibrary -->
-<script>
-MUZE.SampleLib = {
-  _buffers: {},    // id → Tone.ToneAudioBuffer
-  _custom: [],     // user-recorded buffers
-
-  async loadAll() {
-    const promises = MUZE.Config.SAMPLES.map(async (s) => {
-      try {
-        const buf = new Tone.ToneAudioBuffer();
-        await buf.load(s.url);
-        this._buffers[s.id] = buf;
-      } catch (e) {
-        console.warn('Failed to load sample:', s.id, e);
-      }
-    });
-    await Promise.all(promises);
-  },
-
-  get(id) { return this._buffers[id] || null; },
-
-  addCustom(name, buffer) {
-    const id = 'custom-' + Date.now();
-    this._buffers[id] = buffer;
-    this._custom.push({ id, name });
-    return id;
-  },
-
-  getAllSamples() {
-    return [...MUZE.Config.SAMPLES, ...this._custom];
-  }
-};
-</script>
-
-<!-- Audio (synth pad + sample lead) -->
-<script>
-MUZE.Audio = {
-  // Pad: synthesized FM chords
-  padSynth: null, _padPan: null,
-  // Arpeggio synth
-  leadSynth: null, _arpPan: null, _arpReverb: null, _arpDelay: null, _arpFilter: null, _arpFilterGain: null,
-  _arpReverbMax: 0.35, _arpDelayMax: 0.25,
-  // Melody synth (hand-controlled)
-  melodySynth: null, _melPan: null, _melReverb: null, _melDelay: null,
-  _melReverbMax: 0.3, _melDelayMax: 0.2,
-  // Drums
-  kickSynth: null, snareSynth: null, hatSynth: null,
-  // Riser
-  riserSynth: null, _riserGain: null, _riserFilter: null,
-  // Effects
-  filter: null, _filterGain: null, reverb: null, delay: null, chorus: null, compressor: null,
-  _melodyPlaying: false,
-
-  async init() {
-    await Tone.start();
-    Tone.Transport.bpm.value = MUZE.Config.BPM_DEFAULT;
-
-    // Effects chain: Filter → Chorus → Delay → Reverb → Limiter
-    this.compressor = new Tone.Limiter(-3).toDestination();
-    this.reverb = new Tone.Reverb({ decay: MUZE.Config.REVERB_DECAY, preDelay: 0.01 }).connect(this.compressor);
-    await this.reverb.ready;
-    this.reverb.wet.value = 0.3;
-    this.delay = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.3, wet: 0 }).connect(this.reverb);
-    this.chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0, wet: 0.5 }).connect(this.delay);
-    this.chorus.start();
-    this._filterGain = new Tone.Gain(1).connect(this.chorus);
-    this.filter = new Tone.Filter({ frequency: 2000, type: 'lowpass', rolloff: -24, Q: 1.2 }).connect(this._filterGain);
-
-    // Pad synth — warm FM chords
-    this.padSynth = new Tone.PolySynth(Tone.FMSynth, {
-      maxPolyphony: 6,
-      voice: {
-        harmonicity: 2, modulationIndex: 1.2,
-        oscillator: { type: 'sine' },
-        envelope: { attack: 1.0, decay: 0.4, sustain: 0.85, release: 2.5 },
-        modulation: { type: 'triangle' },
-        modulationEnvelope: { attack: 0.6, decay: 0.3, sustain: 0.7, release: 2.0 }
-      }
-    });
-    this.padSynth.volume.value = -14;
-    this._padPan = new Tone.Panner(0).connect(this.filter);
-    this.padSynth.connect(this._padPan);
-
-    // Arpeggio synth — own reverb + delay chain
-    this._arpReverb = new Tone.Reverb({ decay: 3, preDelay: 0.01 }).connect(this.compressor);
-    await this._arpReverb.ready;
-    this._arpReverb.wet.value = 0.35;
-    this._arpDelay = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.35, wet: 0.25 }).connect(this._arpReverb);
-    this.leadSynth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 8,
-      oscillator: { type: 'sawtooth' },
-      envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.8 },
-    });
-    this.leadSynth.volume.value = -8;
-    this._arpFilterGain = new Tone.Gain(1).connect(this._arpDelay);
-    this._arpFilter = new Tone.Filter({ frequency: 2000, type: 'lowpass', rolloff: -24, Q: 1.2 }).connect(this._arpFilterGain);
-    this._arpPan = new Tone.Panner(0.3).connect(this._arpFilter);
-    this.leadSynth.connect(this._arpPan);
-
-    // Melody synth (hand-controlled) — own reverb + delay
-    this._melReverb = new Tone.Reverb({ decay: 3, preDelay: 0.01 }).connect(this.compressor);
-    await this._melReverb.ready;
-    this._melReverb.wet.value = 0.3;
-    this._melDelay = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.3, wet: 0.2 }).connect(this._melReverb);
-    this.melodySynth = new Tone.MonoSynth({
-      oscillator: { type: 'triangle' },
-      envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 0.4 },
-      filterEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.5, release: 0.3, baseFrequency: 300, octaves: 3 },
-    });
-    this.melodySynth.volume.value = -6;
-    this._melPan = new Tone.Panner(-0.3).connect(this._melDelay);
-    this.melodySynth.connect(this._melPan);
-
-    // Drums — bypass tonal effects
-    this.kickSynth = new Tone.MembraneSynth({
-      pitchDecay: 0.05, octaves: 6, oscillator: { type: 'sine' },
-      envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.4 }
-    });
-    this.kickSynth.volume.value = -6;
-    this.kickSynth.connect(this.compressor);
-
-    this.snareSynth = new Tone.NoiseSynth({
-      noise: { type: 'white' },
-      envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.15 }
-    });
-    this.snareSynth.volume.value = -10;
-    this.snareSynth.connect(this.compressor);
-
-    this.hatSynth = new Tone.MetalSynth({
-      frequency: 400, envelope: { attack: 0.001, decay: 0.08, release: 0.05 },
-      harmonicity: 5.1, modulationIndex: 32, resonance: 8000, octaves: 1.5
-    });
-    this.hatSynth.volume.value = -16;
-    this.hatSynth.connect(this.compressor);
-
-    // Binaural beats layer
-    this._binauralL = new Tone.Oscillator({ type: 'sine', frequency: 110 }).connect(new Tone.Panner(-1).connect(this.compressor));
-    this._binauralR = new Tone.Oscillator({ type: 'sine', frequency: 114 }).connect(new Tone.Panner(1).connect(this.compressor));
-    this._binauralL.volume.value = -24;
-    this._binauralR.volume.value = -24;
-    this._binauralActive = false;
-    this._binauralFollowChord = false;
-    this._binauralBeatHz = 4;
-    this._binauralBaseFreq = 110;
-
-    // Riser
-    this._riserFilter = new Tone.Filter({ frequency: 200, type: 'bandpass', Q: 2 }).connect(this.compressor);
-    this._riserGain = new Tone.Gain(0).connect(this._riserFilter);
-    this.riserSynth = new Tone.Noise('pink').connect(this._riserGain);
-    this.riserSynth.start();
-
-    Tone.Transport.start();
-    MUZE.State.audioReady = true;
-  },
-
-  // Continuous effect updates
-  updateParams(state) {
-    const C = MUZE.Config;
-    // Filter: head pitch (chin up/forward = full pass, chin down = low pass)
-    // headPitch ~-0.5..+0.5, normalize to 0..1 then invert
-    const pitchN = 1 - Math.max(0, Math.min(1, (state.headPitch + 0.4) / 0.8));
-    const filterFreq = C.FILTER_FREQ_MIN * Math.pow(C.FILTER_FREQ_MAX / C.FILTER_FREQ_MIN, pitchN);
-    this.filter.frequency.rampTo(filterFreq, 0.08);
-    this._arpFilter.frequency.rampTo(filterFreq, 0.08);
-    // Gain compensation: boost when filter is low to keep perceived volume even
-    const comp = 1 + (1 - pitchN) * 0.35;
-    this._filterGain.gain.rampTo(comp, 0.08);
-    this._arpFilterGain.gain.rampTo(comp, 0.08);
-
-    // Arp + melody reverb/delay: eye openness scales from 0 to slider max
-    this._arpReverb.wet.rampTo(state.eyeOpenness * this._arpReverbMax, 0.1);
-    this._arpDelay.wet.rampTo(state.eyeOpenness * this._arpDelayMax, 0.1);
-    this._melReverb.wet.rampTo(state.eyeOpenness * this._melReverbMax, 0.1);
-    this._melDelay.wet.rampTo(state.eyeOpenness * this._melDelayMax, 0.1);
-    // Chorus: head roll (tilt sideways)
-    const rollN = Math.min(1, Math.abs(state.headRoll) / 0.35);
-    this.chorus.depth = C.CHORUS_DEPTH_MIN + rollN * (C.CHORUS_DEPTH_MAX - C.CHORUS_DEPTH_MIN);
-  },
-
-  // Pad (synth)
-  triggerPad(notes) { this.padSynth.releaseAll(); this.padSynth.triggerAttack(notes, Tone.now(), 0.4); },
-  releasePad() { this.padSynth.releaseAll(); },
-
-  // Hand melody (MonoSynth)
-  startMelody(note) {
-    if (!this.melodySynth) return;
-    this.melodySynth.triggerAttack(MUZE.Music.midiToNote(note), Tone.now(), 0.7);
-    this._melodyPlaying = true;
-  },
-  updateMelody(note) {
-    if (!this.melodySynth) return;
-    if (!this._melodyPlaying) { this.startMelody(note); return; }
-    // MonoSynth: setNote for glide
-    this.melodySynth.setNote(MUZE.Music.midiToNote(note));
-  },
-  stopMelody() {
-    if (this._melodyPlaying && this.melodySynth) {
-      this.melodySynth.triggerRelease(Tone.now());
-      this._melodyPlaying = false;
-    }
-  },
-  setPortamento(on) {
-    if (!this.melodySynth) return;
-    this.melodySynth.portamento = on ? 0.3 : 0;
-  },
-
-  triggerDrum(type) {
-    const now = Tone.now();
-    switch(type) {
-      case 'kick': this.kickSynth.triggerAttackRelease('C1','8n',now); break;
-      case 'snare': this.snareSynth.triggerAttackRelease('8n',now); break;
-      case 'hat': this.hatSynth.triggerAttackRelease('32n',now); break;
-    }
-  },
-
-  _padVolPre: -14, _drumVolPre: {},
-  startRiser(){
-    // Riser noise sweep up
-    this._riserGain.gain.rampTo(0.3,4);
-    this._riserFilter.frequency.rampTo(4000,4);
-    // Duck pad + drums
-    this._padVolPre = this.padSynth.volume.value;
-    this._drumVolPre = { kick: this.kickSynth.volume.value, snare: this.snareSynth.volume.value, hat: this.hatSynth.volume.value };
-    this.padSynth.volume.rampTo(this._padVolPre - 14, 4);
-    this.kickSynth.volume.rampTo(-30, 4);
-    this.snareSynth.volume.rampTo(-30, 4);
-    this.hatSynth.volume.rampTo(-30, 4);
-  },
-  dropRiser(){
-    // Big reverb-drenched drop
-    this._riserGain.gain.rampTo(0,0.05);
-    this._riserFilter.frequency.rampTo(200,0.1);
-    this.kickSynth.triggerAttackRelease('C1','4n',Tone.now(),1);
-    // Reverb wash
-    this.reverb.wet.rampTo(0.95,0.05);
-    this._arpReverb.wet.rampTo(0.95,0.05);
-    this._melReverb.wet.rampTo(0.95,0.05);
-    setTimeout(()=>{
-      this.reverb.wet.rampTo(0.3,2);
-      this._arpReverb.wet.rampTo(this._arpReverbMax,2);
-      this._melReverb.wet.rampTo(this._melReverbMax,2);
-    },300);
-    // Snap volumes back
-    this.padSynth.volume.rampTo(this._padVolPre, 0.05);
-    this.kickSynth.volume.rampTo(this._drumVolPre.kick, 0.05);
-    this.snareSynth.volume.rampTo(this._drumVolPre.snare, 0.05);
-    this.hatSynth.volume.rampTo(this._drumVolPre.hat, 0.05);
-  },
-  cancelRiser(){
-    // Released hold without swipe up — just fade riser out, restore volumes
-    this._riserGain.gain.rampTo(0,0.3);
-    this._riserFilter.frequency.rampTo(200,0.3);
-    this.padSynth.volume.rampTo(this._padVolPre, 0.3);
-    this.kickSynth.volume.rampTo(this._drumVolPre.kick, 0.3);
-    this.snareSynth.volume.rampTo(this._drumVolPre.snare, 0.3);
-    this.hatSynth.volume.rampTo(this._drumVolPre.hat, 0.3);
-  },
-  // Auto-arpeggio — loops continuously on transport
-  _arpSeq: null,
-  _arpNotes: [],
-  _arpIdx: 0,
-
-  startArpeggio() {
-    if (this._arpSeq) return;
-    this._arpIdx = 0;
-    this._arpSeq = new Tone.Loop((time) => {
-      if (!this._arpNotes.length || !this.leadSynth) return;
-      const note = this._arpNotes[this._arpIdx % this._arpNotes.length];
-      this.leadSynth.triggerAttackRelease(note, '8n', time, 0.5);
-      this._arpIdx++;
-    }, '8n');
-    this._arpSeq.start(0);
-  },
-
-  updateArpNotes(scale, root) {
-    const up = scale.map(i => MUZE.Music.midiToNote(root + i));
-    const down = [...up].reverse().slice(1);
-    this._arpNotes = [...up, ...down];
-  },
-
-  stopArpeggio() {
-    if (this._arpSeq) { this._arpSeq.stop(); this._arpSeq.dispose(); this._arpSeq = null; }
-    this._arpNotes = [];
-  },
-  // Binaural beats
-  toggleBinaural() {
-    this._binauralActive = !this._binauralActive;
-    if (this._binauralActive) {
-      this._binauralL.start();
-      this._binauralR.start();
-      this._updateBinauralFreq(this._binauralBaseFreq);
-    } else {
-      this._binauralL.stop();
-      this._binauralR.stop();
-    }
-    return this._binauralActive;
-  },
-  setBinauralBeatHz(hz) {
-    this._binauralBeatHz = hz;
-    if (this._binauralActive) this._updateBinauralFreq(this._binauralL.frequency.value);
-  },
-  setBinauralVolume(db) {
-    this._binauralL.volume.value = db;
-    this._binauralR.volume.value = db;
-  },
-  _updateBinauralFreq(baseFreq) {
-    const half = this._binauralBeatHz / 2;
-    this._binauralL.frequency.rampTo(baseFreq - half, 0.1);
-    this._binauralR.frequency.rampTo(baseFreq + half, 0.1);
-  },
-  updateBinauralFromChord(notes) {
-    if (!this._binauralActive || !this._binauralFollowChord) return;
-    // Use the root note of the chord (first note), drop 1 octave for sub bass
-    const noteName = notes[0];
-    const freq = Tone.Frequency(noteName).toFrequency() / 2;
-    this._updateBinauralFreq(freq);
-  },
-
-  reverbThrow(){
-    // Throw all reverbs to max then decay back
-    const pr=this.reverb.wet.value, pa=this._arpReverb.wet.value, pm=this._melReverb.wet.value;
-    this.reverb.wet.rampTo(0.95,0.05);
-    this._arpReverb.wet.rampTo(0.95,0.05);
-    this._melReverb.wet.rampTo(0.95,0.05);
-    setTimeout(()=>{
-      this.reverb.wet.rampTo(pr,1.5);
-      this._arpReverb.wet.rampTo(pa,1.5);
-      this._melReverb.wet.rampTo(pm,1.5);
-    },200);
-  },
-  tapeStop(){
-    // BPM drop + pitch drop on all synths
-    const o=Tone.Transport.bpm.value;
-    Tone.Transport.bpm.rampTo(20,0.4);
-    // Detune all synths down 2 octaves then snap back
-    [this.padSynth,this.leadSynth,this.melodySynth].forEach(s=>{
-      if(s){s.set({detune:0});s.set({detune:-2400});}
-    });
-    setTimeout(()=>{
-      Tone.Transport.bpm.rampTo(o,0.15);
-      [this.padSynth,this.leadSynth,this.melodySynth].forEach(s=>{
-        if(s) s.set({detune:0});
-      });
-    },500);
-  },
-};
-</script>
-
-<!-- Mic Recorder -->
-<script>
-MUZE.MicRecorder = {
-  _mediaStream: null,
-  _mediaRecorder: null,
-  _chunks: [],
-  _recording: false,
-
-  async record(durationMs) {
-    if (this._recording) return null;
-    this._recording = true;
-
-    this._mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    this._chunks = [];
-
-    return new Promise((resolve) => {
-      this._mediaRecorder = new MediaRecorder(this._mediaStream);
-      this._mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) this._chunks.push(e.data);
-      };
-      this._mediaRecorder.onstop = async () => {
-        this._mediaStream.getTracks().forEach(t => t.stop());
-        this._recording = false;
-        const blob = new Blob(this._chunks, { type: 'audio/webm' });
-        const arrayBuf = await blob.arrayBuffer();
-        const audioBuf = await Tone.context.decodeAudioData(arrayBuf);
-        const toneBuf = new Tone.ToneAudioBuffer().fromArray(audioBuf.getChannelData(0));
-        resolve(toneBuf);
-      };
-      this._mediaRecorder.start();
-      setTimeout(() => {
-        if (this._mediaRecorder.state === 'recording') {
-          this._mediaRecorder.stop();
-        }
-      }, durationMs || 2000);
-    });
-  },
-
-  isRecording() { return this._recording; }
-};
-</script>
-
-<!-- AutoRhythm -->
-<script>
-MUZE.AutoRhythm = {
-  _seq:null, _active:false, _patIdx:0,
-  start(){
-    if(this._seq) this._seq.dispose();
-    this._active=true;
-    this._seq=new Tone.Sequence((t,s)=>{
-      const p=MUZE.Config.RHYTHM_PATTERNS[this._patIdx];
-      if(p.kick[s]) MUZE.Audio.triggerDrum('kick');
-      if(p.snare[s]) MUZE.Audio.triggerDrum('snare');
-      if(p.hat[s]) MUZE.Audio.triggerDrum('hat');
-    },[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],'16n');
-    this._seq.start(0);
-  },
-  stop(){this._active=false;if(this._seq){this._seq.stop();this._seq.dispose();this._seq=null;}},
-  toggle(){if(this._active)this.stop();else this.start();return this._active;},
-  nextPattern(){this._patIdx=(this._patIdx+1)%MUZE.Config.RHYTHM_PATTERNS.length;},
-  prevPattern(){this._patIdx=(this._patIdx-1+MUZE.Config.RHYTHM_PATTERNS.length)%MUZE.Config.RHYTHM_PATTERNS.length;},
-  isActive(){return this._active;}
-};
-</script>
-
-<!-- Synth Menu -->
-<script>
-MUZE.SynthMenu = {
-  init() {
-    const panel = document.getElementById('synth-panel');
-    document.getElementById('synth-menu-btn').addEventListener('click', () => {
-      panel.classList.toggle('open');
-    });
-
-    // Tab switching
-    document.querySelectorAll('.synth-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.synth-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.synth-tab-content').forEach(c => c.classList.remove('active'));
-        tab.classList.add('active');
-        document.getElementById(tab.dataset.tab).classList.add('active');
-      });
-    });
-
-    // Close panel when tapping outside
-    document.addEventListener('touchstart', (e) => {
-      if (panel.classList.contains('open') &&
-          !panel.contains(e.target) &&
-          e.target.id !== 'synth-menu-btn') {
-        panel.classList.remove('open');
-      }
-    });
-
-    // Arpeggio synth controls
-    this._bind('arp-osc', (v) => MUZE.Audio.leadSynth.set({ oscillator: { type: v } }), true);
-    this._bind('arp-atk', (v) => MUZE.Audio.leadSynth.set({ envelope: { attack: +v } }));
-    this._bind('arp-dec', (v) => MUZE.Audio.leadSynth.set({ envelope: { decay: +v } }));
-    this._bind('arp-sus', (v) => MUZE.Audio.leadSynth.set({ envelope: { sustain: +v } }));
-    this._bind('arp-rel', (v) => MUZE.Audio.leadSynth.set({ envelope: { release: +v } }));
-    this._bind('arp-vol', (v) => { MUZE.Audio.leadSynth.volume.value = +v; });
-    this._bind('arp-pan', (v) => { MUZE.Audio._arpPan.pan.value = +v; });
-    this._bind('arp-reverb', (v) => { MUZE.Audio._arpReverbMax = +v; });
-    this._bind('arp-delay', (v) => { MUZE.Audio._arpDelayMax = +v; });
-
-    // Melody synth controls
-    document.getElementById('mel-porta').addEventListener('click', function() {
-      MUZE.State.portamentoMode = !MUZE.State.portamentoMode;
-      this.textContent = MUZE.State.portamentoMode ? 'ON' : 'OFF';
-      MUZE.Audio.setPortamento(MUZE.State.portamentoMode);
-    });
-    this._bind('mel-osc', (v) => MUZE.Audio.melodySynth.set({ oscillator: { type: v } }), true);
-    this._bind('mel-atk', (v) => MUZE.Audio.melodySynth.set({ envelope: { attack: +v } }));
-    this._bind('mel-dec', (v) => MUZE.Audio.melodySynth.set({ envelope: { decay: +v } }));
-    this._bind('mel-sus', (v) => MUZE.Audio.melodySynth.set({ envelope: { sustain: +v } }));
-    this._bind('mel-rel', (v) => MUZE.Audio.melodySynth.set({ envelope: { release: +v } }));
-    this._bind('mel-vol', (v) => { MUZE.Audio.melodySynth.volume.value = +v; });
-    this._bind('mel-pan', (v) => { MUZE.Audio._melPan.pan.value = +v; });
-    this._bind('mel-reverb', (v) => { MUZE.Audio._melReverbMax = +v; });
-    this._bind('mel-delay', (v) => { MUZE.Audio._melDelayMax = +v; });
-
-    // Drum controls
-    this._bind('drum-kick-vol', (v) => { MUZE.Audio.kickSynth.volume.value = +v; });
-    this._bind('drum-snare-vol', (v) => { MUZE.Audio.snareSynth.volume.value = +v; });
-    this._bind('drum-hat-vol', (v) => { MUZE.Audio.hatSynth.volume.value = +v; });
-
-    // Binaural controls
-    document.getElementById('bin-toggle').addEventListener('click', function() {
-      const on = MUZE.Audio.toggleBinaural();
-      this.textContent = on ? 'ON' : 'OFF';
-    });
-    document.getElementById('bin-mode').addEventListener('click', function() {
-      MUZE.Audio._binauralFollowChord = !MUZE.Audio._binauralFollowChord;
-      this.textContent = MUZE.Audio._binauralFollowChord ? 'chord' : 'tonic';
-      if (!MUZE.Audio._binauralFollowChord) {
-        MUZE.Audio._updateBinauralFreq(MUZE.Audio._binauralBaseFreq);
-      }
-    });
-    this._bind('bin-hz', (v) => MUZE.Audio.setBinauralBeatHz(+v));
-    this._bind('bin-vol', (v) => MUZE.Audio.setBinauralVolume(+v));
-
-    // Pad synth controls
-    this._bind('pad-osc', (v) => MUZE.Audio.padSynth.set({ oscillator: { type: v } }), true);
-    this._bind('pad-harm', (v) => MUZE.Audio.padSynth.set({ harmonicity: +v }));
-    this._bind('pad-mod', (v) => MUZE.Audio.padSynth.set({ modulationIndex: +v }));
-    this._bind('pad-atk', (v) => MUZE.Audio.padSynth.set({ envelope: { attack: +v } }));
-    this._bind('pad-rel', (v) => MUZE.Audio.padSynth.set({ envelope: { release: +v } }));
-    this._bind('pad-vol', (v) => { MUZE.Audio.padSynth.volume.value = +v; });
-    this._bind('pad-pan', (v) => { MUZE.Audio._padPan.pan.value = +v; });
-  },
-
-  _bind(id, fn, isSelect) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const valEl = el.parentElement.querySelector('.val');
-    if (isSelect) {
-      el.addEventListener('change', () => fn(el.value));
-    } else {
-      el.addEventListener('input', () => {
-        fn(el.value);
-        if (valEl) valEl.textContent = parseFloat(el.value).toFixed(el.step.includes('.') ? el.step.split('.')[1].length : 0);
-      });
-    }
-  }
-};
-</script>
-
-<!-- Recorder -->
-<script>
-MUZE.Recorder = {
-  _mediaRec: null, _chunks: [], _recording: false,
-  _recCanvas: null, _recCtx: null, _audioDest: null, _mimeType: null,
-  _w: 0, _h: 0,
-  _multitrack: false,
-  _trackRecs: [], _trackChunks: {},
-
-  init() {
-    this._recCanvas = document.getElementById('rec-canvas');
-    this._recCtx = this._recCanvas.getContext('2d');
-    this._audioDest = Tone.context.createMediaStreamDestination();
-    Tone.getDestination().connect(this._audioDest);
-
-    // Per-track destinations (tapped before compressor)
-    this._trackDests = {};
-    const A = MUZE.Audio;
-    const tracks = {
-      pad: A.reverb,        // end of pad chain
-      arp: A._arpReverb,    // end of arp chain
-      melody: A._melReverb, // end of melody chain
-      drums: A.compressor,  // drums go direct to compressor
-      binaural: A.compressor // binaural panners go to compressor
-    };
-    // Create a gain tap for each track
-    this._trackTaps = {};
-    for (const [name, node] of Object.entries(tracks)) {
-      const dest = Tone.context.createMediaStreamDestination();
-      const tap = new Tone.Gain(1);
-      tap.connect(dest);
-      this._trackDests[name] = dest;
-      this._trackTaps[name] = tap;
-    }
-    // Connect taps — each synth's final stage also feeds its tap
-    A.reverb.connect(this._trackTaps.pad);
-    A._arpReverb.connect(this._trackTaps.arp);
-    A._melReverb.connect(this._trackTaps.melody);
-    A.kickSynth.connect(this._trackTaps.drums);
-    A.snareSynth.connect(this._trackTaps.drums);
-    A.hatSynth.connect(this._trackTaps.drums);
-
-    document.getElementById('rec-btn').addEventListener('click', () => {
-      if (this._recording) this.stop(); else this.start();
-    });
-    document.getElementById('rec-multitrack').addEventListener('click', function() {
-      MUZE.Recorder._multitrack = !MUZE.Recorder._multitrack;
-      this.textContent = MUZE.Recorder._multitrack ? 'MULTI' : 'STEREO';
-    });
-  },
-
-  _audioMime() {
-    if (MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
-    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return 'audio/webm;codecs=opus';
-    return 'audio/webm';
-  },
-
-  start() {
-    this._w = 720;
-    this._h = Math.round(720 * (window.innerHeight / window.innerWidth));
-    this._recCanvas.width = this._w;
-    this._recCanvas.height = this._h;
-
-    const canvasStream = this._recCanvas.captureStream(30);
-    const audioTrack = this._audioDest.stream.getAudioTracks()[0];
-    if (audioTrack) canvasStream.addTrack(audioTrack);
-
-    this._mimeType = MediaRecorder.isTypeSupported('video/mp4')
-      ? 'video/mp4'
-      : MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-        ? 'video/webm;codecs=vp9,opus'
-        : 'video/webm';
-
-    this._chunks = [];
-    this._mediaRec = new MediaRecorder(canvasStream, {
-      mimeType: this._mimeType, videoBitsPerSecond: 4000000
-    });
-    this._mediaRec.ondataavailable = (e) => { if (e.data.size > 0) this._chunks.push(e.data); };
-    this._mediaRec.onstop = () => this._save();
-    this._mediaRec.start(500);
-
-    // Start multitrack recorders if enabled
-    this._trackRecs = [];
-    if (this._multitrack) {
-      const aMime = this._audioMime();
-      for (const [name, dest] of Object.entries(this._trackDests)) {
-        this._trackChunks[name] = [];
-        const rec = new MediaRecorder(dest.stream, { mimeType: aMime });
-        rec.ondataavailable = (e) => { if (e.data.size > 0) this._trackChunks[name].push(e.data); };
-        rec.start(500);
-        this._trackRecs.push({ name, rec, mime: aMime });
-      }
-    }
-
-    this._recording = true;
-    document.getElementById('rec-btn').classList.add('recording');
-  },
-
-  stop() {
-    this._recording = false;
-    if (this._mediaRec && this._mediaRec.state === 'recording') {
-      this._mediaRec.stop();
-    }
-    // Stop multitrack recorders
-    const pending = this._trackRecs.filter(t => t.rec.state === 'recording');
-    let done = 0;
-    if (pending.length) {
-      pending.forEach(t => {
-        t.rec.onstop = () => {
-          done++;
-          if (done === pending.length) this._saveMultitrack();
-        };
-        t.rec.stop();
-      });
-    }
-    document.getElementById('rec-btn').classList.remove('recording');
-  },
-
-  // Called from main loop every frame
-  drawFrame() {
-    if (!this._recording) return;
-    const ctx = this._recCtx;
-    const w = this._w, h = this._h;
-    const S = MUZE.State;
-
-    // Camera (mirrored, object-fit: cover)
-    const vid = MUZE.Camera.video;
-    if (vid.readyState >= 2) {
-      const vw = vid.videoWidth, vh = vid.videoHeight;
-      const canvasRatio = w / h, vidRatio = vw / vh;
-      let sx = 0, sy = 0, sw = vw, sh = vh;
-      if (vidRatio > canvasRatio) {
-        sw = vh * canvasRatio; sx = (vw - sw) / 2;
-      } else {
-        sh = vw / canvasRatio; sy = (vh - sh) / 2;
-      }
-      ctx.save();
-      ctx.translate(w, 0);
-      ctx.scale(-1, 1);
-      ctx.drawImage(vid, sx, sy, sw, sh, 0, 0, w, h);
-      ctx.restore();
-    }
-
-    // Overlay canvas (face mesh etc)
-    ctx.drawImage(document.getElementById('overlay'), 0, 0, w, h);
-
-    // Scale factor for UI elements (relative to 720w reference)
-    const s = w / 720;
-
-    // Debug panel (top-left)
-    const sc = MUZE.Music.getScaleName(S.currentScale);
-    const n = S.melodyNote ? MUZE.Music.midiToNote(S.melodyNote) : '-';
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath(); ctx.roundRect(6*s, 6*s, 220*s, 72*s, 6*s); ctx.fill();
-    ctx.font = `${10*s}px monospace`;
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.textAlign = 'left';
-    const dbg = [
-      `${S.faceDetected?'face':'...'} | ${sc} | chord ${S.chordIndex}`,
-      `smile:${S.lipCorner.toFixed(2)} brow:${S.browHeight.toFixed(2)} eyes:${S.eyeOpenness.toFixed(2)}`,
-      `pitch:${S.headPitch.toFixed(2)} yaw:${S.headYaw.toFixed(2)} roll:${S.headRoll.toFixed(2)}`,
-      `hand:${S.handPresent?(S.handOpen?'open':'fist'):'\u2014'} note:${n} auto:${S.autoRhythm?'ON':'\u2014'}`,
-    ];
-    dbg.forEach((line, i) => ctx.fillText(line, 12*s, (18 + i*15)*s));
-
-    // Mode HUD (bottom-center, above chord bar)
-    const modeName = MUZE.Music.getScaleName(S.currentScale).toUpperCase();
-    const v = S.lipCorner;
-    const hudW = 180*s, hudH = 54*s, hudX = (w - hudW) / 2, hudY = h - 100*s;
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.beginPath(); ctx.roundRect(hudX, hudY, hudW, hudH, 10*s); ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.font = `bold ${22*s}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText(modeName, w / 2, hudY + 24*s);
-
-    // Valence bar
-    const barW = 140*s, barH = 5*s, barX = (w - barW) / 2, barY = hudY + 30*s;
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.beginPath(); ctx.roundRect(barX, barY, barW, barH, 2*s); ctx.fill();
-    const pct = (v + 1) / 2;
-    ctx.fillStyle = `hsl(${pct * 120},70%,55%)`;
-    ctx.beginPath(); ctx.roundRect(barX + pct * (barW - 12*s), barY, 12*s, barH, 2*s); ctx.fill();
-    ctx.font = `${10*s}px monospace`;
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillText('valence ' + v.toFixed(2), w / 2, hudY + 48*s);
-
-    // Auto-rhythm indicator
-    if (S.autoRhythm) {
-      ctx.font = `${11*s}px monospace`;
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.textAlign = 'center';
-      ctx.letterSpacing = `${2*s}px`;
-      ctx.fillText('AUTO', w / 2, h * 0.54);
-      ctx.letterSpacing = '0px';
-    }
-
-    // Chord bar
-    const chordY = h - 40*s, chordH = 40*s;
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(0, chordY, w, chordH);
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, chordY); ctx.lineTo(w, chordY); ctx.stroke();
-    const chords = ['I', 'ii', 'iii', 'IV', 'V', 'vi'];
-    const cw = w / 6;
-    ctx.font = `${12*s}px monospace`;
-    ctx.textAlign = 'center';
-    chords.forEach((c, i) => {
-      if (i === S.chordIndex) {
-        ctx.fillStyle = 'rgba(255,255,255,0.08)';
-        ctx.fillRect(cw * i, chordY, cw, chordH);
-      }
-      ctx.fillStyle = i === S.chordIndex ? '#fff' : 'rgba(255,255,255,0.3)';
-      ctx.fillText(c, cw * i + cw / 2, chordY + chordH / 2 + 4*s);
-      if (i < 5) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-        ctx.beginPath(); ctx.moveTo(cw*(i+1), chordY); ctx.lineTo(cw*(i+1), h); ctx.stroke();
-      }
-    });
-
-    // REC indicator (top-right area)
-    ctx.fillStyle = '#f33';
-    ctx.beginPath(); ctx.arc(w - 30*s, 20*s, 5*s, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.font = `${10*s}px monospace`;
-    ctx.textAlign = 'right';
-    ctx.fillText('REC', w - 40*s, 24*s);
-  },
-
-  async _save() {
-    const ext = this._mimeType.includes('mp4') ? 'mp4' : 'webm';
-    const blob = new Blob(this._chunks, { type: this._mimeType });
-    const fileName = `muze-${Date.now()}.${ext}`;
-
-    // Try sharing to camera roll (iOS), fall back to download
-    if (navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: this._mimeType })] })) {
-      try {
-        await navigator.share({
-          files: [new File([blob], fileName, { type: this._mimeType })],
-          title: 'Muze Session'
-        });
-        return;
-      } catch (e) { /* user cancelled or not supported, fall through to download */ }
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-  },
-
-  _saveMultitrack() {
-    const ts = Date.now();
-    for (const [name, chunks] of Object.entries(this._trackChunks)) {
-      if (!chunks.length) continue;
-      const rec = this._trackRecs.find(t => t.name === name);
-      const ext = rec.mime.includes('mp4') ? 'm4a' : 'webm';
-      const blob = new Blob(chunks, { type: rec.mime });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `muze-${name}-${ts}.${ext}`; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    }
-  }
-};
-</script>
-
-<!-- Tutorial -->
-<script>
-MUZE.Tutorial = {
-  _steps: [], _idx: 0, _active: false,
-
-  BASIC: [
-    { title: 'Smile', desc: 'Try smiling. The music shifts to a brighter, happier mode. Watch the mode name change at the bottom of the screen.' },
-    { title: 'Frown', desc: 'Now frown or make a sad face. The music becomes darker and more tense.' },
-    { title: 'Tilt Your Head', desc: 'Tilt your chin down \u2014 the sound gets muffled as the filter closes. Chin up/forward = bright and open.' },
-    { title: 'Chords & Drums', desc: 'The bottom bar has 6 chord buttons (I ii iii IV V vi) \u2014 tap any to change the harmony. Above that are 3 drum zones: hi-hat, snare, kick (top to bottom).' },
-    { title: 'Double Tap', desc: 'Double-tap anywhere in the drum zone to start an auto-rhythm. Double-tap again to stop it.' },
-    { title: 'Show Your Hand', desc: 'Hold your hand up to the camera. A melody synth plays \u2014 move your hand up and down to change pitch.' },
-    { title: 'Show Your Hand', desc: 'Move your hand up and down to play melody notes. Toggle portamento mode in the Melody tab of the gear menu for smooth pitch sweeps.' },
-    { title: 'Eyes = Reverb', desc: 'Open your eyes wide \u2014 the arpeggio and melody get more reverb and delay. Squint to dry them out.' },
-    { title: 'You\'re Ready', desc: 'That covers the basics! Use the record button to capture performances. Tap ? again for the advanced tutorial.' },
-  ],
-
-  ADVANCED: [
-    { title: 'Six Modes', desc: 'Your smile controls which mode plays. From dark to bright: Phrygian, Aeolian, Dorian, Mixolydian, Ionian, Lydian. Each has a different emotional character.' },
-    { title: 'Filter (Head Pitch)', desc: 'Chin down = lowpass filter closes (muffled). Chin up/forward = filter opens (bright). Volume-compensated to stay even. Affects pad, melody, and arpeggio.' },
-    { title: 'Reverb + Delay (Eyes)', desc: 'Eye openness controls reverb and delay on the arpeggio and melody synths. Wide open = full wet, squint = completely dry. Sliders in the gear menu set the max.' },
-    { title: 'Chorus (Head Roll)', desc: 'Tilting your head sideways increases chorus depth, making the sound shimmer and widen in stereo.' },
-    { title: 'Octave (Brow Height)', desc: 'Raising your eyebrows shifts the melody and arpeggio to a higher octave.' },
-    { title: 'Chord Bar', desc: 'The bottom bar has 6 chords (I ii iii IV V vi). Tap any chord at any time \u2014 the pad, arpeggio, and binaural beats all follow.' },
-    { title: 'Hand Melody', desc: 'Hand Y position maps to scale degrees across 2 octaves. Default is stepped 12-tone notes. Toggle portamento in the Melody tab for smooth gliding pitch sweeps.' },
-    { title: 'Riser (Hold + Swipe Up)', desc: 'Hold your finger for 400ms+ \u2014 a riser noise sweep builds over 4 seconds while drums and pad duck. Swipe up to drop: big kick hit, reverb wash, everything snaps back. Release without swiping to cancel.' },
-    { title: 'Swipe Down', desc: 'Swipe down for a tape stop \u2014 pitch drops 2 octaves and tempo crawls, then snaps back.' },
-    { title: 'Swipe Left/Right', desc: 'Swipe horizontally to cycle through 4 drum patterns while auto-rhythm is running.' },
-    { title: 'Synth Panel', desc: 'Gear icon opens a tabbed panel: Arp, Melody, Pad, Binaural. Each tab has Synth (waveform, ADSR), Mix (volume, pan), and FX (reverb/delay max) sections.' },
-    { title: 'Three Synths', desc: 'Pad: FM chords (center). Arpeggio: loops the scale (panned right, own reverb/delay). Melody: hand-controlled MonoSynth (panned left, own reverb/delay).' },
-    { title: 'Binaural Beats', desc: 'Toggle in the Binaural tab. Two sine waves panned hard L/R with a small frequency difference. Tonic mode = fixed root, Chord mode = follows the active chord.' },
-    { title: 'Record + Pause', desc: 'Record button captures video + audio + all UI. Shares to camera roll on iOS. Pause button stops everything \u2014 tap again to resume.' },
-    { title: 'Go Perform', desc: 'You know everything. Layer your face, hands, and touch together. Every parameter stacks \u2014 there are no wrong moves.' },
-  ],
-
-  init() {
-    document.getElementById('help-btn').addEventListener('click', () => {
-      if (this._active) { this._close(); return; }
-      document.getElementById('tut-picker').classList.add('open');
-    });
-    document.getElementById('tut-close-pick').addEventListener('click', () => {
-      document.getElementById('tut-picker').classList.remove('open');
-    });
-    document.getElementById('tut-basic').addEventListener('click', () => this._start(this.BASIC));
-    document.getElementById('tut-advanced').addEventListener('click', () => this._start(this.ADVANCED));
-    document.getElementById('tut-next').addEventListener('click', () => this._go(1));
-    document.getElementById('tut-prev').addEventListener('click', () => this._go(-1));
-    document.getElementById('tut-exit').addEventListener('click', () => this._close());
-  },
-
-  _start(steps) {
-    this._steps = steps;
-    this._idx = 0;
-    this._active = true;
-    document.getElementById('tut-picker').classList.remove('open');
-    document.getElementById('tut-overlay').classList.add('active');
-    this._render();
-  },
-
-  _go(dir) {
-    this._idx = Math.max(0, Math.min(this._steps.length - 1, this._idx + dir));
-    this._render();
-  },
-
-  _render() {
-    const s = this._steps[this._idx];
-    document.getElementById('tut-step-label').textContent = `Step ${this._idx + 1} of ${this._steps.length}`;
-    document.getElementById('tut-title').textContent = s.title;
-    document.getElementById('tut-desc').textContent = s.desc;
-    document.getElementById('tut-prev').style.visibility = this._idx === 0 ? 'hidden' : 'visible';
-    document.getElementById('tut-next').textContent = this._idx === this._steps.length - 1 ? 'done' : 'next \u2192';
-    if (this._idx === this._steps.length - 1) {
-      document.getElementById('tut-next').onclick = () => this._close();
-    } else {
-      document.getElementById('tut-next').onclick = () => this._go(1);
-    }
-  },
-
-  _close() {
-    this._active = false;
-    document.getElementById('tut-overlay').classList.remove('active');
-    document.getElementById('tut-picker').classList.remove('open');
-  }
-};
-</script>
-
-<!-- Touch -->
-<script>
-MUZE.Touch = {
-  _cooldown:{}, _touchStart:null, _lastTapTime:0, _holdTimer:null, _isHolding:false,
-  init(){
-    // Chord zone
-    const selectChord = (el) => {
-      if(el&&el.dataset.chord!==undefined){
-        const idx=parseInt(el.dataset.chord);
-        MUZE.State.chordIndex=idx;
-        document.querySelectorAll('.chord-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
-      }
-    };
-    document.getElementById('chord-zone').addEventListener('touchstart',(e)=>{
-      e.preventDefault();
-      const t=e.changedTouches[0];
-      selectChord(document.elementFromPoint(t.clientX,t.clientY));
-    },{passive:false});
-    document.querySelectorAll('.chord-btn').forEach(btn=>{
-      btn.addEventListener('click',()=>selectChord(btn));
-    });
-
-    // Drum zone
-    const z=document.getElementById('touch-zone');
-    z.addEventListener('touchstart',this._onStart.bind(this),{passive:false});
-    z.addEventListener('touchmove',(e)=>e.preventDefault(),{passive:false});
-    z.addEventListener('touchend',this._onEnd.bind(this),{passive:false});
-    z.addEventListener('touchcancel',this._onEnd.bind(this),{passive:false});
-
-    // Set initial active chord
-    document.querySelector('.chord-btn[data-chord="0"]').classList.add('active');
-  },
-  _onStart(e){
-    e.preventDefault();
-    const t=e.changedTouches[0];
-    this._touchStart={x:t.clientX,y:t.clientY,time:performance.now()};
-    this._isHolding=false;
-    this._holdTimer=setTimeout(()=>{
-      this._isHolding=true; MUZE.Audio.startRiser(); MUZE.State.riserActive=true;
-      document.getElementById('riser-overlay').classList.add('active');
-    },MUZE.Config.HOLD_TIME);
-  },
-  _onEnd(e){
-    e.preventDefault(); if(!this._touchStart) return;
-    const t=e.changedTouches[0], dx=t.clientX-this._touchStart.x, dy=t.clientY-this._touchStart.y;
-    const dt=performance.now()-this._touchStart.time;
-    clearTimeout(this._holdTimer);
-    if(this._isHolding){
-      // Check if swipe up while holding = riser drop
-      if(dy<-MUZE.Config.SWIPE_THRESHOLD){
-        MUZE.Audio.dropRiser();
-      } else {
-        MUZE.Audio.cancelRiser();
-      }
-      MUZE.State.riserActive=false;
-      document.getElementById('riser-overlay').classList.remove('active');
-      this._isHolding=false; this._touchStart=null; return;
-    }
-    const C=MUZE.Config, ax=Math.abs(dx), ay=Math.abs(dy);
-    if(dt<C.SWIPE_MAX_TIME&&(ax>C.SWIPE_THRESHOLD||ay>C.SWIPE_THRESHOLD)){
-      if(ax>ay){if(dx>C.SWIPE_THRESHOLD)MUZE.AutoRhythm.nextPattern();else if(dx<-C.SWIPE_THRESHOLD)MUZE.AutoRhythm.prevPattern();}
-      else if(dy>C.SWIPE_THRESHOLD)MUZE.Audio.tapeStop();
-      // swipe up without hold = no action (hold+swipe up = drop)
-      this._touchStart=null; return;
-    }
-    const now=performance.now();
-    if(now-this._lastTapTime<C.DOUBLE_TAP_TIME){
-      const active=MUZE.AutoRhythm.toggle(); MUZE.State.autoRhythm=active;
-      document.getElementById('rhythm-indicator').classList.toggle('visible',active);
-      this._lastTapTime=0; this._touchStart=null; return;
-    }
-    this._lastTapTime=now;
-    const target=document.elementFromPoint(t.clientX,t.clientY);
-    if(target){
-      const drum=target.dataset.drum||target.parentElement?.dataset?.drum;
-      if(drum){const cn=performance.now();if(!this._cooldown[drum]||cn-this._cooldown[drum]>50){
-        this._cooldown[drum]=cn; MUZE.Audio.triggerDrum(drum);
-        const el=document.getElementById('zone-'+drum);
-        if(el){el.classList.add('hit');setTimeout(()=>el.classList.remove('hit'),100);}
-      }}
-    }
-    this._touchStart=null;
-  }
-};
-</script>
-
-<!-- Main Loop -->
-<script>
-MUZE.Loop = {
-  _running:false, _lastDetect:0, _currentPadKey:null,
-  _prevMelodyNote:null, _prevBrow:0, _lastBrowSpike:0, _prevArticulation:true,
-  _debugEl:null, _modeHudEl:null,
-
-  init(){
-    const c=document.getElementById('overlay');
-    c.width=window.innerWidth*devicePixelRatio; c.height=window.innerHeight*devicePixelRatio;
-    c.style.width=window.innerWidth+'px'; c.style.height=window.innerHeight+'px';
-    this._debugEl=document.getElementById('debug');
-    this._modeHudEl=document.getElementById('mode-hud');
-  },
-  start(){this._running=true;this._tick();},
-  _tick(){
-    if(!this._running) return;
-    requestAnimationFrame(()=>this._tick());
-    const now=performance.now(), video=MUZE.Camera.video, S=MUZE.State, C=MUZE.Config;
-
-    if(now-this._lastDetect>=C.DETECT_INTERVAL){
-      this._lastDetect=now; const ts=Math.round(now);
-      const fr=MUZE.FaceTracker.detect(video,ts);
-      if(fr&&fr.faceLandmarks&&fr.faceLandmarks.length>0){
-        const r=MUZE.FaceFeatures.extract(fr.faceLandmarks[0]);
-        if(r){
-          S.mouthOpenness=MUZE.Smooth.update('mouth',r.mouthOpenness,C.SMOOTH_FAST);
-          S.lipCorner=MUZE.Smooth.update('lip',r.lipCorner,C.SMOOTH_FAST);
-          S.browHeight=MUZE.Smooth.update('brow',r.browHeight,C.SMOOTH_FAST);
-          S.eyeOpenness=MUZE.Smooth.update('eye',r.eyeOpenness,C.SMOOTH_FAST);
-          S.mouthWidth=MUZE.Smooth.update('mouthW',r.mouthWidth,C.SMOOTH_SLOW);
-          S.headPitch=MUZE.Smooth.update('pitch',r.headPitch,C.SMOOTH_FAST);
-          S.headYaw=MUZE.Smooth.update('yaw',r.headYaw,C.SMOOTH_SLOW);
-          S.headRoll=MUZE.Smooth.update('roll',r.headRoll,C.SMOOTH_SLOW);
-          S.faceDetected=true;
-        }
-      } else { S.faceDetected=false; }
-
-      const hr=MUZE.HandTracker.detect(video,ts+1);
-      if(hr&&hr.landmarks&&hr.landmarks.length>0){
-        const r=MUZE.HandFeatures.extract(hr.landmarks);
-        S.handPresent=r.handPresent;
-        S.handX=MUZE.Smooth.update('handX',r.handX,C.SMOOTH_HAND);
-        S.handY=MUZE.Smooth.update('handY',r.handY,C.SMOOTH_HAND);
-        S.handOpen=r.handOpen;
-      } else { S.handPresent=false; }
-
-      // Background blur
-      MUZE.BgBlur.render(video, ts + 2);
-    }
-
-    if(S.faceDetected&&S.audioReady){
-      MUZE.Audio.updateParams(S);
-
-      if(!S.modeFrozen){
-        S.currentScale=MUZE.Music.selectScale(S.lipCorner);
-      }
-      const scale=S.currentScale;
-      const octShift=Math.floor(S.browHeight*C.OCTAVE_RANGE)*12;
-      const root=C.ROOT_NOTE+octShift;
-
-      // Auto-arpeggio — always running
-      MUZE.Audio.updateArpNotes(scale, root);
-      if(!MUZE.Audio._arpSeq) MUZE.Audio.startArpeggio();
-
-      // Pad voicing from chord degree (set by touch chord zone)
-      const degree=C.CHORD_DEGREES[S.chordIndex];
-      const padNotes=MUZE.Music.getPadVoicing(C.ROOT_NOTE,scale,degree);
-      const padKey=padNotes.join(',');
-      if(padKey!==this._currentPadKey){
-        this._currentPadKey=padKey;
-        MUZE.Audio.triggerPad(padNotes);
-        MUZE.Audio.updateBinauralFromChord(padNotes);
-      }
-
-      // Hand → lead melody
-      if(S.handPresent){
-        const note=MUZE.Music.quantize(1-S.handY,scale,root,C.OCTAVE_RANGE);
-        S.melodyNote=note;
-        if(note!==this._prevMelodyNote){
-          if(S.portamentoMode){
-            MUZE.Audio.updateMelody(note);
-          } else {
-            MUZE.Audio.stopMelody();
-            MUZE.Audio.startMelody(note);
-          }
-          this._prevMelodyNote=note;
-        }
-      } else if(this._prevMelodyNote!==null){
-        MUZE.Audio.stopMelody(); this._prevMelodyNote=null; S.melodyNote=null;
-      }
-    } else {
-      if(this._currentPadKey){MUZE.Audio.releasePad();this._currentPadKey=null;}
-      if(this._prevMelodyNote!==null){MUZE.Audio.stopMelody();this._prevMelodyNote=null;}
-    }
-
-    MUZE.Recorder.drawFrame();
-    this._drawDebug(S);
-  },
-  _drawDebug(S){
-    const n=S.melodyNote?MUZE.Music.midiToNote(S.melodyNote):'-';
-    const sc=MUZE.Music.getScaleName(S.currentScale);
-    this._debugEl.innerHTML=
-      '<div style="font:10px/1.5 monospace;color:rgba(255,255,255,0.6);'+
-      'background:rgba(0,0,0,0.35);padding:5px 8px;border-radius:6px;'+
-      'backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">'+
-      `${S.faceDetected?'face':'...'} | ${sc} | chord ${S.chordIndex}<br>`+
-      `smile:${S.lipCorner.toFixed(2)} brow:${S.browHeight.toFixed(2)} eyes:${S.eyeOpenness.toFixed(2)}<br>`+
-      `pitch:${S.headPitch.toFixed(2)} yaw:${S.headYaw.toFixed(2)} roll:${S.headRoll.toFixed(2)}<br>`+
-      `hand:${S.handPresent?(S.handOpen?'open':'fist'):'—'} note:${n}<br>`+
-      `auto:${S.autoRhythm?'ON':'—'}`+
-      '</div>';
-
-    // Big mode + valence HUD
-    const sc2=MUZE.Music.getScaleName(S.currentScale).toUpperCase();
-    const v=S.lipCorner;
-    const pct=((v+1)/2)*100; // -1..+1 → 0..100%
-    const barW=8; // width% of fill indicator
-    const left=Math.max(0,Math.min(100-barW,pct-barW/2));
-    const hue=pct*1.2; // 0=red, 60=yellow, 120=green
-    this._modeHudEl.innerHTML=
-      `<div>${sc2}</div>`+
-      `<div class="valence-bar"><div class="fill" style="left:${left}%;width:${barW}%;background:hsl(${hue},70%,55%)"></div></div>`+
-      `<div class="valence-label">valence ${v.toFixed(2)}</div>`;
-  }
-};
-</script>
-
-<!-- Bootstrap -->
+<!-- Start Screen -->
+<div id="start-screen">
+  <h1>Muze</h1>
+  <p>Your body is the instrument. Create music with your face, hands, and touch.</p>
+  <button id="start-btn">Touch to Begin</button>
+  <span id="loading-text">Loading...</span>
+</div>
+
+<!-- JS Modules -->
+<script src="js/config.js"></script>
+<script src="js/tracking.js"></script>
+<script src="js/music.js"></script>
+<script src="js/mixer.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/visualizer.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+
+<!-- Bootstrap (ES module for MediaPipe import) -->
 <script type="module">
-import { FaceLandmarker, HandLandmarker, ImageSegmenter, FilesetResolver }
+import { FaceLandmarker, HandLandmarker, FilesetResolver }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs';
 
 document.getElementById('start-btn').addEventListener('click', async () => {
@@ -1813,8 +172,10 @@ document.getElementById('start-btn').addEventListener('click', async () => {
   ss.classList.add('loading');
 
   try {
-    // Audio + Camera
+    // Audio + Camera (samples load in background)
     await MUZE.Audio.init();
+    MUZE.SampleLib.loadAll().then(() => console.log('Samples loaded'));
+    document.getElementById('loading-text').textContent = 'Starting camera...';
     await MUZE.Camera.init();
 
     // MediaPipe
@@ -1825,21 +186,26 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     await Promise.all([
       MUZE.FaceTracker.init(FaceLandmarker, vision),
       MUZE.HandTracker.init(HandLandmarker, vision),
-      MUZE.BgBlur.init(ImageSegmenter, vision),
     ]);
 
-    // Init modules
+    // Init UI
     MUZE.Touch.init();
     MUZE.SynthMenu.init();
+    MUZE.MixerUI.init();
+    MUZE.SampleUI.init();
     MUZE.Tutorial.init();
     MUZE.Recorder.init();
+
+    // Restore saved settings
+    MUZE.Storage.load();
+    MUZE.Storage.enableAutoSave();
+
+    // Freeze button
     document.getElementById('freeze-btn').addEventListener('click', () => {
       MUZE.State.modeFrozen = !MUZE.State.modeFrozen;
       document.getElementById('freeze-btn').classList.toggle('frozen', MUZE.State.modeFrozen);
       document.getElementById('mode-hud').classList.toggle('frozen', MUZE.State.modeFrozen);
     });
-    MUZE.BgBlur.toggle(); // on by default
-    MUZE.Loop.init();
 
     // Pause button
     const pauseBtn = document.getElementById('pause-btn');
@@ -1862,7 +228,12 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       }
     });
 
-    ss.remove();
+    MUZE.Loop.init();
+
+    // Fade out start screen
+    ss.classList.add('fade-out');
+    setTimeout(() => ss.remove(), 600);
+
     MUZE.Loop.start();
   } catch (err) {
     console.error('MUZE init failed:', err);
