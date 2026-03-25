@@ -14,6 +14,7 @@
 <body>
 
 <video id="cam" autoplay playsinline muted></video>
+<canvas id="bg-canvas"></canvas>
 <canvas id="overlay"></canvas>
 
 <!-- Drum touch zones -->
@@ -158,6 +159,7 @@
 <!-- JS Modules -->
 <script src="js/config.js"></script>
 <script src="js/tracking.js"></script>
+<script src="js/bgblur.js"></script>
 <script src="js/music.js"></script>
 <script src="js/mixer.js"></script>
 <script src="js/audio.js"></script>
@@ -231,6 +233,12 @@ document.getElementById('start-btn').addEventListener('click', async () => {
         pauseBtn.classList.remove('paused');
       }
     });
+
+    // Background blur (async, never blocks)
+    import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs')
+      .then(m => MUZE.BgBlur.init(m.ImageSegmenter, vision))
+      .then(() => MUZE.BgBlur.activate())
+      .catch(e => console.warn('BgBlur: could not load', e));
 
     MUZE.Loop.init();
 
