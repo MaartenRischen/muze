@@ -130,6 +130,18 @@ MUZE.BgBlur = {
 
     const rawMask = result.confidenceMasks[0].getAsFloat32Array();
 
+    // DEBUG: log mask stats on first frame
+    if (!this._debugged) {
+      let min = 1, max = 0, sum = 0;
+      for (let i = 0; i < rawMask.length; i++) {
+        if (rawMask[i] < min) min = rawMask[i];
+        if (rawMask[i] > max) max = rawMask[i];
+        sum += rawMask[i];
+      }
+      console.log('BgBlur mask stats:', { len: rawMask.length, min, max, avg: sum/rawMask.length, canvasPixels: w*h });
+      this._debugged = true;
+    }
+
     // Step 1: Apply sigmoid to sharpen the transition band
     const lut = this._sigLUT;
     const processed = new Float32Array(rawMask.length);
