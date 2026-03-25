@@ -55,6 +55,9 @@ MUZE.Loop = {
         S.handY = MUZE.Smooth.update('handY', r.handY, C.SMOOTH_HAND);
         S.handOpen = r.handOpen;
       } else { S.handPresent = false; }
+
+      // Background blur
+      MUZE.BgBlur.render(video, ts + 2);
     }
 
     // Audio logic
