@@ -89,56 +89,154 @@ html, body {
 }
 
 /* ============================================================
-   MOOD LIGHTING — Ambient atmosphere overlays
-   Driven by CSS custom properties from moodlight.js
+   MOOD LIGHTING v2 — Premium Ambilight-style ambient atmosphere
+   Driven by 4 CSS custom properties from moodlight.js:
+     --mood-rgb    (R,G,B)  current mode accent
+     --mood-breath (0-1)    organic sine oscillator
+     --mood-energy (0-1)    smoothed audio energy
+     --mood-beat   (0-1)    bass transient spike, fast decay
+   All visual effects derive from calc() + var() — zero reflow.
    ============================================================ */
+
+/* ---------- Gradient overlay (full-screen mode wash) ---------- */
 #mood-gradient-overlay {
   position: fixed; inset: 0;
   pointer-events: none; z-index: 1;
-  opacity: 0.06;
-  transition: opacity 1.5s ease, background 1.5s ease;
+  /* Opacity reacts to energy + breath: silent = barely visible, loud = noticeable */
+  opacity: calc(0.04 + var(--mood-energy, 0) * 0.06 + var(--mood-breath, 0.3) * 0.03);
+  transition: background 1.5s ease;
+  will-change: opacity;
 }
 #mood-gradient-overlay.warm {
-  background: radial-gradient(
-    ellipse 80% 70% at 50% 50%,
-    rgba(var(--mood-rgb, 232,169,72), 0.12) 0%,
-    rgba(var(--mood-rgb, 232,169,72), 0.04) 50%,
-    transparent 100%
-  );
+  background:
+    radial-gradient(
+      ellipse 80% 70% at 50% 55%,
+      rgba(var(--mood-rgb, 232,169,72), 0.14) 0%,
+      rgba(var(--mood-rgb, 232,169,72), 0.06) 40%,
+      rgba(var(--mood-rgb, 232,169,72), 0.02) 70%,
+      transparent 100%
+    );
 }
 #mood-gradient-overlay.cool {
   background:
-    radial-gradient(ellipse 60% 60% at 0% 100%, rgba(var(--mood-rgb, 129,140,248), 0.10) 0%, transparent 70%),
-    radial-gradient(ellipse 60% 60% at 100% 0%, rgba(var(--mood-rgb, 129,140,248), 0.08) 0%, transparent 70%);
+    radial-gradient(ellipse 55% 55% at 0% 100%,   rgba(var(--mood-rgb, 129,140,248), 0.12) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 55% at 100% 0%,    rgba(var(--mood-rgb, 129,140,248), 0.10) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 40% at 100% 100%,  rgba(var(--mood-rgb, 129,140,248), 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 0% 0%,      rgba(var(--mood-rgb, 129,140,248), 0.04) 0%, transparent 60%);
 }
 #mood-gradient-overlay.neutral {
-  background: radial-gradient(
-    ellipse 90% 80% at 50% 50%,
-    rgba(var(--mood-rgb, 34,211,238), 0.08) 0%,
-    transparent 80%
-  );
+  background:
+    radial-gradient(
+      ellipse 90% 80% at 50% 50%,
+      rgba(var(--mood-rgb, 34,211,238), 0.10) 0%,
+      rgba(var(--mood-rgb, 34,211,238), 0.03) 60%,
+      transparent 85%
+    );
 }
+
+/* ---------- Edge glow OUTER (Ambilight diffusion layer) ----------
+   Strongest at bottom, medium on sides, faint at top.
+   Layered gradients simulate real light diffusion: wider = dimmer. */
 #mood-edge-glow {
   position: fixed; inset: 0;
   pointer-events: none; z-index: 1;
-  opacity: calc(var(--mood-breath, 0.3) * 0.5);
-  background:
-    linear-gradient(to top, rgba(var(--mood-rgb, 232,169,72), 0.10) 0%, transparent 25%),
-    linear-gradient(to right, rgba(var(--mood-rgb, 232,169,72), 0.05) 0%, transparent 15%),
-    linear-gradient(to left, rgba(var(--mood-rgb, 232,169,72), 0.05) 0%, transparent 15%);
-  transition: opacity 0.3s ease;
-}
-#mood-breath-bar {
-  position: fixed; bottom: 0; left: 0; width: 100%; height: 200px;
-  pointer-events: none; z-index: 1;
-  opacity: calc(var(--mood-breath, 0.3) * 0.6);
-  background: linear-gradient(
-    to top,
-    rgba(var(--mood-rgb, 232,169,72), 0.12) 0%,
-    rgba(var(--mood-rgb, 232,169,72), 0.04) 40%,
-    transparent 100%
+  will-change: opacity;
+  /* Base opacity from breath, boosted by beat accent (+15% on hit) */
+  opacity: calc(
+    var(--mood-breath, 0.3) * 0.45
+    + var(--mood-energy, 0) * 0.15
+    + var(--mood-beat, 0) * 0.15
   );
-  transition: opacity 0.3s ease;
+  background:
+    /* Bottom glow — strongest, wide spread (Ambilight primary) */
+    linear-gradient(to top,
+      rgba(var(--mood-rgb, 232,169,72), 0.16) 0%,
+      rgba(var(--mood-rgb, 232,169,72), 0.08) 12%,
+      rgba(var(--mood-rgb, 232,169,72), 0.02) 28%,
+      transparent 40%),
+    /* Left side glow */
+    linear-gradient(to right,
+      rgba(var(--mood-rgb, 232,169,72), 0.08) 0%,
+      rgba(var(--mood-rgb, 232,169,72), 0.03) 8%,
+      transparent 18%),
+    /* Right side glow */
+    linear-gradient(to left,
+      rgba(var(--mood-rgb, 232,169,72), 0.08) 0%,
+      rgba(var(--mood-rgb, 232,169,72), 0.03) 8%,
+      transparent 18%),
+    /* Top glow — very faint */
+    linear-gradient(to bottom,
+      rgba(var(--mood-rgb, 232,169,72), 0.03) 0%,
+      transparent 10%),
+    /* Bottom-left corner bloom */
+    radial-gradient(ellipse 30% 25% at 0% 100%,
+      rgba(var(--mood-rgb, 232,169,72), 0.10) 0%,
+      transparent 100%),
+    /* Bottom-right corner bloom */
+    radial-gradient(ellipse 30% 25% at 100% 100%,
+      rgba(var(--mood-rgb, 232,169,72), 0.10) 0%,
+      transparent 100%);
+}
+
+/* ---------- Edge glow INNER (brighter core, tighter spread) ----------
+   Creates depth illusion: brighter band closer to screen edge,
+   dimmer diffusion further away. Like real Ambilight backlight. */
+#mood-edge-glow-inner {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  will-change: opacity;
+  /* Inner is brighter but more affected by beat */
+  opacity: calc(
+    var(--mood-breath, 0.3) * 0.35
+    + var(--mood-energy, 0) * 0.20
+    + var(--mood-beat, 0) * 0.25
+  );
+  background:
+    /* Bottom inner — tight, bright */
+    linear-gradient(to top,
+      rgba(var(--mood-rgb, 232,169,72), 0.22) 0%,
+      rgba(var(--mood-rgb, 232,169,72), 0.10) 5%,
+      transparent 15%),
+    /* Left inner */
+    linear-gradient(to right,
+      rgba(var(--mood-rgb, 232,169,72), 0.12) 0%,
+      transparent 6%),
+    /* Right inner */
+    linear-gradient(to left,
+      rgba(var(--mood-rgb, 232,169,72), 0.12) 0%,
+      transparent 6%),
+    /* Bottom center hotspot */
+    radial-gradient(ellipse 50% 12% at 50% 100%,
+      rgba(var(--mood-rgb, 232,169,72), 0.18) 0%,
+      transparent 100%);
+}
+
+/* ---------- Breath bar (bottom energy bar with scale pulse) ----------
+   Taller than before. Subtle scaleY on breath for organic alive feel. */
+#mood-breath-bar {
+  position: fixed; bottom: 0; left: 0; width: 100%; height: 240px;
+  pointer-events: none; z-index: 1;
+  will-change: opacity, transform;
+  transform-origin: bottom center;
+  /* Scale subtly with breath: 0.96 to 1.04 range */
+  transform: scaleY(calc(0.96 + var(--mood-breath, 0.3) * 0.08));
+  /* Opacity combines breath + energy */
+  opacity: calc(
+    var(--mood-breath, 0.3) * 0.50
+    + var(--mood-energy, 0) * 0.25
+    + var(--mood-beat, 0) * 0.10
+  );
+  background:
+    /* Primary bottom wash */
+    linear-gradient(to top,
+      rgba(var(--mood-rgb, 232,169,72), 0.18) 0%,
+      rgba(var(--mood-rgb, 232,169,72), 0.08) 25%,
+      rgba(var(--mood-rgb, 232,169,72), 0.02) 55%,
+      transparent 100%),
+    /* Center hotspot at bottom */
+    radial-gradient(ellipse 60% 30% at 50% 100%,
+      rgba(var(--mood-rgb, 232,169,72), 0.12) 0%,
+      transparent 100%);
 }
 
 /* ============================================================
@@ -173,6 +271,13 @@ html, body {
   position: fixed; top: 0; left: 0;
   width: 100%; height: 100%;
   object-fit: cover; transform: scaleX(-1); z-index: 0;
+  transition: filter 1.5s ease;
+}
+/* Bass warp on camera element (preserves mirror transform) */
+#cam.bass-warp { animation: cam-bass-warp 0.15s ease-out; }
+@keyframes cam-bass-warp {
+  0%   { transform: scaleX(-1) scale(1.015); }
+  100% { transform: scaleX(-1) scale(1); }
 }
 /* DO NOT REMOVE — see muze-mission.md */
 #bg-canvas {
@@ -204,14 +309,16 @@ html, body {
 }
 .drum-cell::after {
   content: attr(data-label);
-  color: var(--muze-text-muted);
+  color: rgba(255, 255, 255, 0.55);
   font: 500 12px/1 var(--font-ui);
-  letter-spacing: 2px;
+  letter-spacing: 2.5px;
   text-transform: uppercase;
-  opacity: 0.8;
+  opacity: 0.85;
   pointer-events: none;
   z-index: 1; /* Above ::before flash overlay */
   position: relative;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transition: opacity var(--transition-control), transform var(--transition-control);
 }
 .drum-cell.hit {
@@ -224,19 +331,29 @@ html, body {
   opacity: 1;
   transform: scale(1.3);
 }
-#zone-hat { border-bottom: 1px solid var(--muze-border); }
-#zone-hat.hit {
-  background: rgba(var(--muze-accent-rgb), 0.18);
-  box-shadow: inset 0 0 60px rgba(var(--muze-accent-rgb), 0.10);
+/* Per-zone idle tints (2-3% opacity — barely visible, adds depth) */
+#zone-hat {
+  border-bottom: 1px solid var(--muze-border);
+  background: rgba(0, 220, 255, 0.02);
 }
-#zone-snare { border-bottom: 1px solid var(--muze-border); }
+#zone-hat.hit {
+  background: rgba(0, 220, 255, 0.18);
+  box-shadow: inset 0 0 60px rgba(0, 220, 255, 0.10);
+}
+#zone-snare {
+  border-bottom: 1px solid var(--muze-border);
+  background: rgba(255, 240, 180, 0.025);
+}
 #zone-snare.hit {
-  background: rgba(var(--muze-accent-rgb), 0.25);
-  box-shadow: inset 0 0 80px rgba(var(--muze-accent-rgb), 0.14);
+  background: rgba(255, 240, 180, 0.25);
+  box-shadow: inset 0 0 80px rgba(255, 240, 180, 0.14);
+}
+#zone-kick {
+  background: rgba(255, 90, 40, 0.03);
 }
 #zone-kick.hit {
-  background: rgba(var(--muze-accent-rgb), 0.35);
-  box-shadow: inset 0 0 100px rgba(var(--muze-accent-rgb), 0.18);
+  background: rgba(255, 90, 40, 0.35);
+  box-shadow: inset 0 0 100px rgba(255, 90, 40, 0.18);
 }
 
 /* ============================================================
@@ -557,14 +674,14 @@ html, body {
   width: 50vmax; height: 50vmax;
   top: -15%; left: -10%;
   background: radial-gradient(circle, rgba(167,139,250,0.18) 0%, transparent 70%);
-  animation: orb-drift-1 14s ease-in-out infinite alternate;
+  animation: orb-drift-1 14s ease-in-out infinite;
 }
 /* Cyan orb — bottom-right, dorian */
 .ss-orb--cyan {
   width: 45vmax; height: 45vmax;
   bottom: -20%; right: -15%;
   background: radial-gradient(circle, rgba(34,211,238,0.14) 0%, transparent 70%);
-  animation: orb-drift-2 18s ease-in-out infinite alternate;
+  animation: orb-drift-2 18s ease-in-out infinite;
 }
 /* Amber orb — center, main accent */
 .ss-orb--amber {
@@ -572,34 +689,43 @@ html, body {
   top: 30%; left: 50%;
   transform: translateX(-50%);
   background: radial-gradient(circle, rgba(232,169,72,0.12) 0%, transparent 70%);
-  animation: orb-drift-3 16s ease-in-out infinite alternate;
+  animation: orb-drift-3 16s ease-in-out infinite;
 }
 /* Orange orb — bottom-left, phrygian dom */
 .ss-orb--orange {
   width: 35vmax; height: 35vmax;
   bottom: 10%; left: 20%;
   background: radial-gradient(circle, rgba(249,115,22,0.08) 0%, transparent 70%);
-  animation: orb-drift-4 20s ease-in-out infinite alternate;
+  animation: orb-drift-4 20s ease-in-out infinite;
 }
+/* Sine-curve drift patterns — varied per orb for organic feel */
 @keyframes orb-drift-1 {
-  0%   { transform: translate(0, 0) scale(1);       opacity: 0.6; }
-  50%  { transform: translate(8%, 12%) scale(1.15);  opacity: 1; }
-  100% { transform: translate(-5%, 8%) scale(0.95);  opacity: 0.5; }
+  0%   { transform: translate(0, 0) scale(1);         opacity: 0.6; }
+  25%  { transform: translate(6%, 10%) scale(1.08);    opacity: 0.8; }
+  50%  { transform: translate(-3%, 14%) scale(1.15);   opacity: 1;   }
+  75%  { transform: translate(-7%, 6%) scale(1.05);    opacity: 0.7; }
+  100% { transform: translate(0, 0) scale(1);          opacity: 0.6; }
 }
 @keyframes orb-drift-2 {
-  0%   { transform: translate(0, 0) scale(1);       opacity: 0.5; }
-  50%  { transform: translate(-10%, -8%) scale(1.1); opacity: 0.9; }
-  100% { transform: translate(6%, -12%) scale(1.05); opacity: 0.6; }
+  0%   { transform: translate(0, 0) scale(1);          opacity: 0.5; }
+  25%  { transform: translate(-8%, -5%) scale(1.05);    opacity: 0.7; }
+  50%  { transform: translate(-4%, -12%) scale(1.12);   opacity: 0.9; }
+  75%  { transform: translate(5%, -7%) scale(1.08);     opacity: 0.75;}
+  100% { transform: translate(0, 0) scale(1);           opacity: 0.5; }
 }
 @keyframes orb-drift-3 {
-  0%   { transform: translateX(-50%) scale(1);       opacity: 0.4; }
-  50%  { transform: translateX(-45%) scale(1.2);     opacity: 0.8; }
-  100% { transform: translateX(-55%) scale(0.9);     opacity: 0.5; }
+  0%   { transform: translateX(-50%) translate(0, 0) scale(1);       opacity: 0.4; }
+  25%  { transform: translateX(-50%) translate(4%, -6%) scale(1.1);   opacity: 0.6; }
+  50%  { transform: translateX(-50%) translate(-2%, -3%) scale(1.2);  opacity: 0.8; }
+  75%  { transform: translateX(-50%) translate(-5%, 4%) scale(1.08);  opacity: 0.55;}
+  100% { transform: translateX(-50%) translate(0, 0) scale(1);        opacity: 0.4; }
 }
 @keyframes orb-drift-4 {
-  0%   { transform: translate(0, 0) scale(1);        opacity: 0.3; }
-  50%  { transform: translate(12%, -6%) scale(1.15);  opacity: 0.7; }
-  100% { transform: translate(-8%, 4%) scale(1.05);   opacity: 0.4; }
+  0%   { transform: translate(0, 0) scale(1);           opacity: 0.3; }
+  25%  { transform: translate(9%, -4%) scale(1.08);      opacity: 0.5; }
+  50%  { transform: translate(5%, -9%) scale(1.15);      opacity: 0.7; }
+  75%  { transform: translate(-4%, -2%) scale(1.05);     opacity: 0.45;}
+  100% { transform: translate(0, 0) scale(1);            opacity: 0.3; }
 }
 
 /* ---- STAGGERED TITLE LETTERS (M...U...Z...E) ---- */
@@ -621,29 +747,38 @@ html, body {
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.92);
   opacity: 0;
-  transform: translateY(20px) scale(0.9);
+  transform: translateY(20px);
   will-change: transform, opacity, filter;
-  /* Staggered entrance: 0.3s base + 0.25s per letter = ~1.5s total */
-  animation: letter-arrive 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-  animation-delay: calc(0.3s + var(--i) * 0.25s);
+  /* Staggered entrance: 0.3s base + 0.3s per letter = ~1.5s total */
+  animation: letter-arrive 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(0.3s + var(--i) * 0.3s);
   position: relative;
 }
-/* Letter entrance with warm glow burst */
+/* Letter entrance: slide up, land, glow burst that fades */
 @keyframes letter-arrive {
   0% {
     opacity: 0;
-    transform: translateY(20px) scale(0.9);
-    filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0));
+    transform: translateY(20px);
+    text-shadow: 0 0 0px rgba(232, 169, 72, 0);
   }
-  60% {
+  50% {
     opacity: 1;
-    transform: translateY(-2px) scale(1.02);
-    filter: drop-shadow(0 0 24px rgba(232, 169, 72, 0.6));
+    transform: translateY(-1px);
+    text-shadow:
+      0 0 28px rgba(232, 169, 72, 0.7),
+      0 0 60px rgba(232, 169, 72, 0.35);
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(0);
+    text-shadow:
+      0 0 14px rgba(232, 169, 72, 0.4),
+      0 0 40px rgba(232, 169, 72, 0.15);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: drop-shadow(0 0 0px rgba(232, 169, 72, 0));
+    transform: translateY(0);
+    text-shadow: 0 0 0px rgba(232, 169, 72, 0);
   }
 }
 /* After all letters land, shimmer class activates gradient text */
@@ -675,8 +810,8 @@ html, body {
   margin-bottom: 24px;
   opacity: 0;
   will-change: width, opacity;
-  animation: line-expand 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-  animation-delay: 1.6s;
+  animation: line-expand 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 1.9s;
 }
 @keyframes line-expand {
   0%   { width: 0; opacity: 0; }
@@ -703,8 +838,8 @@ html, body {
   opacity: 0;
   transform: translateY(10px);
   will-change: transform, opacity;
-  animation: tagline-in 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-  animation-delay: 1.8s;
+  animation: tagline-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 2.1s;
 }
 @keyframes tagline-in {
   to { opacity: 1; transform: translateY(0); }
@@ -731,8 +866,8 @@ html, body {
   /* Staggered entrance */
   opacity: 0;
   transform: translateY(14px);
-  animation: btn-enter 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-  animation-delay: 2.2s;
+  animation: btn-enter 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 2.5s;
   transition: transform 0.15s ease, filter 0.15s ease,
               box-shadow 0.2s ease;
   box-shadow:
@@ -876,7 +1011,7 @@ html, body {
 }
 /* Title lifts, scales up, and blurs away */
 #start-screen.fade-out #ss-title {
-  animation: title-dissolve 1s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  animation: title-dissolve 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 @keyframes title-dissolve {
   0%   { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
@@ -908,7 +1043,7 @@ html, body {
 }
 /* Whole screen dissolves — camera revealed underneath */
 #start-screen.fade-out {
-  animation: screen-dissolve 1.1s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  animation: screen-dissolve 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 @keyframes screen-dissolve {
   0%   { opacity: 1; }
@@ -1527,6 +1662,8 @@ body::after {
     transparent 55%,
     rgba(0, 0, 0, 0.25) 100%
   );
+  opacity: var(--vignette-opacity, 0.25);
+  transition: opacity 0.15s ease;
 }
 
 /* ============================================================

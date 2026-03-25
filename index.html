@@ -22,6 +22,7 @@
 <!-- Mood lighting overlays (between bg-canvas and overlay) -->
 <div id="mood-gradient-overlay"></div>
 <div id="mood-edge-glow"></div>
+<div id="mood-edge-glow-inner"></div>
 <div id="mood-breath-bar"></div>
 
 <canvas id="overlay"></canvas>
@@ -290,16 +291,16 @@
 <!-- Start screen letter animation JS (minimal, GPU-composited) -->
 <script>
 (function() {
-  // Activate shimmer gradient after staggered letter entrance completes (~1.6s)
+  // Activate shimmer gradient after staggered letter entrance completes (~1.9s)
   setTimeout(function() {
     var title = document.getElementById('ss-title');
     if (title) title.classList.add('shimmer-active');
-  }, 1600);
-  // Activate button glow ring after button entrance (~3s)
+  }, 1900);
+  // Activate button glow ring after button entrance (~3.2s)
   setTimeout(function() {
     var btn = document.getElementById('start-btn');
     if (btn) btn.classList.add('ready');
-  }, 3000);
+  }, 3200);
 })();
 </script>
 

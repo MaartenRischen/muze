@@ -1,7 +1,8 @@
 /* ============================================================
-   MUZE — Audio-Reactive Visualizer (v2)
-   Upgraded: smooth waveform ring, frequency arc, mode geometry,
-   note constellation, improved particles, beat detection.
+   MUZE — Audio-Reactive Visualizer (v3)
+   Concert-grade: multi-layer waveform ring with beat bloom &
+   shockwaves, premium frequency arc with mirror reflection &
+   peak hold, mode geometry, note constellation, particles.
    Canvas 2D only — optimized for 60fps on mobile.
    ============================================================ */
 
@@ -40,24 +41,45 @@ MUZE.Visualizer = {
   _smoothWaveform: null,
 
   // ---- Face mesh AR effects ----
-  _FACE_OVAL: [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109],
-  _RIGHT_EYE: [33,7,163,144,145,153,154,155,133,173,157,158,159,160,161,246],
-  _LEFT_EYE: [362,382,381,380,374,373,390,249,263,466,388,387,386,385,384,398],
-  _LIPS_OUTER: [61,146,91,181,84,17,314,405,321,375,291,409,270,269,267,0,37,39,40,185],
-  _RIGHT_BROW: [46,53,52,65,55,70,63,105,66,107],
-  _LEFT_BROW: [276,283,282,295,285,300,293,334,296,336],
+  _FACE_OVAL: [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109,10],
+  _LEFT_EYE: [33,246,161,160,159,158,157,173,133,155,154,153,145,144,163,7,33],
+  _RIGHT_EYE: [263,466,388,387,386,385,384,398,362,382,381,380,374,373,390,249,263],
+  _LIPS_OUTER: [61,146,91,181,84,17,314,405,321,375,291,409,270,269,267,0,37,39,40,185,61],
+  _LEFT_BROW: [70,63,105,66,107,55,65,52,53,46],
+  _RIGHT_BROW: [300,293,334,296,336,285,295,282,283,276],
   _NOSE_BRIDGE: [168,6,197,195,5,4,1],
   _GLOW_LANDMARKS: [1, 33, 133, 362, 263, 61, 291, 105, 334, 10],
 
-  // ---- Hand light trail ----
-  _handTrail: [],
-  _handTrailMax: 35,
+  // ---- Face effect: expression particles ----
+  _faceParticles: [],
+  _maxFaceParticles: 80,
+
+  // ---- Face effect: head rotation ghost trails ----
+  _contourSnapshots: [],  // [{points: Float32Array, time: number, opacity: number}]
+  _maxSnapshots: 4,
+  _lastHeadYaw: 0,
+  _lastHeadRoll: 0,
+
+  // ---- Face effect: pre-computed mirrored landmarks per frame ----
+  _mirroredLandmarks: null,
+
+  // ---- Hand light painting trail (offscreen canvas) ----
+  _trailCanvas: null,
+  _trailCtx: null,
+  _prevTrailPos: null,
+  _handGlowRadius: 8,       // current glow radius (lerps open/closed)
+  _handGlowTarget: 8,       // target glow radius
+  _handBloomRadius: 30,     // current bloom radius
+  _handBloomTarget: 30,     // target bloom radius
 
   // ---- Note burst particles ----
   _burstParticles: [],
   _maxBurstParticles: 100,
   _lastBurstNote: null,
   _burstRings: [],
+
+  // ---- Connection web (hand-to-face) ----
+  _connectionPulse: 0,
 
   // ---- Explosion particles (riser drop) ----
   _explosionParticles: [],
@@ -67,9 +89,32 @@ MUZE.Visualizer = {
   _beatFlashTimeout: null,
   _lastBassWarpTime: 0,
 
+  // ---- Ring rotation (frame counter based) ----
+  _ringRotationFrame: 0,
+
+  // ---- Beat bloom animation ----
+  _beatBloomRadius: 0,     // current bloom expansion (0 = none)
+  _beatBloomTarget: 0,     // target bloom (set on beat, decays)
+  _beatBloomVelocity: 0,   // for elastic snap
+  _shockwaves: [],         // [{radius, alpha, speed}]
+
+  // ---- Frequency arc peak hold ----
+  _peakHoldBins: null,     // peak values per bin
+  _peakHoldDecay: null,    // decay velocity per bin
+  _bassWarping: false,
+
+  // ---- Mode color grading ----
+  _cachedGradeMode: '',
+
+  // ---- Explosion screen glow ----
+  _explosionGlow: null,  // { x, y, life, startTime }
+
   init() {
     this._canvas = document.getElementById('overlay');
     this._ctx = this._canvas.getContext('2d');
+    // Create offscreen trail canvas for light painting persistence
+    this._trailCanvas = document.createElement('canvas');
+    this._trailCtx = this._trailCanvas.getContext('2d');
     this._resize();
     window.addEventListener('resize', () => this._resize());
   },
@@ -86,8 +131,13 @@ MUZE.Visualizer = {
     // Reset smooth buffers on resize
     this._smoothFFTBins = null;
     this._smoothWaveform = null;
-    // Reset hand trail on resize
-    this._handTrail = [];
+    // Resize offscreen trail canvas (match DPR)
+    if (this._trailCanvas) {
+      this._trailCanvas.width = this._width * dpr;
+      this._trailCanvas.height = this._height * dpr;
+      this._trailCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this._prevTrailPos = null;
+    }
   },
 
   // ============================================================
@@ -143,9 +193,25 @@ MUZE.Visualizer = {
     if (fft && bass > this._lastBass * 1.5 && bass > 0.15) {
       this._beatPulse = 1.0;
       this._beatCount++;
+      // Trigger beat bloom — elastic snap outward
+      this._beatBloomTarget = 1.0;
+      this._beatBloomVelocity = 0.25;
+      // Emit shockwave ring
+      this._shockwaves.push({ radius: 0, alpha: 0.4, speed: 4 + bass * 6 });
+      if (this._shockwaves.length > 5) this._shockwaves.shift();
     }
     this._lastBass = bass;
     this._beatPulse *= 0.90; // slightly slower decay for more dramatic pulse
+
+    // ---- Animate beat bloom (elastic out, slow settle) ----
+    this._beatBloomRadius += this._beatBloomVelocity;
+    const bloomDiff = this._beatBloomTarget - this._beatBloomRadius;
+    this._beatBloomVelocity += bloomDiff * 0.15;
+    this._beatBloomVelocity *= 0.78;
+    this._beatBloomTarget *= 0.94;
+
+    // ---- Advance ring rotation (frame counter) ----
+    this._ringRotationFrame++;
 
     // ---- Beat flash + bass warp (CSS overlay, zero canvas cost) ----
     if (this._beatPulse >= 0.95) {
@@ -155,7 +221,7 @@ MUZE.Visualizer = {
         clearTimeout(this._beatFlashTimeout);
         this._beatFlashTimeout = setTimeout(() => flashEl.classList.remove('flash'), 50);
       }
-      // Bass warp: scale pulse on strong kicks
+      // Bass warp: scale pulse on strong kicks (bg-canvas)
       if (bass > 0.25) {
         const now = performance.now();
         if (now - this._lastBassWarpTime > 300) {
@@ -170,6 +236,31 @@ MUZE.Visualizer = {
         }
       }
     }
+
+    // ---- Bass warp on #cam (CSS transform, preserves mirror) ----
+    if (bass > 0.25 && !this._bassWarping) {
+      this._bassWarping = true;
+      document.getElementById('cam').classList.add('bass-warp');
+      setTimeout(() => { document.getElementById('cam').classList.remove('bass-warp'); this._bassWarping = false; }, 150);
+    }
+
+    // ---- Mode color grading (CSS filter on #cam, only on mode change) ----
+    if (currentMode !== this._cachedGradeMode) {
+      this._cachedGradeMode = currentMode;
+      const grades = {
+        phrygian:    'hue-rotate(-15deg) saturate(1.1)',
+        aeolian:     'hue-rotate(-8deg) saturate(1.05)',
+        dorian:      'none',
+        mixolydian:  'hue-rotate(5deg) saturate(1.05)',
+        ionian:      'hue-rotate(12deg) saturate(1.1) brightness(1.02)',
+        lydian:      'hue-rotate(18deg) saturate(1.15) brightness(1.04)'
+      };
+      document.getElementById('cam').style.filter = grades[currentMode] || 'none';
+    }
+
+    // ---- Edge vignette energy pulse ----
+    const vignetteOpacity = 0.15 + energy * 0.3;
+    document.body.style.setProperty('--vignette-opacity', vignetteOpacity);
 
     // ---- Advance geometry phase ----
     this._geoPhase += 0.003;
@@ -187,7 +278,9 @@ MUZE.Visualizer = {
     const cy = h * 0.38;
     const baseRadius = Math.min(w, h) * 0.18;
     const beatExpand = this._beatPulse * 30;
-    const radius = baseRadius + energy * 80 + beatExpand;
+    // Beat bloom adds 15-20% elastic expansion
+    const bloomExpand = this._beatBloomRadius * baseRadius * 0.18;
+    const radius = baseRadius + energy * 80 + beatExpand + bloomExpand;
 
     this._drawWaveformRing(ctx, waveform, cx, cy, radius, energy, accentRgb);
 
@@ -199,19 +292,43 @@ MUZE.Visualizer = {
     // 5. Frequency arc (elegant bottom arc)
     this._drawFrequencyArc(ctx, fft, w, h, accentRgb, energy);
 
-    // 6. Hand light trail
-    this._updateHandTrail();
-    this._drawHandTrail(ctx);
+    // 6. Hand light painting trail (offscreen canvas composite)
+    this._updateLightPainting();
+    this._drawLightPainting(ctx);
+
+    // 6b. Connection web (hand-to-face threads)
+    this._drawConnectionWeb(ctx, energy);
 
     // 7. Note burst particles
     this._updateBurstParticles();
     this._drawBurstParticles(ctx);
 
-    // 8. Face mesh contour glow + landmark lights
+    // 8. Face mesh AR effects (contour glow, iris, particles, aura, trails)
     const landmarks = MUZE.State._rawLandmarks;
     if (landmarks && MUZE.State.faceDetected) {
-      this._drawContourGlow(ctx, landmarks, w, h, accentRgb, energy, this._beatPulse);
-      this._drawLandmarkLights(ctx, landmarks, w, h, accentRgb, energy, this._beatPulse);
+      // Pre-compute mirrored coordinates once per frame
+      this._computeMirroredLandmarks(landmarks, w, h);
+      const ml = this._mirroredLandmarks;
+
+      // 8a. Head rotation ghost trails (drawn first, behind everything)
+      this._updateContourSnapshots(ml);
+      this._drawContourTrails(ctx, w, h, accentRgb);
+
+      // 8b. Energy aura (soft outer glow, behind contour)
+      this._drawEnergyAura(ctx, ml, w, h, accentRgb, energy, this._beatPulse);
+
+      // 8c. Glowing face contour (the signature Tron look)
+      this._drawContourGlow(ctx, ml, w, h, accentRgb, energy, this._beatPulse);
+
+      // 8d. Iris glow (pulsing with audio)
+      this._drawIrisGlow(ctx, landmarks, ml, w, h, accentRgb, energy, this._beatPulse);
+
+      // 8e. Landmark light points
+      this._drawLandmarkLights(ctx, ml, w, h, accentRgb, energy, this._beatPulse);
+
+      // 8f. Expression particles (mouth + eye sparkles)
+      this._updateFaceParticles(ml, w, h, energy, this._beatPulse, accentRgb);
+      this._drawFaceParticles(ctx, accentRgb);
     }
 
     // 9. Riser drop explosion particles
@@ -219,10 +336,12 @@ MUZE.Visualizer = {
   },
 
   // ============================================================
-  // 1. IMPROVED WAVEFORM RING
-  //    - Quadratic curves for smoothness
-  //    - Subtle radial fill
-  //    - Dramatic beat glow
+  // 1. CONCERT-GRADE WAVEFORM RING
+  //    - Smooth Bezier curves (quadraticCurveTo)
+  //    - 3-pass multi-layer: outer glow, core ring, hot core
+  //    - Radial gradient fill that pulses with energy
+  //    - Beat bloom with elastic snap + shockwave rings
+  //    - Slow rotation via frame counter
   // ============================================================
   _drawWaveformRing(ctx, waveform, cx, cy, radius, energy, accentRgb) {
     const len = waveform.length;
@@ -237,10 +356,13 @@ MUZE.Visualizer = {
       sw[i] = sw[i] * (1 - smoothAlpha) + waveform[i] * smoothAlpha;
     }
 
-    // Pre-compute points on the ring
+    // Ring rotation: 0.5 degrees per frame (~30 deg/sec at 60fps)
+    const rotationRad = (this._ringRotationFrame * 0.5) * (Math.PI / 180);
+
+    // Pre-compute points on the ring (with rotation applied)
     const points = new Array(len);
     for (let i = 0; i < len; i++) {
-      const angle = (i / len) * Math.PI * 2 - Math.PI / 2;
+      const angle = (i / len) * Math.PI * 2 - Math.PI / 2 + rotationRad;
       const amp = sw[i] * 40;
       const r = radius + amp;
       points[i] = {
@@ -249,62 +371,82 @@ MUZE.Visualizer = {
       };
     }
 
-    // ---- Beat glow (dramatic outer bloom) ----
+    // Helper: build smooth Bezier ring path from points array
+    const buildRingPath = () => {
+      ctx.beginPath();
+      const startMidX = (points[len - 1].x + points[0].x) / 2;
+      const startMidY = (points[len - 1].y + points[0].y) / 2;
+      ctx.moveTo(startMidX, startMidY);
+      for (let i = 0; i < len; i++) {
+        const next = points[(i + 1) % len];
+        const midX = (points[i].x + next.x) / 2;
+        const midY = (points[i].y + next.y) / 2;
+        ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+      }
+      ctx.closePath();
+    };
+
+    // ---- Shockwave rings (expanding outward from beat) ----
+    for (let i = this._shockwaves.length - 1; i >= 0; i--) {
+      const sw2 = this._shockwaves[i];
+      sw2.radius += sw2.speed;
+      sw2.alpha *= 0.94;
+      sw2.speed *= 0.98;
+      if (sw2.alpha < 0.005) {
+        this._shockwaves.splice(i, 1);
+        continue;
+      }
+      const shockR = radius + sw2.radius;
+      ctx.beginPath();
+      ctx.arc(cx, cy, shockR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(${accentRgb}, ${sw2.alpha})`;
+      ctx.lineWidth = 2 * sw2.alpha + 0.5;
+      ctx.stroke();
+    }
+
+    // ---- Radial gradient fill INSIDE the ring (pulses with energy) ----
+    const fillBase = 0.02 + energy * 0.06 + this._beatPulse * 0.04;
+    const fillAlpha = Math.min(0.10, fillBase);
+    if (fillAlpha > 0.005) {
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      grad.addColorStop(0, `rgba(${accentRgb}, ${fillAlpha * 0.7})`);
+      grad.addColorStop(0.5, `rgba(${accentRgb}, ${fillAlpha * 0.3})`);
+      grad.addColorStop(0.85, `rgba(${accentRgb}, ${fillAlpha * 0.6})`);
+      grad.addColorStop(1, `rgba(${accentRgb}, 0)`);
+      buildRingPath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    // ---- PASS 1: Outer glow (wide, faint, accent color) ----
+    const glowIntensify = this._beatPulse > 0.3 ? 2.0 : 1.0; // double alpha during bloom
+    buildRingPath();
+    ctx.strokeStyle = `rgba(${accentRgb}, ${0.06 * glowIntensify})`;
+    ctx.lineWidth = 12;
+    ctx.stroke();
+
+    // ---- PASS 2: Core ring (medium, accent color) ----
+    buildRingPath();
+    ctx.strokeStyle = `rgba(${accentRgb}, ${0.35 + energy * 0.4 + this._beatPulse * 0.25})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // ---- PASS 3: Hot core (thin, white, bright center line) ----
+    buildRingPath();
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 + energy * 0.5 + this._beatPulse * 0.3})`;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // ---- Beat glow bloom (dramatic wide glow during beat) ----
     if (this._beatPulse > 0.05) {
       const glowRadius = radius + this._beatPulse * 40;
-      const glowAlpha = this._beatPulse * 0.25;
+      const glowAlpha = this._beatPulse * 0.2;
       ctx.beginPath();
       ctx.arc(cx, cy, glowRadius, 0, Math.PI * 2);
       ctx.strokeStyle = `rgba(${accentRgb}, ${glowAlpha})`;
       ctx.lineWidth = 20 + this._beatPulse * 30;
       ctx.stroke();
     }
-
-    // ---- Outer soft glow ring ----
-    if (energy > 0.012) {
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(${accentRgb}, ${energy * 0.06})`;
-      ctx.lineWidth = 14;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(${accentRgb}, ${energy * 0.10})`;
-      ctx.lineWidth = 4;
-      ctx.stroke();
-    }
-
-    // ---- Build smooth waveform path using quadratic curves ----
-    ctx.beginPath();
-    // Start at the midpoint between last point and first point
-    const startMidX = (points[len - 1].x + points[0].x) / 2;
-    const startMidY = (points[len - 1].y + points[0].y) / 2;
-    ctx.moveTo(startMidX, startMidY);
-
-    for (let i = 0; i < len; i++) {
-      const next = points[(i + 1) % len];
-      const midX = (points[i].x + next.x) / 2;
-      const midY = (points[i].y + next.y) / 2;
-      ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
-    }
-    ctx.closePath();
-
-    // ---- Subtle radial fill ----
-    const fillAlpha = Math.min(0.08, energy * 0.15 + this._beatPulse * 0.06);
-    if (fillAlpha > 0.005) {
-      const grad = ctx.createRadialGradient(cx, cy, radius * 0.3, cx, cy, radius + 30);
-      grad.addColorStop(0, `rgba(${accentRgb}, 0)`);
-      grad.addColorStop(0.7, `rgba(${accentRgb}, ${fillAlpha * 0.5})`);
-      grad.addColorStop(1, `rgba(${accentRgb}, ${fillAlpha})`);
-      ctx.fillStyle = grad;
-      ctx.fill();
-    }
-
-    // ---- Stroke the smooth waveform ----
-    ctx.strokeStyle = `rgba(${accentRgb}, ${0.20 + energy * 0.5 + this._beatPulse * 0.3})`;
-    ctx.lineWidth = 1.2 + this._beatPulse * 1.5;
-    ctx.stroke();
 
     // ---- Inner thin reference circle ----
     ctx.beginPath();
@@ -315,75 +457,160 @@ MUZE.Visualizer = {
   },
 
   // ============================================================
-  // 2. FREQUENCY ARC
-  //    Elegant curved arc above the chord bar showing real-time
-  //    FFT data as colored segments along an arc.
+  // 2. PREMIUM FREQUENCY ARC
+  //    - Rounded rectangle bars along a gentle curved arc
+  //    - Gradient from accent (bass) to brighter (treble)
+  //    - Temporal smoothing for silky motion
+  //    - Mirror reflection below (alpha 0.3, flipped)
+  //    - Peak hold dots with gravity decay
   // ============================================================
   _drawFrequencyArc(ctx, fft, w, h, accentRgb, energy) {
     if (!fft || energy < 0.008) return;
 
-    const arcBins = 48; // number of segments in the arc
+    const arcBins = 64; // more bins for finer resolution
     const step = Math.max(1, Math.floor(fft.length / arcBins));
 
-    // Initialize smoothed bins
+    // Initialize smoothed bins + peak hold
     if (!this._smoothFFTBins || this._smoothFFTBins.length !== arcBins) {
       this._smoothFFTBins = new Float32Array(arcBins);
+      this._peakHoldBins = new Float32Array(arcBins);
+      this._peakHoldDecay = new Float32Array(arcBins);
     }
 
-    // Smooth FFT data for the arc
+    // Smooth FFT data (temporal lerp to prevent jitter)
     for (let i = 0; i < arcBins; i++) {
       const db = fft[Math.min(i * step, fft.length - 1)];
       const linear = Math.max(0, (db + 100) / 100); // 0..1
-      this._smoothFFTBins[i] = this._smoothFFTBins[i] * 0.7 + linear * 0.3;
+      this._smoothFFTBins[i] = this._smoothFFTBins[i] * 0.72 + linear * 0.28;
+
+      // Peak hold: jump up instantly, fall with gravity
+      if (this._smoothFFTBins[i] > this._peakHoldBins[i]) {
+        this._peakHoldBins[i] = this._smoothFFTBins[i];
+        this._peakHoldDecay[i] = 0; // reset velocity
+      } else {
+        this._peakHoldDecay[i] += 0.0008; // gravity acceleration
+        this._peakHoldBins[i] -= this._peakHoldDecay[i];
+        if (this._peakHoldBins[i] < 0) this._peakHoldBins[i] = 0;
+      }
     }
 
-    // Arc geometry — sits above the chord bar area
+    // Arc geometry — gentle curve above the chord bar
     const arcCx = w / 2;
-    const arcCy = h + 20; // center below screen bottom for a gentle upward curve
-    const arcRadius = Math.min(w * 0.55, h * 0.5);
-    const arcSpan = Math.PI * 0.55; // total arc span (roughly 100 degrees)
-    const startAngle = Math.PI + (Math.PI - arcSpan) / 2; // centered on the top of the below-screen circle
-    const segAngle = arcSpan / arcBins;
+    const arcCy = h + h * 0.35; // center well below screen for gentle upward curve
+    const arcRadius = Math.min(w * 0.6, h * 0.55);
+    const arcSpan = Math.PI * 0.50; // ~90 degrees of arc
+    const startAngle = Math.PI + (Math.PI - arcSpan) / 2;
 
-    // Parse accent color components for hue shifting
+    // Bar sizing
+    const barWidth = 5;  // 5px wide bars
+    const barGap = 2;    // 2px gap
+    const totalBarSpace = barWidth + barGap;
+
+    // Parse accent color for gradient
     const rgb = accentRgb.split(',').map(Number);
 
-    for (let i = 0; i < arcBins; i++) {
-      const val = this._smoothFFTBins[i];
-      if (val < 0.05) continue; // skip silent bins
+    ctx.save();
+    ctx.lineCap = 'round';
 
-      const angle = startAngle + i * segAngle;
-      const barHeight = val * 35 + 2;
+    // Compute bar positions along the arc
+    const segAngle = arcSpan / arcBins;
+    const maxBarH = 55; // maximum bar height in pixels
 
-      // Color: shift hue slightly across frequency range
-      // Low freq = accent color, high freq = shifted brighter/cooler
-      const freqRatio = i / arcBins;
-      const r = Math.round(rgb[0] * (1 - freqRatio * 0.3) + 255 * freqRatio * 0.3);
-      const g = Math.round(rgb[1] * (1 - freqRatio * 0.2) + 255 * freqRatio * 0.2);
-      const b = Math.round(rgb[2] * (1 - freqRatio * 0.1) + 200 * freqRatio * 0.1);
+    for (let pass = 0; pass < 2; pass++) {
+      // pass 0 = mirror reflection (drawn first, behind)
+      // pass 1 = main bars
+      const isMirror = pass === 0;
+      const passAlpha = isMirror ? 0.15 : 1.0;
 
-      const alpha = 0.06 + val * 0.12;
+      for (let i = 0; i < arcBins; i++) {
+        const val = this._smoothFFTBins[i];
+        if (val < 0.03 && !isMirror) continue;
 
-      // Draw each segment as a small wedge along the arc
-      const innerR = arcRadius - barHeight;
-      const outerR = arcRadius;
-      const aStart = angle - segAngle * 0.4;
-      const aEnd = angle + segAngle * 0.4;
+        const angle = startAngle + (i + 0.5) * segAngle;
+        const barH = val * maxBarH + 1;
 
-      ctx.beginPath();
-      ctx.arc(arcCx, arcCy, outerR, aStart, aEnd);
-      ctx.arc(arcCx, arcCy, innerR, aEnd, aStart, true);
-      ctx.closePath();
-      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-      ctx.fill();
+        // Position on the arc: the base of the bar sits on the arc
+        const baseX = arcCx + Math.cos(angle) * arcRadius;
+        const baseY = arcCy + Math.sin(angle) * arcRadius;
+
+        // Direction vector pointing inward (toward center) for bar growth
+        const dx = Math.cos(angle);
+        const dy = Math.sin(angle);
+
+        // Color gradient: bass = accent, treble = brighter/whiter
+        const freqRatio = i / arcBins;
+        const r = Math.round(rgb[0] + (255 - rgb[0]) * freqRatio * 0.5);
+        const g = Math.round(rgb[1] + (255 - rgb[1]) * freqRatio * 0.4);
+        const b = Math.round(rgb[2] + (255 - rgb[2]) * freqRatio * 0.3);
+
+        const alpha = (0.15 + val * 0.55) * passAlpha;
+
+        ctx.save();
+        ctx.translate(baseX, baseY);
+        // Rotate so the bar grows radially inward (toward center)
+        ctx.rotate(angle + Math.PI / 2);
+
+        if (isMirror) {
+          // Mirror: flip vertically, draw below the arc baseline
+          ctx.scale(1, -1);
+          ctx.translate(0, -1); // slight offset down
+        }
+
+        // Draw rounded rectangle bar
+        const bw = barWidth;
+        const bh = barH;
+        const borderR = Math.min(2, bw / 2, bh / 2); // rounded top
+        ctx.beginPath();
+        ctx.moveTo(-bw / 2, 0);
+        ctx.lineTo(-bw / 2, -bh + borderR);
+        ctx.quadraticCurveTo(-bw / 2, -bh, -bw / 2 + borderR, -bh);
+        ctx.lineTo(bw / 2 - borderR, -bh);
+        ctx.quadraticCurveTo(bw / 2, -bh, bw / 2, -bh + borderR);
+        ctx.lineTo(bw / 2, 0);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        ctx.fill();
+
+        // On main pass, add subtle glow on energetic bars
+        if (!isMirror && val > 0.4) {
+          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${(val - 0.4) * 0.15})`;
+          const glowBw = bw + 4;
+          ctx.beginPath();
+          ctx.moveTo(-glowBw / 2, 2);
+          ctx.lineTo(-glowBw / 2, -bh - 2);
+          ctx.lineTo(glowBw / 2, -bh - 2);
+          ctx.lineTo(glowBw / 2, 2);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        ctx.restore();
+
+        // Peak hold dot (main pass only)
+        if (!isMirror) {
+          const peakVal = this._peakHoldBins[i];
+          if (peakVal > 0.05) {
+            const peakH = peakVal * maxBarH + 3;
+            // Position the dot at the peak height along the radial direction
+            const dotX = baseX - dx * peakH;
+            const dotY = baseY - dy * peakH;
+            ctx.beginPath();
+            ctx.arc(dotX, dotY, 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + peakVal * 0.3})`;
+            ctx.fill();
+          }
+        }
+      }
     }
 
-    // Thin arc outline for elegance
+    // Thin arc baseline for elegance
     ctx.beginPath();
     ctx.arc(arcCx, arcCy, arcRadius, startAngle, startAngle + arcSpan);
-    ctx.strokeStyle = `rgba(${accentRgb}, 0.04)`;
+    ctx.strokeStyle = `rgba(${accentRgb}, 0.06)`;
     ctx.lineWidth = 0.5;
     ctx.stroke();
+
+    ctx.restore();
   },
 
   // ============================================================
@@ -737,40 +964,340 @@ MUZE.Visualizer = {
   },
 
   // ============================================================
-  // FACE CONTOUR GLOW — Multi-pass neon outline
+  // PRE-COMPUTE MIRRORED LANDMARKS (once per frame)
   // ============================================================
-  _drawContourGlow(ctx, landmarks, w, h, accentRgb, energy, beatPulse) {
-    const contours = [this._FACE_OVAL, this._RIGHT_EYE, this._LEFT_EYE, this._LIPS_OUTER, this._RIGHT_BROW, this._LEFT_BROW, this._NOSE_BRIDGE];
-    const closed =   [true,            true,            true,           true,             false,            false,           false];
+  _computeMirroredLandmarks(landmarks, w, h) {
+    const count = landmarks.length;
+    if (!this._mirroredLandmarks || this._mirroredLandmarks.length !== count) {
+      this._mirroredLandmarks = new Array(count);
+      for (let i = 0; i < count; i++) this._mirroredLandmarks[i] = { x: 0, y: 0 };
+    }
+    const ml = this._mirroredLandmarks;
+    for (let i = 0; i < count; i++) {
+      const lm = landmarks[i];
+      ml[i].x = (1 - lm.x) * w;
+      ml[i].y = lm.y * h;
+    }
+  },
+
+  // ============================================================
+  // GLOWING FACE CONTOUR — Multi-pass neon outline (Tron/cyberpunk)
+  // ============================================================
+  _drawContourGlow(ctx, ml, w, h, accentRgb, energy, beatPulse) {
+    const contours = [
+      this._FACE_OVAL, this._LEFT_EYE, this._RIGHT_EYE,
+      this._LIPS_OUTER, this._LEFT_BROW, this._RIGHT_BROW, this._NOSE_BRIDGE
+    ];
 
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
+    // 3-pass neon glow: wide dim -> medium -> thin bright core
     const passes = [
-      { width: 8,  alpha: 0.03 + beatPulse * 0.06 },
-      { width: 3,  alpha: 0.08 + energy * 0.1 + beatPulse * 0.12 },
-      { width: 1,  alpha: 0.2 + energy * 0.25 + beatPulse * 0.3 },
+      { width: 8,   alpha: 0.08 },
+      { width: 4,   alpha: 0.15 },
+      { width: 1.5, alpha: 0.4 },
     ];
 
     for (const pass of passes) {
       ctx.lineWidth = pass.width;
       ctx.strokeStyle = `rgba(${accentRgb}, ${Math.min(1, pass.alpha)})`;
 
+      // Batch all contours into a single beginPath/stroke per pass
+      ctx.beginPath();
       for (let c = 0; c < contours.length; c++) {
         const indices = contours[c];
-        ctx.beginPath();
         for (let i = 0; i < indices.length; i++) {
-          const lm = landmarks[indices[i]];
-          if (!lm) continue;
-          const x = (1 - lm.x) * w;
-          const y = lm.y * h;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+          const pt = ml[indices[i]];
+          if (!pt) continue;
+          if (i === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
         }
-        if (closed[c]) ctx.closePath();
-        ctx.stroke();
       }
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  },
+
+  // ============================================================
+  // IRIS GLOW — Pulsing radial glow at iris centers
+  // ============================================================
+  _drawIrisGlow(ctx, rawLandmarks, ml, w, h, accentRgb, energy, beatPulse) {
+    let irisPoints;
+    if (rawLandmarks.length > 473) {
+      irisPoints = [
+        { x: (1 - rawLandmarks[468].x) * w, y: rawLandmarks[468].y * h },
+        { x: (1 - rawLandmarks[473].x) * w, y: rawLandmarks[473].y * h }
+      ];
+    } else {
+      const approxCenter = (indices) => {
+        let sx = 0, sy = 0;
+        for (const idx of indices) { sx += ml[idx].x; sy += ml[idx].y; }
+        return { x: sx / indices.length, y: sy / indices.length };
+      };
+      irisPoints = [
+        approxCenter([33, 133, 159, 145]),
+        approxCenter([263, 362, 386, 374])
+      ];
+    }
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    const pulseScale = 1.0 + energy * 0.8 + beatPulse * 1.2;
+    const baseRadius = 6 * pulseScale;
+    const baseAlpha = 0.2 + energy * 0.4 + beatPulse * 0.3;
+
+    for (const iris of irisPoints) {
+      const r = baseRadius;
+
+      // Outer soft glow
+      const outerGrad = ctx.createRadialGradient(iris.x, iris.y, 0, iris.x, iris.y, r * 3);
+      outerGrad.addColorStop(0, `rgba(${accentRgb}, ${Math.min(1, baseAlpha * 0.6)})`);
+      outerGrad.addColorStop(0.3, `rgba(${accentRgb}, ${baseAlpha * 0.25})`);
+      outerGrad.addColorStop(1, `rgba(${accentRgb}, 0)`);
+      ctx.fillStyle = outerGrad;
+      ctx.beginPath();
+      ctx.arc(iris.x, iris.y, r * 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Inner bright core (white center fading to accent)
+      const coreGrad = ctx.createRadialGradient(iris.x, iris.y, 0, iris.x, iris.y, r);
+      coreGrad.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, baseAlpha * 0.7)})`);
+      coreGrad.addColorStop(0.4, `rgba(${accentRgb}, ${Math.min(1, baseAlpha * 0.5)})`);
+      coreGrad.addColorStop(1, `rgba(${accentRgb}, 0)`);
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(iris.x, iris.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  },
+
+  // ============================================================
+  // EXPRESSION PARTICLES — Mouth emission + eye sparkle
+  // ============================================================
+  _updateFaceParticles(ml, w, h, energy, beatPulse, accentRgb) {
+    const S = MUZE.State;
+
+    // Mouth particles: emit when mouth is open (singing)
+    const mouthOpen = S.mouthOpenness || 0;
+    if (mouthOpen > 0.15) {
+      const mouthCx = (ml[0].x + ml[17].x) * 0.5;
+      const mouthCy = (ml[0].y + ml[17].y) * 0.5;
+      const spawnCount = Math.min(4, Math.floor(mouthOpen * 6 + beatPulse * 3));
+
+      for (let s = 0; s < spawnCount; s++) {
+        if (this._faceParticles.length >= this._maxFaceParticles) break;
+        this._faceParticles.push({
+          x: mouthCx + (Math.random() - 0.5) * 12,
+          y: mouthCy,
+          vx: (Math.random() - 0.5) * 2.5,
+          vy: -Math.random() * 2.5 - 0.8,
+          life: 1.0,
+          decay: 0.015 + Math.random() * 0.015,
+          size: 1.0 + Math.random() * 2.0,
+          type: 'mouth'
+        });
+      }
+    }
+
+    // Eye sparkle particles: wide eyes = reverb = sparkle
+    const eyeOpen = S.eyeOpenness || 0;
+    if (eyeOpen > 0.7) {
+      const sparkleIntensity = (eyeOpen - 0.7) / 0.3;
+      const spawnCount = Math.min(2, Math.floor(sparkleIntensity * 3));
+
+      const eyeCenters = [
+        { x: (ml[33].x + ml[133].x) * 0.5, y: (ml[33].y + ml[133].y) * 0.5 },
+        { x: (ml[263].x + ml[362].x) * 0.5, y: (ml[263].y + ml[362].y) * 0.5 }
+      ];
+
+      for (const eye of eyeCenters) {
+        for (let s = 0; s < spawnCount; s++) {
+          if (this._faceParticles.length >= this._maxFaceParticles) break;
+          const angle = Math.random() * Math.PI * 2;
+          this._faceParticles.push({
+            x: eye.x + (Math.random() - 0.5) * 6,
+            y: eye.y + (Math.random() - 0.5) * 6,
+            vx: Math.cos(angle) * (0.5 + Math.random() * 1.5),
+            vy: Math.sin(angle) * (0.5 + Math.random() * 1.5) - 0.3,
+            life: 1.0,
+            decay: 0.02 + Math.random() * 0.015,
+            size: 0.6 + Math.random() * 1.2,
+            type: 'eye'
+          });
+        }
+      }
+    }
+
+    // Update all face particles
+    for (let i = this._faceParticles.length - 1; i >= 0; i--) {
+      const p = this._faceParticles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.type === 'mouth') p.vy -= 0.03;
+      p.vx *= 0.98;
+      p.vy *= 0.98;
+      p.life -= p.decay;
+      if (p.life <= 0) {
+        this._faceParticles[i] = this._faceParticles[this._faceParticles.length - 1];
+        this._faceParticles.pop();
+      }
+    }
+  },
+
+  _drawFaceParticles(ctx, accentRgb) {
+    if (this._faceParticles.length === 0) return;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    for (const p of this._faceParticles) {
+      const alpha = p.life * p.life * 0.6;
+      if (alpha < 0.01) continue;
+
+      if (p.type === 'eye') {
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.7})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = `rgba(${accentRgb}, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  },
+
+  // ============================================================
+  // ENERGY AURA — Soft breathing glow around face contour
+  // ============================================================
+  _drawEnergyAura(ctx, ml, w, h, accentRgb, energy, beatPulse) {
+    if (energy < 0.02 && beatPulse < 0.1) return;
+
+    const ovalIndices = this._FACE_OVAL;
+    if (!ovalIndices || ovalIndices.length === 0) return;
+
+    let fcx = 0, fcy = 0;
+    for (let i = 0; i < ovalIndices.length; i++) {
+      const pt = ml[ovalIndices[i]];
+      fcx += pt.x; fcy += pt.y;
+    }
+    fcx /= ovalIndices.length;
+    fcy /= ovalIndices.length;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const expand = 15 + beatPulse * 10;
+    const auraAlpha = 0.03 + energy * 0.06 + beatPulse * 0.05;
+
+    const auraPasses = [
+      { width: 30, alpha: auraAlpha * 0.4 },
+      { width: 15, alpha: auraAlpha * 0.7 },
+    ];
+
+    for (const pass of auraPasses) {
+      ctx.lineWidth = pass.width;
+      ctx.strokeStyle = `rgba(${accentRgb}, ${Math.min(0.15, pass.alpha)})`;
+
+      ctx.beginPath();
+      for (let i = 0; i < ovalIndices.length; i++) {
+        const pt = ml[ovalIndices[i]];
+        const dx = pt.x - fcx;
+        const dy = pt.y - fcy;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const ex = pt.x + (dx / dist) * expand;
+        const ey = pt.y + (dy / dist) * expand;
+        if (i === 0) ctx.moveTo(ex, ey);
+        else ctx.lineTo(ex, ey);
+      }
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  },
+
+  // ============================================================
+  // HEAD ROTATION TRAILS — Ghost traces at previous positions
+  // ============================================================
+  _updateContourSnapshots(ml) {
+    const S = MUZE.State;
+    const yaw = S.headYaw || 0;
+    const roll = S.headRoll || 0;
+
+    const yawDelta = Math.abs(yaw - this._lastHeadYaw);
+    const rollDelta = Math.abs(roll - this._lastHeadRoll);
+    const moving = yawDelta > 0.012 || rollDelta > 0.012;
+
+    this._lastHeadYaw = yaw;
+    this._lastHeadRoll = roll;
+
+    if (moving) {
+      const ovalIndices = this._FACE_OVAL;
+      const snapshot = new Float32Array(ovalIndices.length * 2);
+      for (let i = 0; i < ovalIndices.length; i++) {
+        const pt = ml[ovalIndices[i]];
+        snapshot[i * 2] = pt.x;
+        snapshot[i * 2 + 1] = pt.y;
+      }
+      this._contourSnapshots.push({ points: snapshot, opacity: 0.3 });
+
+      while (this._contourSnapshots.length > this._maxSnapshots) {
+        this._contourSnapshots.shift();
+      }
+    }
+
+    for (let i = this._contourSnapshots.length - 1; i >= 0; i--) {
+      this._contourSnapshots[i].opacity *= 0.88;
+      if (this._contourSnapshots[i].opacity < 0.01) {
+        this._contourSnapshots.splice(i, 1);
+      }
+    }
+  },
+
+  _drawContourTrails(ctx, w, h, accentRgb) {
+    if (this._contourSnapshots.length === 0) return;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const ovalLen = this._FACE_OVAL.length;
+
+    for (const snap of this._contourSnapshots) {
+      const a = snap.opacity;
+      if (a < 0.005) continue;
+
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = `rgba(${accentRgb}, ${a * 0.5})`;
+      ctx.beginPath();
+      for (let i = 0; i < ovalLen; i++) {
+        const px = snap.points[i * 2];
+        const py = snap.points[i * 2 + 1];
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = `rgba(${accentRgb}, ${a * 0.15})`;
+      ctx.beginPath();
+      for (let i = 0; i < ovalLen; i++) {
+        const px = snap.points[i * 2];
+        const py = snap.points[i * 2 + 1];
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
     }
 
     ctx.restore();
@@ -779,206 +1306,266 @@ MUZE.Visualizer = {
   // ============================================================
   // LANDMARK LIGHT POINTS — Glowing dots at key facial landmarks
   // ============================================================
-  _drawLandmarkLights(ctx, landmarks, w, h, accentRgb, energy, beatPulse) {
+  _drawLandmarkLights(ctx, ml, w, h, accentRgb, energy, beatPulse) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
     for (const idx of this._GLOW_LANDMARKS) {
-      const lm = landmarks[idx];
-      if (!lm) continue;
-      const x = (1 - lm.x) * w;
-      const y = lm.y * h;
+      const pt = ml[idx];
+      if (!pt) continue;
 
       const baseRadius = 3;
       const radius = baseRadius + energy * 8 + beatPulse * 12;
       const alpha = 0.15 + energy * 0.3 + beatPulse * 0.4;
 
-      const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, radius);
       grad.addColorStop(0, `rgba(${accentRgb}, ${Math.min(1, alpha)})`);
       grad.addColorStop(0.4, `rgba(${accentRgb}, ${alpha * 0.4})`);
       grad.addColorStop(1, `rgba(${accentRgb}, 0)`);
 
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
       ctx.fill();
-    }
-  },
-
-  // ============================================================
-  // HAND LIGHT TRAIL — Fading ribbon following hand position
-  // ============================================================
-  _updateHandTrail() {
-    const S = MUZE.State;
-    if (!S.handPresent) {
-      // Fade existing trail
-      for (const p of this._handTrail) {
-        p.alpha *= 0.90;
-      }
-      while (this._handTrail.length > 0 && this._handTrail[0].alpha < 0.01) {
-        this._handTrail.shift();
-      }
-      return;
-    }
-
-    const w = this._width;
-    const h = this._height;
-    const px = S.handX * w;
-    const py = S.handY * h;
-
-    // Pitch-to-color: low=cool blue, high=warm orange
-    const note = S.melodyNote || 60;
-    const pitchNorm = Math.max(0, Math.min(1, (note - 48) / 36));
-    const r = Math.round(40 + pitchNorm * 215);
-    const g = Math.round(100 + pitchNorm * 60);
-    const b = Math.round(250 - pitchNorm * 200);
-
-    const baseWidth = S.handOpen ? 14 : 4;
-
-    this._handTrail.push({
-      x: px, y: py,
-      width: baseWidth,
-      r, g, b,
-      alpha: 0.7
-    });
-
-    if (this._handTrail.length > this._handTrailMax) {
-      this._handTrail.shift();
-    }
-
-    // Age points
-    for (let i = 0; i < this._handTrail.length - 1; i++) {
-      const age = 1 - (i / this._handTrail.length);
-      this._handTrail[i].alpha = 0.7 * (1 - age * age);
-    }
-  },
-
-  _drawHandTrail(ctx) {
-    const trail = this._handTrail;
-    if (trail.length < 3) return;
-
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    for (let i = 1; i < trail.length; i++) {
-      const prev = trail[i - 1];
-      const curr = trail[i];
-      const taper = i / trail.length;
-      const alpha = curr.alpha * taper * taper;
-
-      if (alpha < 0.005) continue;
-
-      const lineWidth = curr.width * taper;
-      if (lineWidth < 0.3) continue;
-
-      ctx.beginPath();
-      ctx.strokeStyle = `rgba(${curr.r},${curr.g},${curr.b},${alpha})`;
-      ctx.lineWidth = lineWidth;
-
-      if (i >= 2) {
-        const pprev = trail[i - 2];
-        const mx1 = (pprev.x + prev.x) / 2;
-        const my1 = (pprev.y + prev.y) / 2;
-        const mx2 = (prev.x + curr.x) / 2;
-        const my2 = (prev.y + curr.y) / 2;
-        ctx.moveTo(mx1, my1);
-        ctx.quadraticCurveTo(prev.x, prev.y, mx2, my2);
-      } else {
-        ctx.moveTo(prev.x, prev.y);
-        ctx.lineTo(curr.x, curr.y);
-      }
-      ctx.stroke();
-    }
-
-    // Glow dot at head
-    if (trail.length > 0 && MUZE.State.handPresent) {
-      const head = trail[trail.length - 1];
-      ctx.beginPath();
-      ctx.shadowColor = `rgb(${head.r},${head.g},${head.b})`;
-      ctx.shadowBlur = 15;
-      ctx.fillStyle = `rgba(${head.r},${head.g},${head.b},0.6)`;
-      ctx.arc(head.x, head.y, 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
     }
 
     ctx.restore();
   },
 
   // ============================================================
-  // NOTE BURST PARTICLES — Expand from hand on note change
+  // HAND LIGHT PAINTING — Offscreen canvas with persistence fade
+  // Long-exposure photography effect. 3-layer glow. Pitch color.
+  // ============================================================
+
+  _noteToTrailColor(note) {
+    if (note == null) note = 60;
+    const n = Math.max(36, Math.min(72, note));
+    let h, s, l;
+    if (n <= 48) {
+      const t = (n - 36) / 12;
+      h = 220 + (170 - 220) * t; s = 80; l = 60;
+    } else if (n <= 60) {
+      const t = (n - 48) / 12;
+      h = 170 + (35 - 170) * t;
+      s = 80 + (90 - 80) * t; l = 60 + (65 - 60) * t;
+    } else {
+      const t = Math.min(1, (n - 60) / 12);
+      h = 35 - t * 10; s = 90; l = 65 + t * 5;
+    }
+    return `hsl(${Math.round(h)}, ${Math.round(s)}%, ${Math.round(l)}%)`;
+  },
+
+  _noteToRgb(note) {
+    if (note == null) note = 60;
+    const nrm = Math.max(0, Math.min(1, (note - 36) / 36));
+    let r, g, b;
+    if (nrm < 0.33) {
+      const t = nrm / 0.33;
+      r = Math.round(60 + t * 40); g = Math.round(100 + t * 80); b = Math.round(200 + t * 55);
+    } else if (nrm < 0.66) {
+      const t = (nrm - 0.33) / 0.33;
+      r = Math.round(100 + t * 130); g = Math.round(180 + t * 20); b = Math.round(255 - t * 180);
+    } else {
+      const t = (nrm - 0.66) / 0.34;
+      r = Math.round(230 + t * 25); g = Math.round(200 - t * 60); b = Math.round(75 - t * 40);
+    }
+    return { r, g, b };
+  },
+
+  _updateLightPainting() {
+    if (!this._trailCanvas) return;
+    const tctx = this._trailCtx;
+    const w = this._width, h = this._height;
+    const S = MUZE.State;
+
+    // Fade previous content (alpha 0.015 => ~3s fade at 60fps)
+    tctx.globalCompositeOperation = 'source-over';
+    tctx.fillStyle = 'rgba(0, 0, 0, 0.015)';
+    tctx.fillRect(0, 0, w, h);
+
+    // Finger spread: lerp glow sizes (~100ms)
+    if (S.handPresent) {
+      this._handGlowTarget = S.handOpen ? 20 : 8;
+      this._handBloomTarget = S.handOpen ? 45 : 18;
+    }
+    this._handGlowRadius += (this._handGlowTarget - this._handGlowRadius) * 0.3;
+    this._handBloomRadius += (this._handBloomTarget - this._handBloomRadius) * 0.3;
+
+    if (S.handPresent) {
+      const px = S.handX * w, py = S.handY * h;
+      const color = this._noteToTrailColor(S.melodyNote);
+      const glow = this._handGlowRadius;
+      const bloom = this._handBloomRadius;
+      const core = S.handOpen ? 4 : 2;
+
+      if (this._prevTrailPos) {
+        const dx = px - this._prevTrailPos.x;
+        const dy = py - this._prevTrailPos.y;
+        if (dx * dx + dy * dy > 0.25) {
+          tctx.lineCap = 'round';
+          tctx.globalCompositeOperation = 'lighter';
+
+          // Outer bloom
+          tctx.beginPath(); tctx.strokeStyle = color;
+          tctx.globalAlpha = 0.08; tctx.lineWidth = bloom;
+          tctx.moveTo(this._prevTrailPos.x, this._prevTrailPos.y);
+          tctx.lineTo(px, py); tctx.stroke();
+
+          // Inner glow
+          tctx.beginPath(); tctx.strokeStyle = color;
+          tctx.globalAlpha = 0.35; tctx.lineWidth = glow;
+          tctx.moveTo(this._prevTrailPos.x, this._prevTrailPos.y);
+          tctx.lineTo(px, py); tctx.stroke();
+
+          // Core white
+          tctx.beginPath(); tctx.strokeStyle = '#ffffff';
+          tctx.globalAlpha = 0.9; tctx.lineWidth = core;
+          tctx.moveTo(this._prevTrailPos.x, this._prevTrailPos.y);
+          tctx.lineTo(px, py); tctx.stroke();
+          tctx.globalAlpha = 1.0;
+        }
+      }
+
+      // 3-layer radial glow dot at hand position
+      tctx.globalCompositeOperation = 'lighter';
+      tctx.beginPath(); tctx.globalAlpha = 0.15;
+      tctx.fillStyle = color;
+      tctx.arc(px, py, bloom * 0.7, 0, Math.PI * 2); tctx.fill();
+
+      tctx.beginPath(); tctx.globalAlpha = 0.6;
+      tctx.fillStyle = color;
+      tctx.arc(px, py, glow * 0.6, 0, Math.PI * 2); tctx.fill();
+
+      tctx.beginPath(); tctx.globalAlpha = 1.0;
+      tctx.fillStyle = '#ffffff';
+      tctx.arc(px, py, core * 0.75, 0, Math.PI * 2); tctx.fill();
+      tctx.globalAlpha = 1.0;
+
+      this._prevTrailPos = { x: px, y: py };
+    } else {
+      this._prevTrailPos = null;
+    }
+    tctx.globalCompositeOperation = 'source-over';
+  },
+
+  _drawLightPainting(ctx) {
+    if (!this._trailCanvas) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(this._trailCanvas, 0, 0, this._width, this._height);
+    ctx.restore();
+  },
+
+  // ============================================================
+  // CONNECTION WEB — Curved glowing threads between hand and face
+  // ============================================================
+  _drawConnectionWeb(ctx, energy) {
+    const S = MUZE.State;
+    if (!S.handPresent || !S.faceDetected) return;
+    const landmarks = S._rawLandmarks;
+    if (!landmarks) return;
+    const w = this._width, h = this._height;
+    const hx = S.handX * w, hy = S.handY * h;
+    const accentRgb = this._cachedAccentRgb;
+
+    const idxs = [1, 152, 10, 105, 334]; // nose, chin, forehead, brows
+    const targets = [];
+    for (const idx of idxs) {
+      const lm = landmarks[idx];
+      if (lm) targets.push({ x: (1 - lm.x) * w, y: lm.y * h });
+    }
+    if (targets.length === 0) return;
+
+    this._connectionPulse += 0.04;
+    const pulse = 0.7 + Math.sin(this._connectionPulse) * 0.3;
+    const baseAlpha = (0.02 + Math.min(0.06, energy * 0.4)) * pulse;
+
+    ctx.save(); ctx.lineWidth = 0.8; ctx.lineCap = 'round';
+    for (const t of targets) {
+      const mx = (hx + t.x) / 2, my = (hy + t.y) / 2;
+      const dx = t.x - hx, dy = t.y - hy;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const bow = len * 0.08;
+      const cpx = mx + (-dy / len) * bow;
+      const cpy = my + (dx / len) * bow;
+
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(${accentRgb}, ${baseAlpha})`;
+      ctx.moveTo(hx, hy);
+      ctx.quadraticCurveTo(cpx, cpy, t.x, t.y);
+      ctx.stroke();
+
+      if (baseAlpha > 0.015) {
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(${accentRgb}, ${baseAlpha * 1.5})`;
+        ctx.arc(t.x, t.y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  },
+
+  // ============================================================
+  // NOTE BURST — Expanding ring + radial particles, pitch-colored
   // ============================================================
   _triggerNoteBurst(note, handX, handY) {
     if (this._lastBurstNote === null) {
       this._lastBurstNote = note;
       return;
     }
-
     const interval = Math.abs(note - this._lastBurstNote);
     this._lastBurstNote = note;
-
     if (interval === 0) return;
 
-    const w = this._width;
-    const h = this._height;
-    const cx = handX * w;
-    const cy = handY * h;
+    const cx = handX * this._width;
+    const cy = handY * this._height;
+    const { r, g, b } = this._noteToRgb(note);
 
-    const colors = MUZE.Config.MODE_COLORS[MUZE.State.currentModeName];
-    const rgb = colors ? colors.rgb : '232,169,72';
-    const [r, g, b] = rgb.split(',').map(Number);
-
-    const count = Math.min(20, Math.max(3, Math.round(interval * 2)));
-    const burstSpeed = 1.5 + interval * 0.4;
+    const count = Math.min(20, Math.max(5, Math.round(interval * 1.7)));
+    const burstSpeed = 1.5 + interval * 0.5;
 
     for (let i = 0; i < count; i++) {
       if (this._burstParticles.length >= this._maxBurstParticles) {
         this._burstParticles.shift();
       }
-
-      const angle = (i / count) * Math.PI * 2 + Math.random() * 0.3;
-      const speed = burstSpeed * (0.7 + Math.random() * 0.6);
-
+      const angle = (i / count) * Math.PI * 2 + Math.random() * 0.4;
+      const speed = burstSpeed * (0.6 + Math.random() * 0.8);
       this._burstParticles.push({
         x: cx, y: cy,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         life: 1.0,
-        decay: 0.015 + Math.random() * 0.01,
-        size: 1.5 + interval * 0.3 + Math.random() * 1.5,
+        decay: 0.014 + Math.random() * 0.012,
+        size: 1.5 + interval * 0.35 + Math.random() * 1.5,
         r, g, b,
         gravity: -0.02
       });
     }
-
-    // Expanding ring
+    // Expanding ring (0 -> max over ~400ms)
+    const ringMax = Math.min(60, 15 + interval * 5);
     this._burstRings.push({
-      x: cx, y: cy,
-      radius: 5,
-      maxRadius: 20 + interval * 5,
-      alpha: 0.5,
-      r, g, b,
-      speed: 2 + interval * 0.6
+      x: cx, y: cy, radius: 0,
+      maxRadius: ringMax, alpha: 0.6,
+      r, g, b, speed: ringMax / 24
     });
   },
 
   _updateBurstParticles() {
     for (let i = this._burstParticles.length - 1; i >= 0; i--) {
       const p = this._burstParticles[i];
-      p.x += p.vx;
-      p.y += p.vy;
+      p.x += p.vx; p.y += p.vy;
       p.vy += p.gravity;
-      p.vx *= 0.98;
-      p.vy *= 0.98;
+      p.vx *= 0.97; p.vy *= 0.97;
       p.life -= p.decay;
       if (p.life <= 0) {
         this._burstParticles[i] = this._burstParticles[this._burstParticles.length - 1];
         this._burstParticles.pop();
       }
     }
-
     for (let i = this._burstRings.length - 1; i >= 0; i--) {
       const ring = this._burstRings[i];
       ring.radius += ring.speed;
-      ring.alpha *= 0.93;
+      ring.alpha *= 0.94;
       if (ring.alpha < 0.01 || ring.radius > ring.maxRadius) {
         this._burstRings.splice(i, 1);
       }
@@ -988,19 +1575,31 @@ MUZE.Visualizer = {
   _drawBurstParticles(ctx) {
     for (const p of this._burstParticles) {
       const alpha = p.life * p.life;
+      if (alpha < 0.01) continue;
+      const sz = p.size * p.life;
+      // Additive outer glow
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha * 0.3})`;
+      ctx.arc(p.x, p.y, sz * 2, 0, Math.PI * 2);
+      ctx.fill();
+      // Core
+      ctx.globalCompositeOperation = 'source-over';
       ctx.beginPath();
       ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha})`;
-      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
       ctx.fill();
     }
-
     for (const ring of this._burstRings) {
+      if (ring.alpha < 0.01) continue;
+      ctx.globalCompositeOperation = 'lighter';
       ctx.beginPath();
       ctx.strokeStyle = `rgba(${ring.r},${ring.g},${ring.b},${ring.alpha})`;
-      ctx.lineWidth = 1.5 * ring.alpha;
+      ctx.lineWidth = 2 * ring.alpha + 0.5;
       ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
       ctx.stroke();
     }
+    ctx.globalCompositeOperation = 'source-over';
   },
 
   // ============================================================
@@ -1009,13 +1608,13 @@ MUZE.Visualizer = {
   triggerExplosion(x, y, count) {
     x = x || this._width / 2;
     y = y || this._height * 0.4;
-    count = count || 100;
+    count = count || 120;
     const rgb = this._cachedAccentRgb;
 
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 2 + Math.random() * 8;
-      const size = 1 + Math.random() * 3;
+      const size = 2 + Math.random() * 4; // 2-6px particles
       this._explosionParticles.push({
         x: x, y: y,
         vx: Math.cos(angle) * speed,
@@ -1028,9 +1627,30 @@ MUZE.Visualizer = {
         drag: 0.98
       });
     }
+    // Screen-wide glow at explosion center (fades over 500ms)
+    this._explosionGlow = { x: x, y: y, life: 1.0 };
   },
 
   _updateAndDrawExplosion(ctx) {
+    // Screen-wide glow (large soft circle at explosion center, fades over ~500ms)
+    if (this._explosionGlow && this._explosionGlow.life > 0) {
+      const g = this._explosionGlow;
+      g.life -= 0.033; // ~30 frames = 500ms at 60fps
+      if (g.life > 0) {
+        const glowRadius = Math.min(this._width, this._height) * 0.4;
+        const glowAlpha = g.life * g.life * 0.15;
+        const rgb = this._cachedAccentRgb;
+        const grad = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, glowRadius);
+        grad.addColorStop(0, `rgba(${rgb}, ${glowAlpha})`);
+        grad.addColorStop(1, `rgba(${rgb}, 0)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(g.x - glowRadius, g.y - glowRadius, glowRadius * 2, glowRadius * 2);
+      } else {
+        this._explosionGlow = null;
+      }
+    }
+
+    // Particles
     for (let i = this._explosionParticles.length - 1; i >= 0; i--) {
       const p = this._explosionParticles[i];
       p.x += p.vx;

@@ -79,7 +79,10 @@ MUZE.Touch = {
     if (this._isHolding) {
       if (dy < -MUZE.Config.SWIPE_THRESHOLD) {
         MUZE.Audio.dropRiser();
-        if (MUZE.Visualizer.triggerExplosion) MUZE.Visualizer.triggerExplosion();
+        if (MUZE.Visualizer.triggerExplosion) {
+          const w = window.innerWidth, h = window.innerHeight;
+          MUZE.Visualizer.triggerExplosion(w / 2, h * 0.4, 120);
+        }
       } else {
         MUZE.Audio.cancelRiser();
       }

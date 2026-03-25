@@ -30,10 +30,12 @@ MUZE.DrumFX = (() => {
   // ---- Ripple config ----
   const RIPPLE_MAX_RADIUS = 160;
   const RIPPLE_DURATION = 500;   // ms
-  const RIPPLE_LINE_WIDTH = 2;
+  const RIPPLE_LINE_WIDTH = 1.5;       // thin crisp ring
+  const RIPPLE_GLOW_WIDTH = 6;         // wider soft glow underneath
 
   // ---- Particle config ----
-  const PARTICLE_COUNT = 12;
+  const PARTICLE_COUNT_MIN = 12;
+  const PARTICLE_COUNT_MAX = 15;
   const PARTICLE_SPEED_MIN = 1.5;
   const PARTICLE_SPEED_MAX = 5;
   const PARTICLE_LIFE = 400;     // ms
@@ -179,35 +181,50 @@ MUZE.DrumFX = (() => {
       // Opacity: starts strong, fades out with ease-in curve
       const opacity = 1 - Math.pow(t, 2);
 
-      // Primary ripple ring
+      // Primary ripple ring — soft glow underneath (wider, low alpha)
       _ctx.beginPath();
       _ctx.arc(rip.x, rip.y, radius, 0, Math.PI * 2);
-      _ctx.strokeStyle = `rgba(${rip.r}, ${rip.g}, ${rip.b}, ${(0.6 * opacity).toFixed(3)})`;
+      _ctx.strokeStyle = `rgba(${rip.r}, ${rip.g}, ${rip.b}, ${(0.15 * opacity).toFixed(3)})`;
+      _ctx.lineWidth = RIPPLE_GLOW_WIDTH * (1 - t * 0.4);
+      _ctx.stroke();
+
+      // Primary ripple ring — crisp thin stroke on top
+      _ctx.beginPath();
+      _ctx.arc(rip.x, rip.y, radius, 0, Math.PI * 2);
+      _ctx.strokeStyle = `rgba(${rip.r}, ${rip.g}, ${rip.b}, ${(0.7 * opacity).toFixed(3)})`;
       _ctx.lineWidth = RIPPLE_LINE_WIDTH * (1 - t * 0.5);
       _ctx.stroke();
 
-      // Secondary thinner ripple (slightly delayed, wider)
-      if (t > 0.1) {
-        const t2 = (t - 0.1) / 0.9;
+      // Secondary outer ripple (delayed, slower expansion, creates depth)
+      if (t > 0.08) {
+        const t2 = (t - 0.08) / 0.92;
         const easeOut2 = 1 - Math.pow(1 - t2, 3);
-        const radius2 = easeOut2 * RIPPLE_MAX_RADIUS * 1.3;
+        const radius2 = easeOut2 * RIPPLE_MAX_RADIUS * 1.35;
         const opacity2 = 1 - Math.pow(t2, 1.5);
 
+        // Outer ring glow
         _ctx.beginPath();
         _ctx.arc(rip.x, rip.y, radius2, 0, Math.PI * 2);
-        _ctx.strokeStyle = `rgba(${rip.r}, ${rip.g}, ${rip.b}, ${(0.25 * opacity2).toFixed(3)})`;
+        _ctx.strokeStyle = `rgba(${rip.r}, ${rip.g}, ${rip.b}, ${(0.08 * opacity2).toFixed(3)})`;
+        _ctx.lineWidth = RIPPLE_GLOW_WIDTH * 0.7;
+        _ctx.stroke();
+
+        // Outer ring crisp
+        _ctx.beginPath();
+        _ctx.arc(rip.x, rip.y, radius2, 0, Math.PI * 2);
+        _ctx.strokeStyle = `rgba(${rip.r}, ${rip.g}, ${rip.b}, ${(0.3 * opacity2).toFixed(3)})`;
         _ctx.lineWidth = 1;
         _ctx.stroke();
       }
 
-      // Inner glow fill (very brief)
-      if (t < 0.3) {
-        const glowOpacity = (1 - t / 0.3) * 0.15;
-        const grad = _ctx.createRadialGradient(rip.x, rip.y, 0, rip.x, rip.y, radius * 0.8);
+      // Inner glow fill (very brief — initial impact)
+      if (t < 0.25) {
+        const glowOpacity = (1 - t / 0.25) * 0.18;
+        const grad = _ctx.createRadialGradient(rip.x, rip.y, 0, rip.x, rip.y, radius * 0.7);
         grad.addColorStop(0, `rgba(${rip.r}, ${rip.g}, ${rip.b}, ${glowOpacity.toFixed(3)})`);
         grad.addColorStop(1, `rgba(${rip.r}, ${rip.g}, ${rip.b}, 0)`);
         _ctx.beginPath();
-        _ctx.arc(rip.x, rip.y, radius * 0.8, 0, Math.PI * 2);
+        _ctx.arc(rip.x, rip.y, radius * 0.7, 0, Math.PI * 2);
         _ctx.fillStyle = grad;
         _ctx.fill();
       }
@@ -224,29 +241,32 @@ MUZE.DrumFX = (() => {
         continue;
       }
 
-      // Update position (velocity with drag)
-      const drag = 1 - t * 0.4;
+      // Update position — drag physics: exponential deceleration
+      const drag = Math.pow(1 - t, 1.8);
       p.x += p.vx * drag;
       p.y += p.vy * drag;
 
-      // Opacity: quick in, smooth out
-      const opacity = t < 0.1 ? t / 0.1 : 1 - Math.pow((t - 0.1) / 0.9, 2);
+      // Opacity: quick in, smooth fade-out
+      const opacity = t < 0.08 ? t / 0.08 : 1 - Math.pow((t - 0.08) / 0.92, 1.5);
 
-      // Size: starts at max, shrinks
-      const size = p.size * (1 - t * 0.6);
+      // Size: starts at max, shrinks gently
+      const size = p.size * (1 - t * 0.55);
 
+      // Glow halo behind each particle (soft, wider)
+      const glowR = Math.max(size * 3, 4);
+      const grad = _ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+      grad.addColorStop(0, `rgba(${p.r}, ${p.g}, ${p.b}, ${(opacity * 0.2).toFixed(3)})`);
+      grad.addColorStop(1, `rgba(${p.r}, ${p.g}, ${p.b}, 0)`);
       _ctx.beginPath();
-      _ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
-      _ctx.fillStyle = `rgba(${p.r}, ${p.g}, ${p.b}, ${(opacity * 0.9).toFixed(3)})`;
+      _ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2);
+      _ctx.fillStyle = grad;
       _ctx.fill();
 
-      // Tiny glow around each particle
-      if (size > 1.5) {
-        _ctx.beginPath();
-        _ctx.arc(p.x, p.y, size * 2.5, 0, Math.PI * 2);
-        _ctx.fillStyle = `rgba(${p.r}, ${p.g}, ${p.b}, ${(opacity * 0.12).toFixed(3)})`;
-        _ctx.fill();
-      }
+      // Core particle (solid, bright)
+      _ctx.beginPath();
+      _ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+      _ctx.fillStyle = `rgba(${p.r}, ${p.g}, ${p.b}, ${(opacity * 0.95).toFixed(3)})`;
+      _ctx.fill();
     }
   }
 
@@ -263,7 +283,7 @@ MUZE.DrumFX = (() => {
   }
 
   function _spawnParticles(x, y, color) {
-    const count = PARTICLE_COUNT;
+    const count = PARTICLE_COUNT_MIN + Math.floor(Math.random() * (PARTICLE_COUNT_MAX - PARTICLE_COUNT_MIN + 1));
     const now = performance.now();
 
     for (let i = 0; i < count; i++) {
