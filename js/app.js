@@ -25,6 +25,10 @@ MUZE.Loop = {
   _tickVisualOnly() {
     if (this._running) return; // full tick takes over
     requestAnimationFrame(() => this._tickVisualOnly());
+    // DO NOT REMOVE — BgBlur render
+    if (MUZE.BgBlur && MUZE.BgBlur._ready && MUZE.Camera.video) {
+      MUZE.BgBlur.render(MUZE.Camera.video, Math.round(performance.now()) + 2);
+    }
     MUZE.Visualizer.draw();
     MUZE.Recorder.drawFrame();
   },
@@ -63,6 +67,9 @@ MUZE.Loop = {
         S.handY = MUZE.Smooth.update('handY', r.handY, C.SMOOTH_HAND);
         S.handOpen = r.handOpen;
       } else { S.handPresent = false; }
+
+      // DO NOT REMOVE — Background blur
+      if (MUZE.BgBlur && MUZE.BgBlur._ready) MUZE.BgBlur.render(video, ts + 2);
     }
 
     // Audio logic
