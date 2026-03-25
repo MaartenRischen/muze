@@ -130,26 +130,13 @@ MUZE.BgBlur = {
 
     const rawMask = result.confidenceMasks[0].getAsFloat32Array();
 
-    // DEBUG: show mask stats on screen
-    if (!this._debugged) {
-      let min = 1, max = 0, sum = 0;
-      for (let i = 0; i < rawMask.length; i++) {
-        if (rawMask[i] < min) min = rawMask[i];
-        if (rawMask[i] > max) max = rawMask[i];
-        sum += rawMask[i];
-      }
-      const info = `mask: ${rawMask.length}px, min:${min.toFixed(3)} max:${max.toFixed(3)} avg:${(sum/rawMask.length).toFixed(3)} canvas:${w}x${h}`;
-      const el = document.createElement('div');
-      el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:999;background:red;color:#fff;padding:16px;font:14px monospace;border-radius:8px;pointer-events:none;white-space:pre-wrap;max-width:90%;text-align:center';
-      el.textContent = info;
-      document.body.appendChild(el);
-      setTimeout(() => el.remove(), 10000);
-      this._debugged = true;
-    }
-
     // Step 1: Apply sigmoid to sharpen the transition band
     const lut = this._sigLUT;
-    const processed = new Float32Array(rawMask.length);
+    // PERF: reuse buffer instead of allocating per frame
+    if (!this._processedBuf || this._processedBuf.length !== rawMask.length) {
+      this._processedBuf = new Float32Array(rawMask.length);
+    }
+    const processed = this._processedBuf;
     for (let i = 0; i < rawMask.length; i++) {
       processed[i] = lut[rawMask[i] * 255 | 0];
     }
@@ -170,7 +157,7 @@ MUZE.BgBlur = {
 
     // Apply video blur only after first successful segmentation
     if (!this._blurApplied) {
-      document.getElementById('cam').style.filter = 'blur(12px) brightness(0.85)';
+      document.getElementById('cam').style.filter = 'blur(12px)';
       this._blurApplied = true;
     }
 
