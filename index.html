@@ -634,68 +634,69 @@ MUZE.BgBlur = {
   },
 
   resize() {
-    const w = window.innerWidth, h = window.innerHeight;
-    const scale = Math.min(1, 320 / w);
-    this._w = Math.round(w * scale);
-    this._h = Math.round(h * scale);
+    // Use video's native resolution — no mismatch with segmenter
+    const video = MUZE.Camera.video;
+    const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+    this._w = vw; this._h = vh;
     [this._bgCanvas, this._sharpCanvas, this._blurCanvas].forEach(c => {
-      c.width = this._w; c.height = this._h;
+      c.width = vw; c.height = vh;
     });
-    this._bgCanvas.style.width = w + 'px';
-    this._bgCanvas.style.height = h + 'px';
+    this._bgCanvas.style.width = '100%';
+    this._bgCanvas.style.height = '100%';
+    this._bgCanvas.style.objectFit = 'cover';
+    this._bgCanvas.style.transform = 'scaleX(-1)';
   },
 
   toggle() {
     this._active = !this._active;
     document.getElementById('cam').classList.toggle('hidden', this._active);
-    if (this._active) this.resize();
+    if (this._active) {
+      // Defer resize until video has dimensions
+      const check = () => {
+        if (MUZE.Camera.video.videoWidth) this.resize();
+        else setTimeout(check, 100);
+      };
+      check();
+    }
     return this._active;
   },
 
   render(video, ts) {
     if (!this._active || !this._segmenter || video.readyState < 2) return;
+    if (!this._w) this.resize();
     const w = this._w, h = this._h;
 
-    // Draw video mirrored + cover-cropped
-    const vw = video.videoWidth, vh = video.videoHeight;
-    const cr = w / h, vr = vw / vh;
-    let sx = 0, sy = 0, sw = vw, sh = vh;
-    if (vr > cr) { sw = vh * cr; sx = (vw - sw) / 2; }
-    else { sh = vw / cr; sy = (vh - sh) / 2; }
-
-    this._sharpCtx.save();
-    this._sharpCtx.translate(w, 0);
-    this._sharpCtx.scale(-1, 1);
-    this._sharpCtx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
-    this._sharpCtx.restore();
+    // Draw video (not mirrored — CSS handles mirror)
+    this._sharpCtx.drawImage(video, 0, 0, w, h);
 
     // Blurred version
-    this._blurCtx.filter = 'blur(12px)';
+    this._blurCtx.filter = 'blur(14px)';
     this._blurCtx.drawImage(this._sharpCanvas, 0, 0);
     this._blurCtx.filter = 'none';
 
-    // Segment the drawn canvas (matches canvas resolution)
-    const result = this._segmenter.segmentForVideo(this._sharpCanvas, ts);
+    // Segment at native video resolution
+    let result;
+    try { result = this._segmenter.segmentForVideo(video, ts); } catch(e) { return; }
     if (!result || !result.confidenceMasks || !result.confidenceMasks.length) return;
     const conf = result.confidenceMasks[0].getAsFloat32Array();
 
-    // Get pixel data from both
+    // Get pixel data
     const sharp = this._sharpCtx.getImageData(0, 0, w, h);
     const blur = this._blurCtx.getImageData(0, 0, w, h);
-    const out = sharp; // reuse sharp buffer for output
     const sd = sharp.data, bd = blur.data;
+    const pixels = Math.min(conf.length, sd.length / 4);
 
-    // Blend: person pixels from sharp, background from blur
-    for (let i = 0; i < conf.length; i++) {
+    // Blend per-pixel
+    for (let i = 0; i < pixels; i++) {
       const p = i * 4;
       const a = conf[i]; // 0=bg, 1=person
       const b = 1 - a;
-      sd[p]     = sd[p]     * a + bd[p]     * b;
-      sd[p + 1] = sd[p + 1] * a + bd[p + 1] * b;
-      sd[p + 2] = sd[p + 2] * a + bd[p + 2] * b;
+      sd[p]     = sd[p]     * a + bd[p]     * b | 0;
+      sd[p + 1] = sd[p + 1] * a + bd[p + 1] * b | 0;
+      sd[p + 2] = sd[p + 2] * a + bd[p + 2] * b | 0;
     }
 
-    this._bgCtx.putImageData(out, 0, 0);
+    this._bgCtx.putImageData(sharp, 0, 0);
     result.confidenceMasks[0].close();
   }
 };
