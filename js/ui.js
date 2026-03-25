@@ -31,6 +31,9 @@ MUZE.Touch = {
     z.addEventListener('touchend', this._onEnd.bind(this), { passive: false });
     z.addEventListener('touchcancel', this._onEnd.bind(this), { passive: false });
 
+    // Premium drum hit visual feedback
+    if (MUZE.DrumFX) MUZE.DrumFX.init();
+
     document.querySelector('.chord-btn[data-chord="0"]').classList.add('active');
   },
 
@@ -59,6 +62,7 @@ MUZE.Touch = {
     if (this._isHolding) {
       if (dy < -MUZE.Config.SWIPE_THRESHOLD) {
         MUZE.Audio.dropRiser();
+        if (MUZE.Visualizer.triggerExplosion) MUZE.Visualizer.triggerExplosion();
       } else {
         MUZE.Audio.cancelRiser();
       }
@@ -95,7 +99,7 @@ MUZE.Touch = {
     }
     this._lastTapTime = now;
 
-    // Single tap → drum hit with velocity
+    // Single tap → drum hit with velocity + premium visual feedback
     const target = document.elementFromPoint(t.clientX, t.clientY);
     if (target) {
       const drum = target.dataset.drum || target.parentElement?.dataset?.drum;
@@ -106,6 +110,8 @@ MUZE.Touch = {
           // Velocity: faster taps = harder hits
           const velocity = Math.min(1, Math.max(0.3, 1 - (dt / 300)));
           MUZE.Audio.triggerDrum(drum, velocity);
+          // Premium visual feedback (ripple, particles, flash, pulse, kick punch)
+          if (MUZE.DrumFX) MUZE.DrumFX.trigger(drum, t.clientX, t.clientY);
           const el = document.getElementById('zone-' + drum);
           if (el) {
             el.classList.add('hit');

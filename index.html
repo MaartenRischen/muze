@@ -19,12 +19,15 @@
 <video id="cam" autoplay playsinline muted></video>
 <canvas id="bg-canvas"></canvas>
 
-<!-- Mood Lighting (tints camera feed, under canvas overlay) -->
-<div id="mood-gradient-overlay"><div class="mood-grad-neutral"></div></div>
+<!-- Mood lighting overlays (between bg-canvas and overlay) -->
+<div id="mood-gradient-overlay"></div>
 <div id="mood-edge-glow"></div>
 <div id="mood-breath-bar"></div>
 
 <canvas id="overlay"></canvas>
+
+<!-- Audio-reactive beat flash -->
+<div id="beat-flash-overlay"></div>
 
 <!-- Drum touch zones -->
 <div id="touch-zone">
@@ -262,11 +265,43 @@
 
 <!-- Start Screen -->
 <div id="start-screen">
-  <h1>Muze</h1>
-  <p>Your body is the instrument. Create music with your face, hands, and touch.</p>
-  <button id="start-btn">Begin Session</button>
-  <span id="loading-text">Loading...</span>
+  <!-- Ambient gradient orbs -->
+  <div class="ss-ambient">
+    <div class="ss-orb ss-orb--purple"></div>
+    <div class="ss-orb ss-orb--cyan"></div>
+    <div class="ss-orb ss-orb--amber"></div>
+    <div class="ss-orb ss-orb--orange"></div>
+  </div>
+  <!-- Staggered title -->
+  <h1 id="ss-title" aria-label="Muze">
+    <span class="ss-letter" style="--i:0">M</span><span class="ss-letter" style="--i:1">U</span><span class="ss-letter" style="--i:2">Z</span><span class="ss-letter" style="--i:3">E</span>
+  </h1>
+  <div class="ss-title-line"></div>
+  <p id="ss-tagline">Your body is the instrument</p>
+  <button id="start-btn">
+    <span class="btn-ring"></span>
+    <span class="btn-label">Begin Session</span>
+  </button>
+  <div id="loading-text" aria-live="polite">
+    <span class="lt-current">Initializing audio...</span>
+  </div>
 </div>
+
+<!-- Start screen letter animation JS (minimal, GPU-composited) -->
+<script>
+(function() {
+  // Activate shimmer gradient after staggered letter entrance completes (~1.6s)
+  setTimeout(function() {
+    var title = document.getElementById('ss-title');
+    if (title) title.classList.add('shimmer-active');
+  }, 1600);
+  // Activate button glow ring after button entrance (~3s)
+  setTimeout(function() {
+    var btn = document.getElementById('start-btn');
+    if (btn) btn.classList.add('ready');
+  }, 3000);
+})();
+</script>
 
 <!-- JS Modules -->
 <script src="js/config.js"></script>
@@ -277,6 +312,7 @@
 <script src="js/audio.js"></script>
 <script src="js/visualizer.js"></script>
 <script src="js/moodlight.js"></script>
+<script src="js/drumfx.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/features.js"></script>
@@ -287,19 +323,33 @@
 import { FaceLandmarker, HandLandmarker, FilesetResolver }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs';
 
+/* ---------- Loading text transition helper ---------- */
+function setLoadingText(text) {
+  const container = document.getElementById('loading-text');
+  const current = container.querySelector('.lt-current');
+  if (current) current.classList.add('lt-out');
+  const next = document.createElement('span');
+  next.className = 'lt-current lt-in';
+  next.textContent = text;
+  container.appendChild(next);
+  requestAnimationFrame(() => next.classList.remove('lt-in'));
+  if (current) setTimeout(() => current.remove(), 400);
+}
+
 document.getElementById('start-btn').addEventListener('click', async () => {
   const ss = document.getElementById('start-screen');
   ss.classList.add('loading');
 
   try {
     // Audio + Camera (samples load in background)
+    setLoadingText('Initializing audio...');
     await MUZE.Audio.init();
     MUZE.SampleLib.loadAll().then(() => console.log('Samples loaded'));
-    document.getElementById('loading-text').textContent = 'Starting camera...';
+    setLoadingText('Starting camera...');
     await MUZE.Camera.init();
 
     // MediaPipe
-    document.getElementById('loading-text').textContent = 'Loading face + hand models...';
+    setLoadingText('Loading AI models...');
     const vision = await FilesetResolver.forVisionTasks(
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm'
     );
@@ -309,10 +359,10 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     ]);
 
     // Init UI
+    setLoadingText('Preparing interface...');
     MUZE.Touch.init();
     MUZE.SynthMenu.init();
     MUZE.MixerUI.init();
-    MUZE.MoodLight.init();
     MUZE.SampleUI.init();
     MUZE.Tutorial.init();
     MUZE.PerfBar.init();
@@ -322,6 +372,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     MUZE.Gyroscope.init();
     MUZE.BeatRepeat.init();
     MUZE.ChordAdvance.init();
+    MUZE.MoodLight.init();
 
     // Restore saved settings
     MUZE.Storage.load();
@@ -363,12 +414,14 @@ document.getElementById('start-btn').addEventListener('click', async () => {
 
     MUZE.Loop.init();
 
-    // Fade out start screen
+    // Cinematic dissolve: title lifts, background blurs, screen dissolves
+    setLoadingText('Ready');
+    await new Promise(r => setTimeout(r, 400));
     ss.classList.add('fade-out');
-    setTimeout(() => ss.remove(), 600);
+    setTimeout(() => ss.remove(), 1200);
   } catch (err) {
     console.error('MUZE init failed:', err);
-    document.getElementById('loading-text').textContent = 'Error: ' + err.message;
+    setLoadingText('Error: ' + err.message);
     ss.classList.remove('loading');
   }
 });

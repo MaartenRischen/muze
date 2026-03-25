@@ -33,7 +33,6 @@ MUZE.Loop = {
       MUZE.BgBlur.render(MUZE.Camera.video, Math.round(performance.now()) + 2);
     }
     MUZE.Visualizer.draw();
-    MUZE.MoodLight.update();
     MUZE.Recorder.drawFrame();
   },
 
@@ -53,6 +52,7 @@ MUZE.Loop = {
         // Even cycle: face detection
         const fr = MUZE.FaceTracker.detect(video, ts);
         if (fr && fr.faceLandmarks && fr.faceLandmarks.length > 0) {
+          S._rawLandmarks = fr.faceLandmarks[0];
           const r = MUZE.FaceFeatures.extract(fr.faceLandmarks[0]);
           if (r) {
             S.mouthOpenness = MUZE.Smooth.update('mouth', r.mouthOpenness, C.SMOOTH_FAST);
@@ -119,6 +119,8 @@ MUZE.Loop = {
             MUZE.Audio.startMelody(note);
           }
           this._prevMelodyNote = note;
+          // Trigger hand burst effect on note change
+          if (MUZE.Visualizer._triggerNoteBurst) MUZE.Visualizer._triggerNoteBurst(note, S.handX, S.handY);
           // Feed melody note to loop recorder
           if (MUZE.LoopRecorder) MUZE.LoopRecorder.recordNote(note);
         }
@@ -136,8 +138,9 @@ MUZE.Loop = {
 
     // Draw
     MUZE.Visualizer.draw();
-    MUZE.MoodLight.update();
     MUZE.Recorder.drawFrame();
+    // Mood lighting update (CSS custom properties only — no reflow)
+    if (MUZE.MoodLight && MUZE.MoodLight.update) MUZE.MoodLight.update();
     // PERF: Throttle HUD updates to ~5fps (every 200ms) to avoid DOM reflow every frame
     if (now - this._lastHUDUpdate >= this._hudThrottleMs) {
       this._lastHUDUpdate = now;
