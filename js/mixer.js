@@ -4,12 +4,12 @@
 
 MUZE.Mixer = {
   channels: {
-    pad:      { volume: -14, pan: 0,    eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.35, delaySend: 0.25, mute: false, solo: false, faceLinked: true,  color: '#60a5fa' },
-    arp:      { volume: -8,  pan: 0.3,  eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.35, delaySend: 0.25, mute: false, solo: false, faceLinked: true,  color: '#4ade80' },
-    melody:   { volume: -6,  pan: -0.3, eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.30, delaySend: 0.20, mute: false, solo: false, faceLinked: true,  color: '#c084fc' },
+    pad:      { volume: -10, pan: 0,    eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.35, delaySend: 0.25, mute: false, solo: false, faceLinked: true,  color: '#60a5fa' },
+    arp:      { volume: -12, pan: 0.3,  eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.35, delaySend: 0.25, mute: false, solo: false, faceLinked: true,  color: '#4ade80' },
+    melody:   { volume: -8,  pan: -0.3, eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.30, delaySend: 0.20, mute: false, solo: false, faceLinked: true,  color: '#c084fc' },
     kick:     { volume: -6,  pan: 0,    eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0,    delaySend: 0,    mute: false, solo: false, faceLinked: false, color: '#f87171' },
-    snare:    { volume: -10, pan: 0,    eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.10, delaySend: 0,    mute: false, solo: false, faceLinked: false, color: '#fb923c' },
-    hat:      { volume: -16, pan: 0,    eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.05, delaySend: 0,    mute: false, solo: false, faceLinked: false, color: '#facc15' },
+    snare:    { volume: -10, pan: 0,    eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.15, delaySend: 0,    mute: false, solo: false, faceLinked: false, color: '#fb923c' },
+    hat:      { volume: -16, pan: 0.2,  eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.05, delaySend: 0,    mute: false, solo: false, faceLinked: false, color: '#facc15' },
     binaural: { volume: -24, pan: 0,    eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0,    delaySend: 0,    mute: false, solo: false, faceLinked: false, color: '#22d3ee' },
     riser:    { volume: -6,  pan: 0,    eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.15, delaySend: 0,    mute: false, solo: false, faceLinked: false, color: '#e2e8f0' },
   },

@@ -8,6 +8,7 @@ MUZE.Loop = {
   _debugEl: null, _modeHudEl: null,
   _lastHUDUpdate: 0, _hudThrottleMs: 200, // PERF: throttle HUD to ~5fps
   _prevHUDModeName: '', _prevHUDRootName: '', _prevHUDBPM: 0, _prevHUDValence: null,
+  _detectCycle: 0, // PERF: stagger face/hand detection on alternating frames
 
   init() {
     MUZE.Visualizer.init();
@@ -40,35 +41,41 @@ MUZE.Loop = {
     requestAnimationFrame(() => this._tick());
     const now = performance.now(), video = MUZE.Camera.video, S = MUZE.State, C = MUZE.Config;
 
-    // Detection at interval
+    // Detection at interval — PERF: stagger face and hand on alternating cycles
+    // to halve per-frame ML cost (~15fps each instead of ~30fps both)
     if (now - this._lastDetect >= C.DETECT_INTERVAL && MUZE.Camera.available) {
       this._lastDetect = now;
       const ts = Math.round(now);
+      this._detectCycle = (this._detectCycle || 0) + 1;
 
-      const fr = MUZE.FaceTracker.detect(video, ts);
-      if (fr && fr.faceLandmarks && fr.faceLandmarks.length > 0) {
-        const r = MUZE.FaceFeatures.extract(fr.faceLandmarks[0]);
-        if (r) {
-          S.mouthOpenness = MUZE.Smooth.update('mouth', r.mouthOpenness, C.SMOOTH_FAST);
-          S.lipCorner = MUZE.Smooth.update('lip', r.lipCorner, C.SMOOTH_FAST);
-          S.browHeight = MUZE.Smooth.update('brow', r.browHeight, C.SMOOTH_FAST);
-          S.eyeOpenness = MUZE.Smooth.update('eye', r.eyeOpenness, C.SMOOTH_FAST);
-          S.mouthWidth = MUZE.Smooth.update('mouthW', r.mouthWidth, C.SMOOTH_SLOW);
-          S.headPitch = MUZE.Smooth.update('pitch', r.headPitch, C.SMOOTH_FAST);
-          S.headYaw = MUZE.Smooth.update('yaw', r.headYaw, C.SMOOTH_SLOW);
-          S.headRoll = MUZE.Smooth.update('roll', r.headRoll, C.SMOOTH_SLOW);
-          S.faceDetected = true;
-        }
-      } else { S.faceDetected = false; }
-
-      const hr = MUZE.HandTracker.detect(video, ts + 1);
-      if (hr && hr.landmarks && hr.landmarks.length > 0) {
-        const r = MUZE.HandFeatures.extract(hr.landmarks);
-        S.handPresent = r.handPresent;
-        S.handX = MUZE.Smooth.update('handX', r.handX, C.SMOOTH_HAND);
-        S.handY = MUZE.Smooth.update('handY', r.handY, C.SMOOTH_HAND);
-        S.handOpen = r.handOpen;
-      } else { S.handPresent = false; }
+      if (this._detectCycle % 2 === 0) {
+        // Even cycle: face detection
+        const fr = MUZE.FaceTracker.detect(video, ts);
+        if (fr && fr.faceLandmarks && fr.faceLandmarks.length > 0) {
+          const r = MUZE.FaceFeatures.extract(fr.faceLandmarks[0]);
+          if (r) {
+            S.mouthOpenness = MUZE.Smooth.update('mouth', r.mouthOpenness, C.SMOOTH_FAST);
+            S.lipCorner = MUZE.Smooth.update('lip', r.lipCorner, C.SMOOTH_FAST);
+            S.browHeight = MUZE.Smooth.update('brow', r.browHeight, C.SMOOTH_FAST);
+            S.eyeOpenness = MUZE.Smooth.update('eye', r.eyeOpenness, C.SMOOTH_FAST);
+            S.mouthWidth = MUZE.Smooth.update('mouthW', r.mouthWidth, C.SMOOTH_SLOW);
+            S.headPitch = MUZE.Smooth.update('pitch', r.headPitch, C.SMOOTH_FAST);
+            S.headYaw = MUZE.Smooth.update('yaw', r.headYaw, C.SMOOTH_SLOW);
+            S.headRoll = MUZE.Smooth.update('roll', r.headRoll, C.SMOOTH_SLOW);
+            S.faceDetected = true;
+          }
+        } else { S.faceDetected = false; }
+      } else {
+        // Odd cycle: hand detection
+        const hr = MUZE.HandTracker.detect(video, ts + 1);
+        if (hr && hr.landmarks && hr.landmarks.length > 0) {
+          const r = MUZE.HandFeatures.extract(hr.landmarks);
+          S.handPresent = r.handPresent;
+          S.handX = MUZE.Smooth.update('handX', r.handX, C.SMOOTH_HAND);
+          S.handY = MUZE.Smooth.update('handY', r.handY, C.SMOOTH_HAND);
+          S.handOpen = r.handOpen;
+        } else { S.handPresent = false; }
+      }
 
       // DO NOT REMOVE — Background blur
       if (MUZE.BgBlur && MUZE.BgBlur._ready) MUZE.BgBlur.render(video, ts + 2);

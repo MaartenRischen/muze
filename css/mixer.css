@@ -142,7 +142,7 @@
 
 /* ---- Color-coded Header Label ---- */
 .strip-label {
-  font: 700 8px/1 var(--mixer-font-ui);
+  font: 700 10px/1 var(--mixer-font-ui);
   letter-spacing: 1.5px;
   text-transform: uppercase;
   padding: 6px 4px 5px;
@@ -196,7 +196,7 @@
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 0%;
+  height: 100%;
   border-radius: 3px;
   /* Turquoise -> amber -> red gradient (iZotope-inspired) */
   background: linear-gradient(
@@ -222,9 +222,10 @@
     transparent 3px,
     transparent 4px
   );
+  transform: scaleY(0);
   transform-origin: bottom;
-  will-change: height;
-  transition: height 0.06s linear;
+  transition: transform 0.06s linear;
+  will-change: transform;
 }
 
 /* Glow effect at high levels */
@@ -383,7 +384,7 @@
 
 /* Fader value readout (below fader) */
 .strip-fader .fader-val {
-  font: 400 8px/1 var(--mixer-font);
+  font: 400 10px/1 var(--mixer-font);
   font-feature-settings: 'tnum';
   color: var(--muze-text-muted, #52525A);
   margin-top: 3px;
@@ -440,11 +441,11 @@
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
-  color: var(--muze-text-muted, #52525A);
+  color: var(--muze-text-muted, #6E6E78);
   font: 700 9px/1 var(--mixer-font-ui);
   width: var(--mixer-btn-size);
-  height: 28px;
-  min-height: 28px;
+  height: 32px;
+  min-height: 32px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.1s;
@@ -452,6 +453,18 @@
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
+  position: relative;
+}
+
+/* Touch target expander for strip buttons (44px minimum) */
+.strip-buttons button::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: -4px;
+  width: 44px;
+  height: 44px;
+  background: transparent;
 }
 
 .strip-buttons button:active {
@@ -509,7 +522,7 @@
 }
 
 .master-limiter-val {
-  font: 400 7px/1 var(--mixer-font);
+  font: 400 9px/1 var(--mixer-font);
   font-feature-settings: 'tnum';
   color: var(--muze-text-muted, #52525A);
   letter-spacing: 0.5px;

@@ -6,6 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0E0E11">
+<meta name="description" content="Create music with your face, hands, and touch">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
 <title>MUZE</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/mixer.css">
@@ -51,7 +54,7 @@
 
 <!-- Toolbar (minimal: 4 buttons) -->
 <div class="toolbar">
-  <button class="toolbar-btn" id="pause-btn" aria-label="Play">&#9654;</button>
+  <button class="toolbar-btn" id="pause-btn" aria-label="Pause">&#9208;</button>
   <button class="toolbar-btn" id="rec-btn" aria-label="Record">&#9679;</button>
   <button class="toolbar-btn" id="help-btn" aria-label="Help" style="font-weight:bold">?</button>
   <button class="toolbar-btn" id="synth-menu-btn" aria-label="Settings">&#9881;</button>
@@ -355,15 +358,6 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     // Fade out start screen
     ss.classList.add('fade-out');
     setTimeout(() => ss.remove(), 600);
-
-    // Start paused — user presses play to begin sound
-    // Only init the loop + visualizer, don't run audio logic
-    Tone.Transport.pause();
-    MUZE.Loop._running = false;
-    pauseBtn.textContent = '\u25B6';
-    pauseBtn.classList.add('paused');
-    // Start the render loop (for visualizer + camera) but audio won't trigger since _running is false
-    MUZE.Loop._tickVisualOnly();
   } catch (err) {
     console.error('MUZE init failed:', err);
     document.getElementById('loading-text').textContent = 'Error: ' + err.message;

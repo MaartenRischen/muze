@@ -41,6 +41,7 @@ MUZE.LoopRecorder = {
     const now = performance.now();
     const elapsed = now - this._startTime;
     const layer = this._layers[this._layers.length - 1];
+    if (!layer) return;
 
     // End previous note
     if (this._currentNote !== null) {
@@ -85,17 +86,28 @@ MUZE.LoopRecorder = {
   },
 
   _startRecording() {
-    this._state = 'recording';
-    this._loopDuration = this._getLoopMs();
-    this._startTime = performance.now();
-    this._layers = [[]];
-    this._currentNote = null;
+    this._state = 'counting';
     this._updateUI();
-    this._startProgress();
-
-    this._autoStopTimer = setTimeout(() => {
-      if (this._state === 'recording') this._stopRecording();
-    }, this._loopDuration);
+    const beatMs = 60000 / Tone.Transport.bpm.value;
+    // Play 4 clicks as count-in
+    for (let i = 0; i < 4; i++) {
+      setTimeout(() => {
+        MUZE.Audio.triggerDrum('hat', 0.3);
+      }, i * beatMs);
+    }
+    // Start actual recording after count-in
+    setTimeout(() => {
+      this._state = 'recording';
+      this._loopDuration = this._getLoopMs();
+      this._startTime = performance.now();
+      this._layers = [[]];
+      this._currentNote = null;
+      this._updateUI();
+      this._startProgress();
+      this._autoStopTimer = setTimeout(() => {
+        if (this._state === 'recording') this._stopRecording();
+      }, this._loopDuration);
+    }, 4 * beatMs);
   },
 
   _stopRecording() {
@@ -203,14 +215,15 @@ MUZE.LoopRecorder = {
     const pUndo = document.getElementById('loop-undo-panel-btn');
     const pClear = document.getElementById('loop-clear-panel-btn');
 
+    const isCounting = this._state === 'counting';
     const isRec = this._state === 'recording';
     const isOvr = this._state === 'overdubbing';
     const isPlay = this._state === 'playing';
     const hasLayers = this._layers.length > 0;
 
     if (pRec) {
-      pRec.textContent = isRec || isOvr ? '■ STOP' : isPlay ? '● OVR' : '● REC';
-      pRec.style.color = isRec ? '#ef4444' : isOvr ? '#f59e0b' : '';
+      pRec.textContent = isCounting ? '● COUNT' : isRec || isOvr ? '■ STOP' : isPlay ? '● OVR' : '● REC';
+      pRec.style.color = isCounting ? '#facc15' : isRec ? '#ef4444' : isOvr ? '#f59e0b' : '';
     }
     if (pOvr) pOvr.disabled = !isPlay;
     if (pUndo) pUndo.disabled = !hasLayers || isRec || isOvr;
@@ -732,15 +745,27 @@ MUZE.Sidechain = {
 
   duck() {
     const padNode = MUZE.Audio._nodes.pad;
-    if (!padNode) return;
-
+    const arpNode = MUZE.Audio._nodes.arp;
     const now = Tone.now();
-    const currentGain = padNode.gain.gain.value;
 
-    // Quick duck down, slow release (classic sidechain curve)
-    padNode.gain.gain.cancelScheduledValues(now);
-    padNode.gain.gain.setValueAtTime(currentGain, now);
-    padNode.gain.gain.linearRampToValueAtTime(currentGain * 0.3, now + 0.01); // fast attack
-    padNode.gain.gain.linearRampToValueAtTime(currentGain, now + 0.15); // release
+    // Duck pad to 10% with 5ms linear attack, 30ms hold, 300ms exponential release
+    if (padNode) {
+      const padGain = padNode.gain.gain.value;
+      padNode.gain.gain.cancelScheduledValues(now);
+      padNode.gain.gain.setValueAtTime(padGain, now);
+      padNode.gain.gain.linearRampToValueAtTime(padGain * 0.10, now + 0.005);   // 5ms attack
+      padNode.gain.gain.setValueAtTime(padGain * 0.10, now + 0.005 + 0.030);    // 30ms hold
+      padNode.gain.gain.exponentialRampToValueAtTime(Math.max(padGain, 0.001), now + 0.005 + 0.030 + 0.300); // 300ms release
+    }
+
+    // Duck arp to 50% with same attack/hold, 250ms exponential release
+    if (arpNode) {
+      const arpGain = arpNode.gain.gain.value;
+      arpNode.gain.gain.cancelScheduledValues(now);
+      arpNode.gain.gain.setValueAtTime(arpGain, now);
+      arpNode.gain.gain.linearRampToValueAtTime(arpGain * 0.50, now + 0.005);   // 5ms attack
+      arpNode.gain.gain.setValueAtTime(arpGain * 0.50, now + 0.005 + 0.030);    // 30ms hold
+      arpNode.gain.gain.exponentialRampToValueAtTime(Math.max(arpGain, 0.001), now + 0.005 + 0.030 + 0.250); // 250ms release
+    }
   }
 };

@@ -96,12 +96,15 @@ MUZE.Storage = {
         const arpBtn = document.getElementById('arp-pattern');
         if (arpBtn) arpBtn.textContent = MUZE.Config.ARP_PATTERNS[MUZE.State.arpPatternIdx];
       }
-      if (data['extraScaleMode'] && data['extraScaleMode'] !== 'null') {
-        MUZE.State.extraScaleMode = data['extraScaleMode'];
-        MUZE.State.modeFrozen = true;
-        MUZE.State.currentScale = MUZE.Music.EXTRA_SCALES[data['extraScaleMode']];
-        const scaleVal = document.getElementById('scale-val');
-        if (scaleVal) scaleVal.textContent = data['extraScaleMode'];
+      if (data['extraScaleMode'] && data['extraScaleMode'] !== 'null' && MUZE.Music.EXTRA_SCALES) {
+        const scaleData = MUZE.Music.EXTRA_SCALES[data['extraScaleMode']];
+        if (scaleData) {
+          MUZE.State.extraScaleMode = data['extraScaleMode'];
+          MUZE.State.modeFrozen = true;
+          MUZE.State.currentScale = scaleData;
+          const scaleVal = document.getElementById('scale-val');
+          if (scaleVal) scaleVal.textContent = data['extraScaleMode'];
+        }
       }
 
       // Restore chord auto-advance

@@ -38,7 +38,7 @@ MUZE.Config = Object.freeze({
 
   ROOT_NOTE: 60, OCTAVE_RANGE: 2, BPM_DEFAULT: 85,
   BPM_MIN: 40, BPM_MAX: 200,
-  CHORD_DEGREES: [0, 3, 4, 2, 5, 0],
+  CHORD_DEGREES: [0, 1, 2, 3, 4, 5],
   BROW_SPIKE_THRESHOLD: 0.25, BROW_SPIKE_COOLDOWN: 600,
   DETECT_INTERVAL: 33,
   SWIPE_THRESHOLD: 50, SWIPE_MAX_TIME: 300, DOUBLE_TAP_TIME: 300, HOLD_TIME: 400,
@@ -68,6 +68,9 @@ MUZE.Config = Object.freeze({
     'harm. minor':    { accent: '#f472b6', rgb: '244,114,182' },
     'whole tone':     { accent: '#a3e635', rgb: '163,230,53' },
     'blues':          { accent: '#38bdf8', rgb: '56,189,248' },
+    'melodic minor':  { accent: '#a78bfa', rgb: '167,139,250' },
+    'phrygian dom':   { accent: '#f97316', rgb: '249,115,22' },
+    'hirajoshi':      { accent: '#ec4899', rgb: '236,72,153' },
   },
 
   // Root note names for selector

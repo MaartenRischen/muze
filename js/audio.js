@@ -79,16 +79,27 @@ MUZE.Audio = {
     this.analyser.toDestination();
 
     this._masterGain = new Tone.Gain(1).connect(this._limiter);
+    // FFT analyser for frequency visualization
+    this.fftAnalyser = new Tone.Analyser('fft', 512);
+    this._masterGain.connect(this.fftAnalyser);
     // PERF: Removed _masterMeter (Tone.Meter does FFT every frame). Use gain.value as proxy.
     this._masterEQ = new Tone.EQ3(0, 0, 0).connect(this._masterGain);
 
-    // Tape saturation — very subtle warmth on the master bus
-    this._masterSaturation = new Tone.Distortion({
-      distortion: 0.08,
-      wet: 0.15,
-      oversample: '2x'
-    });
-    this._masterSaturation.connect(this._masterEQ);
+    // Tape saturation — WaveShaper with tanh curve for analog warmth
+    this._masterSatDry = new Tone.Gain(0.8);  // 80% dry
+    this._masterSatWet = new Tone.Gain(0.2);  // 20% wet
+    this._masterSatShaper = new Tone.WaveShaper((x) => {
+      const a = 0.8;
+      return Math.tanh(a * x) / Math.tanh(a);
+    }, 2048);
+    this._masterSatMerge = new Tone.Gain(1).connect(this._masterEQ);
+    this._masterSatDry.connect(this._masterSatMerge);
+    this._masterSatShaper.connect(this._masterSatWet);
+    this._masterSatWet.connect(this._masterSatMerge);
+    // _masterSaturation acts as the input node for the saturation stage
+    this._masterSaturation = new Tone.Gain(1);
+    this._masterSaturation.connect(this._masterSatDry);
+    this._masterSaturation.connect(this._masterSatShaper);
 
     this._masterFilterGain = new Tone.Gain(1).connect(this._masterSaturation);
     this._masterFilter = new Tone.Filter({ frequency: 2000, type: 'lowpass', rolloff: -24, Q: 1.2 }).connect(this._masterFilterGain);
@@ -98,7 +109,10 @@ MUZE.Audio = {
     // ============================================================
     // (Removed: reverb modulation chorus — unnecessary CPU for barely audible effect)
 
-    this._reverbBus = new Tone.Reverb({ decay: 3.2, preDelay: 0.035 }).connect(this._masterSaturation);
+    // Reverb HF damping: cut harsh high frequencies from reverb tail
+    this._reverbDamping = new Tone.EQ3({ low: 0, mid: 0, high: -6 }).connect(this._masterSaturation);
+
+    this._reverbBus = new Tone.Reverb({ decay: 3.2, preDelay: 0.035 }).connect(this._reverbDamping);
     await this._reverbBus.ready;
     this._reverbBus.wet.value = 1; // fully wet — send level controls amount
 
@@ -111,10 +125,10 @@ MUZE.Audio = {
     // ---- PAD SYNTH: FM + sub oscillator ----
     // PERF: maxPolyphony 3 (plays 3-note chords), removed _padDetune2 entirely
     this.padSynth = new Tone.PolySynth(Tone.FMSynth, {
-      maxPolyphony: 3,
+      maxPolyphony: 4,
       voice: {
-        harmonicity: 2, modulationIndex: 1.2,
-        oscillator: { type: 'sine' },
+        harmonicity: 1.5, modulationIndex: 2.5,
+        oscillator: { type: 'fatsine', count: 3, spread: 18 },
         envelope: { attack: 1.0, decay: 0.4, sustain: 0.85, release: 2.5 },
         modulation: { type: 'triangle' },
         modulationEnvelope: { attack: 0.6, decay: 0.3, sustain: 0.7, release: 2.0 }
@@ -125,14 +139,14 @@ MUZE.Audio = {
 
     // Sub oscillator: one octave down, sine, subtle
     this._padSub = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 3,
+      maxPolyphony: 4,
       oscillator: { type: 'sine' },
       envelope: { attack: 1.2, decay: 0.5, sustain: 0.9, release: 3.0 },
     });
-    this._padSub.volume.value = -20; // subtle sub presence
+    this._padSub.volume.value = -14; // increased sub presence
 
     // Chorus insert for pad (enhanced: slightly higher rate for shimmer)
-    this._padChorus = new Tone.Chorus({ frequency: 1.2, delayTime: 4.0, depth: 0, wet: 0.5 });
+    this._padChorus = new Tone.Chorus({ frequency: 1.2, delayTime: 4.0, depth: 0.35, wet: 0.5 });
     this._padChorus.start();
 
     // (Removed: _padDetune2 — single pad layer + sub is enough, saves 3 FMSynth voices)
@@ -145,8 +159,8 @@ MUZE.Audio = {
     // ---- ARPEGGIO SYNTH: Filter envelope + stereo ping-pong ----
     this.leadSynth = new Tone.PolySynth(Tone.Synth, {
       maxPolyphony: 8,
-      oscillator: { type: 'sawtooth' },
-      envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.8 },
+      oscillator: { type: 'fatsawtooth', count: 2, spread: 20 },
+      envelope: { attack: 0.005, decay: 0.25, sustain: 0.15, release: 0.25 },
     });
 
     // Filter with envelope for the arp — gives it that classic analog pluck
@@ -154,7 +168,7 @@ MUZE.Audio = {
       frequency: 2000,
       type: 'lowpass',
       rolloff: -24,
-      Q: 2
+      Q: 5
     });
 
     // (Removed: _arpPingPong — shared delay bus handles stereo width)
@@ -164,13 +178,13 @@ MUZE.Audio = {
 
     // ---- MELODY SYNTH: Expressive filter envelope + vibrato ----
     this.melodySynth = new Tone.MonoSynth({
-      oscillator: { type: 'triangle' },
+      oscillator: { type: 'fatsawtooth', count: 2, spread: 15 },
       envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 0.4 },
       filterEnvelope: {
         attack: 0.02, decay: 0.3, sustain: 0.3, release: 0.5,
-        baseFrequency: 200, octaves: 4.5, exponent: 2
+        baseFrequency: 400, octaves: 4.5, exponent: 2
       },
-      filter: { type: 'lowpass', rolloff: -24, Q: 2 }
+      filter: { type: 'lowpass', rolloff: -24, Q: 4 }
     });
 
     // Vibrato LFO for melody expressiveness
@@ -180,7 +194,7 @@ MUZE.Audio = {
       max: 15,
       type: 'sine'
     });
-    this._melodyVibratoGain = new Tone.Gain(0); // starts off, user can enable
+    this._melodyVibratoGain = new Tone.Gain(0.15); // always-on subtle vibrato
     this._melodyVibrato.connect(this._melodyVibratoGain);
     this._melodyVibratoGain.connect(this.melodySynth.detune);
     this._melodyVibrato.start();
@@ -191,7 +205,7 @@ MUZE.Audio = {
 
     // KICK: MembraneSynth + click transient (short noise burst)
     this.kickSynth = new Tone.MembraneSynth({
-      pitchDecay: 0.06, octaves: 7, oscillator: { type: 'sine' },
+      pitchDecay: 0.06, octaves: 5, oscillator: { type: 'sine' },
       envelope: { attack: 0.002, decay: 0.5, sustain: 0, release: 0.5 }
     });
     // Click transient: short filtered noise burst for definition
@@ -205,22 +219,25 @@ MUZE.Audio = {
     const kickMix = new Tone.Gain(1);
     this.kickSynth.connect(kickMix);
     this._kickClickFilter.connect(kickMix);
-    this._kickClick.volume.value = -12; // subtle click
+    this._kickClick.volume.value = -7; // more click presence
     this._createChannelStrip('kick', kickMix);
 
     // SNARE: NoiseSynth (top) + short tonal body (bottom)
     this.snareSynth = new Tone.NoiseSynth({
-      noise: { type: 'white' },
+      noise: { type: 'pink' },
       envelope: { attack: 0.002, decay: 0.18, sustain: 0, release: 0.18 }
     });
+    // Bandpass filter on snare noise layer for tighter character
+    this._snareNoiseFilter = new Tone.Filter({ frequency: 3500, type: 'bandpass', Q: 1.2 });
     // Snare body: short pitched sine for "thwack"
     this._snareBody = new Tone.MembraneSynth({
       pitchDecay: 0.03, octaves: 3, oscillator: { type: 'sine' },
       envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.06 }
     });
-    this._snareBody.volume.value = -8;
+    this._snareBody.volume.value = -5;
     const snareMix = new Tone.Gain(1);
-    this.snareSynth.connect(snareMix);
+    this.snareSynth.connect(this._snareNoiseFilter);
+    this._snareNoiseFilter.connect(snareMix);
     this._snareBody.connect(snareMix);
     this._createChannelStrip('snare', snareMix);
 
@@ -405,12 +422,12 @@ MUZE.Audio = {
       case 'kick':
         this.kickSynth.triggerAttackRelease('C1', '8n', now, vel);
         this._kickClick.triggerAttackRelease('32n', now, vel * 0.6);
-        // Sidechain: duck the pad
-        if (MUZE.Sidechain) MUZE.Sidechain.duck();
+        // Sidechain: duck pad and arp for punch
+        this._sidechainDuck();
         break;
       case 'snare':
         this.snareSynth.triggerAttackRelease('8n', now, vel);
-        this._snareBody.triggerAttackRelease('E3', '16n', now, vel * 0.5);
+        this._snareBody.triggerAttackRelease('B2', '16n', now, vel * 0.5);
         break;
       case 'hat':
         if (isOpenHat) {
@@ -419,6 +436,32 @@ MUZE.Audio = {
           this.hatSynth.triggerAttackRelease('32n', now, vel);
         }
         break;
+    }
+  },
+
+  // ============================================================
+  // SIDECHAIN DUCK (improved: deeper duck, hold, exponential release, also ducks arp)
+  // ============================================================
+  _sidechainDuck() {
+    const now = Tone.now();
+    // Duck pad to 10% with 5ms attack, 30ms hold, 300ms exponential release
+    const padNode = this._nodes.pad;
+    if (padNode) {
+      const padGain = padNode.gain.gain.value;
+      padNode.gain.gain.cancelScheduledValues(now);
+      padNode.gain.gain.setValueAtTime(padGain, now);
+      padNode.gain.gain.linearRampToValueAtTime(padGain * 0.1, now + 0.005);   // 5ms attack
+      padNode.gain.gain.setValueAtTime(padGain * 0.1, now + 0.005 + 0.03);      // 30ms hold
+      padNode.gain.gain.exponentialRampToValueAtTime(padGain, now + 0.005 + 0.03 + 0.3); // 300ms exp release
+    }
+    // Duck arp to 50% with 5ms attack, 250ms exponential release
+    const arpNode = this._nodes.arp;
+    if (arpNode) {
+      const arpGain = arpNode.gain.gain.value;
+      arpNode.gain.gain.cancelScheduledValues(now);
+      arpNode.gain.gain.setValueAtTime(arpGain, now);
+      arpNode.gain.gain.linearRampToValueAtTime(arpGain * 0.5, now + 0.005);   // 5ms attack
+      arpNode.gain.gain.exponentialRampToValueAtTime(arpGain, now + 0.005 + 0.25); // 250ms exp release
     }
   },
 
@@ -460,12 +503,14 @@ MUZE.Audio = {
         node.reverbSend.gain.rampTo(node._reverbSendPre, 2);
       }
     }, 300);
-    // Restore ducked volumes
+    // Restore ducked volumes (fallback to mixer defaults if _preRiserGains is empty)
     for (const ch of ['pad', 'kick', 'snare', 'hat']) {
       const node = this._nodes[ch];
-      if (node && this._preRiserGains[ch] !== undefined) {
-        node.gain.gain.rampTo(this._preRiserGains[ch], 0.05);
-      }
+      if (!node) continue;
+      const restoreGain = this._preRiserGains[ch] !== undefined
+        ? this._preRiserGains[ch]
+        : Tone.dbToGain(MUZE.Mixer.channels[ch].volume);
+      node.gain.gain.rampTo(restoreGain, 0.05);
     }
     this._preRiserGains = {};
   },
@@ -475,9 +520,11 @@ MUZE.Audio = {
     this._riserFilter.frequency.rampTo(200, 0.3);
     for (const ch of ['pad', 'kick', 'snare', 'hat']) {
       const node = this._nodes[ch];
-      if (node && this._preRiserGains[ch] !== undefined) {
-        node.gain.gain.rampTo(this._preRiserGains[ch], 0.3);
-      }
+      if (!node) continue;
+      const restoreGain = this._preRiserGains[ch] !== undefined
+        ? this._preRiserGains[ch]
+        : Tone.dbToGain(MUZE.Mixer.channels[ch].volume);
+      node.gain.gain.rampTo(restoreGain, 0.3);
     }
     this._preRiserGains = {};
   },
@@ -491,7 +538,8 @@ MUZE.Audio = {
     this._arpSeq = new Tone.Loop((time) => {
       if (!this._arpNotes.length || !this.leadSynth) return;
       const note = this._arpNotes[this._arpIdx % this._arpNotes.length];
-      this.leadSynth.triggerAttackRelease(note, '8n', time, 0.5);
+      const accent = (this._arpIdx % 4 === 0) ? 0.75 : 0.4 + Math.random() * 0.15;
+      this.leadSynth.triggerAttackRelease(note, '8n', time, accent);
 
       // Animate arp filter for each note (pluck effect)
       if (this._arpFilter) {
@@ -556,7 +604,7 @@ MUZE.Audio = {
   // ============================================================
   toggleBinaural() {
     this._binauralActive = !this._binauralActive;
-    if (this._binauralActive) {
+    if (this._binauralActive && this._binauralL.state !== 'started') {
       this._binauralL.start(); this._binauralR.start();
       this._updateBinauralFreq(this._binauralBaseFreq);
     } else {
@@ -610,7 +658,7 @@ MUZE.Audio = {
     });
     setTimeout(() => {
       Tone.Transport.bpm.rampTo(orig, 0.15);
-      [this.padSynth, this.leadSynth, this.melodySynth].forEach(s => {
+      [this.padSynth, this._padSub, this.leadSynth, this.melodySynth].forEach(s => {
         if (s) s.set({ detune: 0 });
       });
       // Restore pad detuning
@@ -755,7 +803,7 @@ MUZE.Audio = {
     this._padSampleMode = false;
     MUZE.State.padSampleId = null;
     this.padSynth.volume.rampTo(-14, 0.3);
-    this._padSub.volume.rampTo(-20, 0.3);
+    this._padSub.volume.rampTo(-14, 0.3);
     this._padGrain.volume.rampTo(-60, 0.3);
     setTimeout(() => { try { this._padGrain.stop(); } catch(e) {} }, 400);
   },
@@ -766,6 +814,10 @@ MUZE.Audio = {
   getWaveform() {
     if (!this.analyser) return null;
     return this.analyser.getValue();
+  },
+
+  getFFT() {
+    return this.fftAnalyser ? this.fftAnalyser.getValue() : null;
   }
 };
 

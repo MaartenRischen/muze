@@ -12,6 +12,9 @@ MUZE.Music = {
     'harm. minor':  [0,2,3,5,7,8,11],
     'whole tone':   [0,2,4,6,8,10],
     'blues':        [0,3,5,6,7,10],
+    'melodic minor': [0,2,3,5,7,9,11],
+    'phrygian dom':  [0,1,4,5,7,8,10],
+    'hirajoshi':     [0,2,3,7,8],
   },
 
   selectScale(lipCorner) {
@@ -40,10 +43,17 @@ MUZE.Music = {
 
   getPadVoicing(root, scale, degree) {
     const d = degree % scale.length;
+    const root_note = root + scale[d];
+    const third = root + scale[(d + 2) % scale.length];
+    const fifth = root + scale[(d + 4) % scale.length];
+    const seventh = root + scale[(d + 6) % scale.length];
+
+    // Open voicing: root down octave, third, fifth, seventh up
     return [
-      root + scale[d] - 12,
-      root + scale[(d + 4) % scale.length],
-      root + scale[(d + 2) % scale.length] + 12
+      root_note - 12,
+      third,
+      fifth,
+      seventh
     ].map(n => this.midiToNote(n));
   },
 
@@ -63,6 +73,19 @@ MUZE.Music = {
       }
     }
     return '?';
+  },
+
+  snapToScale(midiNote, scale, root) {
+    let bestNote = root;
+    let bestDist = 999;
+    for (let oct = -1; oct <= 8; oct++) {
+      for (const interval of scale) {
+        const candidate = root + oct * 12 + interval;
+        const dist = Math.abs(candidate - midiNote);
+        if (dist < bestDist) { bestDist = dist; bestNote = candidate; }
+      }
+    }
+    return bestNote;
   },
 
   // Get the effective root note (C4 base + offset)
