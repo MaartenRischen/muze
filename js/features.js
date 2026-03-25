@@ -29,6 +29,16 @@ MUZE.LoopRecorder = {
     undoBtn.addEventListener('click', () => this._undoLayer());
     clearBtn.addEventListener('click', () => this._clearAll());
 
+    // Also wire panel buttons (in synth panel Performance tab)
+    const pRec = document.getElementById('loop-rec-panel-btn');
+    const pOvr = document.getElementById('loop-overdub-panel-btn');
+    const pUndo = document.getElementById('loop-undo-panel-btn');
+    const pClear = document.getElementById('loop-clear-panel-btn');
+    if (pRec) pRec.addEventListener('click', () => this._onRecBtn());
+    if (pOvr) pOvr.addEventListener('click', () => this._onOverdubBtn());
+    if (pUndo) pUndo.addEventListener('click', () => this._undoLayer());
+    if (pClear) pClear.addEventListener('click', () => this._clearAll());
+
     // Create a MediaStream destination from the audio context
     this._audioDest = Tone.context.createMediaStreamDestination();
     Tone.getDestination().connect(this._audioDest);
@@ -276,6 +286,19 @@ MUZE.LoopRecorder = {
         undoBtn.disabled = true;
         break;
     }
+    // Sync panel buttons
+    const pRec = document.getElementById('loop-rec-panel-btn');
+    const pOvr = document.getElementById('loop-overdub-panel-btn');
+    const pUndo = document.getElementById('loop-undo-panel-btn');
+    const pClear = document.getElementById('loop-clear-panel-btn');
+    if (pRec) {
+      pRec.disabled = false;
+      pRec.textContent = this._state === 'recording' || this._state === 'overdubbing' ? '■ STOP' : '● REC';
+      pRec.style.color = this._state === 'recording' ? '#ef4444' : this._state === 'overdubbing' ? '#f59e0b' : '';
+    }
+    if (pOvr) pOvr.disabled = overdubBtn.disabled;
+    if (pUndo) pUndo.disabled = undoBtn.disabled;
+    if (pClear) pClear.disabled = clearBtn.disabled;
   }
 };
 
