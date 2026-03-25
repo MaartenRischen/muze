@@ -169,8 +169,9 @@ MUZE.Audio = {
     eq.connect(panner);
     panner.connect(gain);
 
-    // Dry path → Master Filter
-    gain.connect(this._masterFilter);
+    // Dry path: face-linked channels go through master filter, others bypass to master EQ
+    const faceLinked = MUZE.Mixer.channels[name].faceLinked;
+    gain.connect(faceLinked ? this._masterFilter : this._masterEQ);
 
     // Send paths (post-fader)
     gain.connect(reverbSend);
