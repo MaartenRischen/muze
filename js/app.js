@@ -56,8 +56,8 @@ MUZE.Loop = {
         S.handOpen = r.handOpen;
       } else { S.handPresent = false; }
 
-      // Background blur
-      MUZE.BgBlur.render(video, ts + 2);
+      // Background blur (uses face landmarks for person clipping)
+      MUZE.BgBlur.render(video, fr && fr.faceLandmarks);
     }
 
     // Audio logic

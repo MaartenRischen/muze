@@ -166,7 +166,7 @@
 
 <!-- Bootstrap (ES module for MediaPipe import) -->
 <script type="module">
-import { FaceLandmarker, HandLandmarker, ImageSegmenter, FilesetResolver }
+import { FaceLandmarker, HandLandmarker, FilesetResolver }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs';
 
 document.getElementById('start-btn').addEventListener('click', async () => {
@@ -189,8 +189,6 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       MUZE.FaceTracker.init(FaceLandmarker, vision),
       MUZE.HandTracker.init(HandLandmarker, vision),
     ]);
-    // Init segmenter separately — don't block app if it fails
-    MUZE.BgBlur.init(ImageSegmenter, vision).catch(e => console.warn('BgBlur init failed:', e));
 
     // Init UI
     MUZE.Touch.init();
@@ -232,6 +230,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       }
     });
 
+    MUZE.BgBlur.init();
     MUZE.BgBlur.activate();
     MUZE.Loop.init();
 
