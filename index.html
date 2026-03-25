@@ -14,6 +14,7 @@
 <body>
 
 <video id="cam" autoplay playsinline muted></video>
+<canvas id="bg-canvas"></canvas>
 <canvas id="overlay"></canvas>
 
 <!-- Drum touch zones -->
@@ -158,6 +159,7 @@
 <!-- JS Modules -->
 <script src="js/config.js"></script>
 <script src="js/tracking.js"></script>
+<script src="js/bgblur.js"></script>
 <script src="js/music.js"></script>
 <script src="js/mixer.js"></script>
 <script src="js/audio.js"></script>
@@ -232,6 +234,8 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       }
     });
 
+    MUZE.BgBlur.init();
+    MUZE.BgBlur.activate();
     MUZE.Loop.init();
 
     // Fade out start screen
