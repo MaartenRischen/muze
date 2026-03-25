@@ -21,6 +21,14 @@ MUZE.Loop = {
 
   start() { this._running = true; this._tick(); },
 
+  // Render loop without audio logic (for paused state)
+  _tickVisualOnly() {
+    if (this._running) return; // full tick takes over
+    requestAnimationFrame(() => this._tickVisualOnly());
+    MUZE.Visualizer.draw();
+    MUZE.Recorder.drawFrame();
+  },
+
   _tick() {
     if (!this._running) return;
     requestAnimationFrame(() => this._tick());
@@ -55,9 +63,6 @@ MUZE.Loop = {
         S.handY = MUZE.Smooth.update('handY', r.handY, C.SMOOTH_HAND);
         S.handOpen = r.handOpen;
       } else { S.handPresent = false; }
-
-      // Background blur
-      if (MUZE.BgBlur._ready) MUZE.BgBlur.render(video, ts + 2);
     }
 
     // Audio logic

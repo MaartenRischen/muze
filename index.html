@@ -14,7 +14,6 @@
 <body>
 
 <video id="cam" autoplay playsinline muted></video>
-<canvas id="bg-canvas"></canvas>
 <canvas id="overlay"></canvas>
 
 <!-- Drum touch zones -->
@@ -159,7 +158,6 @@
 <!-- JS Modules -->
 <script src="js/config.js"></script>
 <script src="js/tracking.js"></script>
-<script src="js/bgblur.js"></script>
 <script src="js/music.js"></script>
 <script src="js/mixer.js"></script>
 <script src="js/audio.js"></script>
@@ -234,12 +232,6 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       }
     });
 
-    // Background blur (async, never blocks)
-    import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs')
-      .then(m => MUZE.BgBlur.init(m.ImageSegmenter, vision))
-      .then(() => MUZE.BgBlur.activate())
-      .catch(e => console.warn('BgBlur: could not load', e));
-
     MUZE.Loop.init();
 
     // Fade out start screen
@@ -247,11 +239,13 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     setTimeout(() => ss.remove(), 600);
 
     // Start paused — user presses play to begin sound
-    MUZE.Loop.start();
-    MUZE.Loop._running = false;
+    // Only init the loop + visualizer, don't run audio logic
     Tone.Transport.pause();
+    MUZE.Loop._running = false;
     pauseBtn.textContent = '\u25B6';
     pauseBtn.classList.add('paused');
+    // Start the render loop (for visualizer + camera) but audio won't trigger since _running is false
+    MUZE.Loop._tickVisualOnly();
   } catch (err) {
     console.error('MUZE init failed:', err);
     document.getElementById('loading-text').textContent = 'Error: ' + err.message;
