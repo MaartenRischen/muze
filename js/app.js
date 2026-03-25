@@ -33,6 +33,7 @@ MUZE.Loop = {
       MUZE.BgBlur.render(MUZE.Camera.video, Math.round(performance.now()) + 2);
     }
     MUZE.Visualizer.draw();
+    MUZE.MoodLight.update();
     MUZE.Recorder.drawFrame();
   },
 
@@ -135,6 +136,7 @@ MUZE.Loop = {
 
     // Draw
     MUZE.Visualizer.draw();
+    MUZE.MoodLight.update();
     MUZE.Recorder.drawFrame();
     // PERF: Throttle HUD updates to ~5fps (every 200ms) to avoid DOM reflow every frame
     if (now - this._lastHUDUpdate >= this._hudThrottleMs) {

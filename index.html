@@ -18,6 +18,12 @@
 
 <video id="cam" autoplay playsinline muted></video>
 <canvas id="bg-canvas"></canvas>
+
+<!-- Mood Lighting (tints camera feed, under canvas overlay) -->
+<div id="mood-gradient-overlay"><div class="mood-grad-neutral"></div></div>
+<div id="mood-edge-glow"></div>
+<div id="mood-breath-bar"></div>
+
 <canvas id="overlay"></canvas>
 
 <!-- Drum touch zones -->
@@ -270,6 +276,7 @@
 <script src="js/mixer.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/visualizer.js"></script>
+<script src="js/moodlight.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/features.js"></script>
@@ -305,6 +312,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     MUZE.Touch.init();
     MUZE.SynthMenu.init();
     MUZE.MixerUI.init();
+    MUZE.MoodLight.init();
     MUZE.SampleUI.init();
     MUZE.Tutorial.init();
     MUZE.PerfBar.init();
