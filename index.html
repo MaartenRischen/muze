@@ -614,40 +614,35 @@ MUZE.HandFeatures = {
 MUZE.BgBlur = {
   _segmenter: null, _active: false,
   _bgCanvas: null, _bgCtx: null,
-  _tempCanvas: null, _tempCtx: null,
-  _maskCanvas: null, _maskCtx: null,
-  _blurAmount: 20,
+  _sharpCanvas: null, _sharpCtx: null,
+  _blurCanvas: null, _blurCtx: null,
 
   async init(ImageSegmenter, vision) {
     this._bgCanvas = document.getElementById('bg-canvas');
-    this._bgCtx = this._bgCanvas.getContext('2d');
-    this._tempCanvas = document.createElement('canvas');
-    this._tempCtx = this._tempCanvas.getContext('2d');
-    this._maskCanvas = document.createElement('canvas');
-    this._maskCtx = this._maskCanvas.getContext('2d');
+    this._bgCtx = this._bgCanvas.getContext('2d', { willReadFrequently: true });
+    this._sharpCanvas = document.createElement('canvas');
+    this._sharpCtx = this._sharpCanvas.getContext('2d', { willReadFrequently: true });
+    this._blurCanvas = document.createElement('canvas');
+    this._blurCtx = this._blurCanvas.getContext('2d');
 
     this._segmenter = await ImageSegmenter.createFromOptions(vision, {
       baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite', delegate: 'GPU' },
       runningMode: 'VIDEO',
-      outputCategoryMask: true,
-      outputConfidenceMasks: false
+      outputCategoryMask: false,
+      outputConfidenceMasks: true
     });
   },
 
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
-    // Use half resolution for performance
-    const scale = Math.min(1, 360 / w);
+    const scale = Math.min(1, 320 / w);
     this._w = Math.round(w * scale);
     this._h = Math.round(h * scale);
-    this._bgCanvas.width = this._w;
-    this._bgCanvas.height = this._h;
+    [this._bgCanvas, this._sharpCanvas, this._blurCanvas].forEach(c => {
+      c.width = this._w; c.height = this._h;
+    });
     this._bgCanvas.style.width = w + 'px';
     this._bgCanvas.style.height = h + 'px';
-    this._tempCanvas.width = this._w;
-    this._tempCanvas.height = this._h;
-    this._maskCanvas.width = this._w;
-    this._maskCanvas.height = this._h;
   },
 
   toggle() {
@@ -660,66 +655,48 @@ MUZE.BgBlur = {
   render(video, ts) {
     if (!this._active || !this._segmenter || video.readyState < 2) return;
     const w = this._w, h = this._h;
-    const ctx = this._bgCtx;
-    const tmp = this._tempCtx;
-    const msk = this._maskCtx;
 
-    // Draw video (mirrored, cover-cropped)
+    // Draw video mirrored + cover-cropped
     const vw = video.videoWidth, vh = video.videoHeight;
-    const canvasRatio = w / h, vidRatio = vw / vh;
+    const cr = w / h, vr = vw / vh;
     let sx = 0, sy = 0, sw = vw, sh = vh;
-    if (vidRatio > canvasRatio) { sw = vh * canvasRatio; sx = (vw - sw) / 2; }
-    else { sh = vw / canvasRatio; sy = (vh - sh) / 2; }
+    if (vr > cr) { sw = vh * cr; sx = (vw - sw) / 2; }
+    else { sh = vw / cr; sy = (vh - sh) / 2; }
 
-    tmp.save();
-    tmp.translate(w, 0);
-    tmp.scale(-1, 1);
-    tmp.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
-    tmp.restore();
+    this._sharpCtx.save();
+    this._sharpCtx.translate(w, 0);
+    this._sharpCtx.scale(-1, 1);
+    this._sharpCtx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+    this._sharpCtx.restore();
 
-    // Segment
+    // Blurred version
+    this._blurCtx.filter = 'blur(12px)';
+    this._blurCtx.drawImage(this._sharpCanvas, 0, 0);
+    this._blurCtx.filter = 'none';
+
+    // Segment — use confidence mask for smooth edges
     const result = this._segmenter.segmentForVideo(video, ts);
-    if (!result || !result.categoryMask) return;
-    const mask = result.categoryMask.getAsUint8Array();
+    if (!result || !result.confidenceMasks || !result.confidenceMasks.length) return;
+    const conf = result.confidenceMasks[0].getAsFloat32Array();
 
-    // Build mask image
-    const maskImg = msk.createImageData(w, h);
-    const d = maskImg.data;
-    // Segmenter mask: category 0 = background, 1+ = person
-    // But selfie segmenter uses confidence, category mask: 0=bg, 255=person
-    for (let i = 0; i < mask.length; i++) {
-      const a = mask[i] > 0 ? 255 : 0;
-      d[i * 4] = 255;
-      d[i * 4 + 1] = 255;
-      d[i * 4 + 2] = 255;
-      d[i * 4 + 3] = a;
+    // Get pixel data from both
+    const sharp = this._sharpCtx.getImageData(0, 0, w, h);
+    const blur = this._blurCtx.getImageData(0, 0, w, h);
+    const out = sharp; // reuse sharp buffer for output
+    const sd = sharp.data, bd = blur.data;
+
+    // Blend: person pixels from sharp, background from blur
+    for (let i = 0; i < conf.length; i++) {
+      const p = i * 4;
+      const a = conf[i]; // 0=bg, 1=person
+      const b = 1 - a;
+      sd[p]     = sd[p]     * a + bd[p]     * b;
+      sd[p + 1] = sd[p + 1] * a + bd[p + 1] * b;
+      sd[p + 2] = sd[p + 2] * a + bd[p + 2] * b;
     }
-    msk.putImageData(maskImg, 0, 0);
 
-    // Draw blurred background
-    ctx.filter = `blur(${this._blurAmount}px)`;
-    ctx.drawImage(this._tempCanvas, 0, 0);
-    ctx.filter = 'none';
-
-    // Draw sharp person using mask as clip
-    ctx.save();
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.drawImage(this._maskCanvas, 0, 0);
-    ctx.restore();
-    ctx.save();
-    ctx.globalCompositeOperation = 'destination-over';
-    ctx.drawImage(this._tempCanvas, 0, 0);
-    ctx.restore();
-
-    // Outline glow around person
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.filter = `blur(3px)`;
-    ctx.globalAlpha = 0.4;
-    ctx.drawImage(this._maskCanvas, 0, 0);
-    ctx.restore();
-
-    result.categoryMask.close();
+    this._bgCtx.putImageData(out, 0, 0);
+    result.confidenceMasks[0].close();
   }
 };
 </script>
