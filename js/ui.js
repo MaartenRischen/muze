@@ -40,8 +40,25 @@ MUZE.Touch = {
   _onStart(e) {
     e.preventDefault();
     const t = e.changedTouches[0];
-    this._touchStart = { x: t.clientX, y: t.clientY, time: performance.now() };
+    const now = performance.now();
+    this._touchStart = { x: t.clientX, y: t.clientY, time: now };
     this._isHolding = false;
+
+    // INSTANT drum trigger on touchstart (zero latency)
+    const target = document.elementFromPoint(t.clientX, t.clientY);
+    if (target) {
+      const drum = target.dataset.drum || target.parentElement?.dataset?.drum;
+      if (drum && (!this._cooldown[drum] || now - this._cooldown[drum] > 120)) {
+        this._cooldown[drum] = now;
+        MUZE.Audio.triggerDrum(drum, 0.7);
+        if (MUZE.DrumFX) MUZE.DrumFX.trigger(drum, t.clientX, t.clientY);
+        if (MUZE.LoopRecorder) MUZE.LoopRecorder.recordHit(drum);
+        const el = document.getElementById('zone-' + drum);
+        if (el) { el.classList.add('hit'); setTimeout(() => el.classList.remove('hit'), 180); }
+        this._drumFiredOnStart = true;
+      }
+    }
+
     this._holdTimer = setTimeout(() => {
       this._isHolding = true;
       MUZE.Audio.startRiser();
@@ -99,26 +116,8 @@ MUZE.Touch = {
     }
     this._lastTapTime = now;
 
-    // Single tap → drum hit with velocity + premium visual feedback
-    const target = document.elementFromPoint(t.clientX, t.clientY);
-    if (target) {
-      const drum = target.dataset.drum || target.parentElement?.dataset?.drum;
-      if (drum) {
-        const cn = performance.now();
-        if (!this._cooldown[drum] || cn - this._cooldown[drum] > 50) {
-          this._cooldown[drum] = cn;
-          // Velocity: faster taps = harder hits
-          const velocity = Math.min(1, Math.max(0.3, 1 - (dt / 300)));
-          MUZE.Audio.triggerDrum(drum, velocity);
-          // Premium visual feedback (ripple, particles, flash, pulse, kick punch)
-          if (MUZE.DrumFX) MUZE.DrumFX.trigger(drum, t.clientX, t.clientY);
-          const el = document.getElementById('zone-' + drum);
-          if (el) {
-            el.classList.add('hit');
-            setTimeout(() => el.classList.remove('hit'), 180);
-          }
-        }
-      }
+    // Drum already fired on touchstart — nothing to do here
+    // (double-tap detection above handles auto-rhythm toggle)
     }
     this._touchStart = null;
   }
