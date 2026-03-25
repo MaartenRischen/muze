@@ -188,8 +188,9 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     await Promise.all([
       MUZE.FaceTracker.init(FaceLandmarker, vision),
       MUZE.HandTracker.init(HandLandmarker, vision),
-      MUZE.BgBlur.init(ImageSegmenter, vision),
     ]);
+    // Init segmenter separately — don't block app if it fails
+    MUZE.BgBlur.init(ImageSegmenter, vision).catch(e => console.warn('BgBlur init failed:', e));
 
     // Init UI
     MUZE.Touch.init();
