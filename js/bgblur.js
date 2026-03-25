@@ -57,32 +57,31 @@ MUZE.BgBlur = {
     const faceH = faceBottom - faceTop;
     const faceW = (rightEar.x - leftEar.x) * w;
 
-    // Person center — slightly below nose to include torso
+    // Sharp column centered on person — head to bottom of frame
     const pcx = cx;
-    const pcy = faceTop + faceH * 0.8;
-
-    // Radii — tight around head + shoulders
-    const rx = faceW * 1.0;
-    const ry = faceH * 1.3;
+    const columnW = faceW * 1.2;
 
     // Draw sharp video
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(video, 0, 0, w, h);
 
-    // Erase edges with soft radial gradient → reveals blurred video behind
+    // Erase sides with horizontal gradient — keep a vertical column sharp
     ctx.save();
     ctx.globalCompositeOperation = 'destination-in';
-    const grad = ctx.createRadialGradient(pcx, pcy, 0, pcx, pcy, Math.max(rx, ry));
-    grad.addColorStop(0, 'rgba(255,255,255,1)');
-    grad.addColorStop(0.3, 'rgba(255,255,255,1)');
-    grad.addColorStop(0.6, 'rgba(255,255,255,0.2)');
+
+    // Horizontal gradient: transparent → solid → solid → transparent
+    const grad = ctx.createLinearGradient(0, 0, w, 0);
+    const leftEdge = Math.max(0, (pcx - columnW) / w);
+    const leftIn = Math.max(0, (pcx - columnW * 0.6) / w);
+    const rightIn = Math.min(1, (pcx + columnW * 0.6) / w);
+    const rightEdge = Math.min(1, (pcx + columnW) / w);
+    grad.addColorStop(0, 'rgba(255,255,255,0)');
+    grad.addColorStop(leftEdge, 'rgba(255,255,255,0)');
+    grad.addColorStop(leftIn, 'rgba(255,255,255,1)');
+    grad.addColorStop(rightIn, 'rgba(255,255,255,1)');
+    grad.addColorStop(rightEdge, 'rgba(255,255,255,0)');
     grad.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = grad;
-
-    // Use ellipse transform for non-circular falloff
-    ctx.translate(pcx, pcy);
-    ctx.scale(1, ry / rx);
-    ctx.translate(-pcx, -pcy);
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
   }
