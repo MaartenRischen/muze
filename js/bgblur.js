@@ -17,7 +17,6 @@ MUZE.BgBlur = {
 
   activate() {
     this._active = true;
-    document.getElementById('cam').style.filter = 'blur(10px) brightness(0.9)';
     const check = () => {
       const v = MUZE.Camera.video;
       if (v && v.videoWidth) {
