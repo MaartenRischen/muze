@@ -170,7 +170,7 @@
 
 <!-- Bootstrap (ES module for MediaPipe import) -->
 <script type="module">
-import { FaceLandmarker, HandLandmarker, ImageSegmenter, FilesetResolver }
+import { FaceLandmarker, HandLandmarker, FilesetResolver }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs';
 
 document.getElementById('start-btn').addEventListener('click', async () => {
@@ -234,7 +234,11 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       }
     });
 
-    MUZE.BgBlur.init(ImageSegmenter, vision).then(() => MUZE.BgBlur.activate());
+    // Load segmenter async — never blocks app
+    import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs')
+      .then(m => MUZE.BgBlur.init(m.ImageSegmenter, vision))
+      .then(() => MUZE.BgBlur.activate())
+      .catch(e => console.warn('BgBlur: could not load', e));
     MUZE.Loop.init();
 
     // Fade out start screen
