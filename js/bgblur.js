@@ -61,9 +61,9 @@ MUZE.BgBlur = {
     const pcx = cx;
     const pcy = faceTop + faceH * 0.8;
 
-    // Radii — generous to cover head + shoulders + upper body
-    const rx = faceW * 1.8;
-    const ry = faceH * 2.2;
+    // Radii — tight around head + shoulders
+    const rx = faceW * 1.0;
+    const ry = faceH * 1.3;
 
     // Draw sharp video
     ctx.clearRect(0, 0, w, h);
@@ -74,8 +74,8 @@ MUZE.BgBlur = {
     ctx.globalCompositeOperation = 'destination-in';
     const grad = ctx.createRadialGradient(pcx, pcy, 0, pcx, pcy, Math.max(rx, ry));
     grad.addColorStop(0, 'rgba(255,255,255,1)');
-    grad.addColorStop(0.45, 'rgba(255,255,255,1)');
-    grad.addColorStop(0.75, 'rgba(255,255,255,0.3)');
+    grad.addColorStop(0.3, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.6, 'rgba(255,255,255,0.2)');
     grad.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = grad;
 
