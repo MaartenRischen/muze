@@ -196,21 +196,41 @@ MUZE.SynthMenu = {
 };
 
 // ============================================================
-// MIXER UI — Builds and wires the channel strip interface
+// MIXER UI — Professional mobile DAW mixer with progressive disclosure
+// Strip view: fader + meter + pan + M/S
+// Detail panel: EQ + sends + pan (slide-up sheet)
 // ============================================================
 MUZE.MixerUI = {
+  _meterRAF: null,
+  _metersRunning: false,
+  _detailOpen: false,
+  _detailCh: null,
+
   init() {
     const panel = document.getElementById('mixer-panel');
     const strips = document.getElementById('mixer-strips');
+    const detail = document.getElementById('mixer-detail');
 
-    // Toggle
-    document.getElementById('mixer-btn').addEventListener('click', () => panel.classList.toggle('open'));
-    document.getElementById('mixer-close').addEventListener('click', () => panel.classList.remove('open'));
+    // Toggle mixer panel
+    document.getElementById('mixer-btn').addEventListener('click', () => {
+      const opening = !panel.classList.contains('open');
+      panel.classList.toggle('open');
+      if (opening) this._startMeters();
+      else this._stopMeters();
+    });
+
+    document.getElementById('mixer-close').addEventListener('click', () => {
+      panel.classList.remove('open');
+      this._stopMeters();
+      this._closeDetail();
+    });
 
     // Close when tapping outside
     document.addEventListener('touchstart', (e) => {
       if (panel.classList.contains('open') && !panel.contains(e.target) && e.target.id !== 'mixer-btn') {
         panel.classList.remove('open');
+        this._stopMeters();
+        this._closeDetail();
       }
     });
 
@@ -218,10 +238,12 @@ MUZE.MixerUI = {
     for (const ch of MUZE.Mixer.CHANNEL_ORDER) {
       strips.appendChild(this._buildStrip(ch));
     }
-    // Master strip
+
+    // Build master strip (pinned right)
     strips.appendChild(this._buildMasterStrip());
   },
 
+  // ---- Build a channel strip (progressive: fader + meter + pan + M/S) ----
   _buildStrip(ch) {
     const data = MUZE.Mixer.channels[ch];
     const el = document.createElement('div');
@@ -229,52 +251,41 @@ MUZE.MixerUI = {
     el.dataset.ch = ch;
     el.style.setProperty('--strip-color', data.color);
 
+    // Short label (max 4 chars)
+    const label = ch.toUpperCase().slice(0, 4);
+
+    // Pan position as percentage for the dot
+    const panPct = ((data.pan + 1) / 2) * 100;
+
     el.innerHTML = `
-      <div class="strip-label">${ch.toUpperCase().slice(0, 4)}</div>
-      <div class="strip-eq">
-        <div class="eq-slider"><label>H</label><input type="range" data-band="high" min="-12" max="12" step="0.5" value="${data.eqHigh}"></div>
-        <div class="eq-slider"><label>M</label><input type="range" data-band="mid" min="-12" max="12" step="0.5" value="${data.eqMid}"></div>
-        <div class="eq-slider"><label>L</label><input type="range" data-band="low" min="-12" max="12" step="0.5" value="${data.eqLow}"></div>
+      <div class="strip-label" data-ch="${ch}">${label}</div>
+      <div class="strip-fader-area">
+        <div class="strip-meter">
+          <div class="strip-meter-fill" data-meter="${ch}"></div>
+        </div>
+        <div class="strip-fader">
+          <input type="range" min="-60" max="6" step="0.5" value="${data.volume}" orient="vertical">
+          <div class="fader-val">${data.volume > -60 ? data.volume : '-inf'}</div>
+        </div>
       </div>
-      <div class="strip-sends">
-        <div class="send-knob"><label>RV</label><input type="range" data-send="reverb" min="0" max="1" step="0.02" value="${data.reverbSend}"></div>
-        <div class="send-knob"><label>DL</label><input type="range" data-send="delay" min="0" max="1" step="0.02" value="${data.delaySend}"></div>
-      </div>
-      <div class="strip-pan"><label>PAN</label><input type="range" min="-1" max="1" step="0.05" value="${data.pan}"></div>
-      <div class="strip-fader">
-        <input type="range" min="-60" max="6" step="0.5" value="${data.volume}" orient="vertical">
-        <div class="fader-val">${data.volume}</div>
+      <div class="strip-pan-indicator${ch === 'binaural' ? ' disabled' : ''}" data-ch="${ch}">
+        <div class="pan-line">
+          <div class="pan-dot" style="left:${panPct}%"></div>
+        </div>
       </div>
       <div class="strip-buttons">
-        <button class="mute-btn">M</button>
-        <button class="solo-btn">S</button>
+        <button class="mute-btn${data.mute ? ' active' : ''}">M</button>
+        <button class="solo-btn${data.solo ? ' active' : ''}">S</button>
       </div>
     `;
-
-    // Wire EQ
-    el.querySelectorAll('.eq-slider input').forEach(inp => {
-      inp.addEventListener('input', () => MUZE.Mixer.setChannelEQ(ch, inp.dataset.band, +inp.value));
-    });
-
-    // Wire sends
-    el.querySelectorAll('.send-knob input').forEach(inp => {
-      inp.addEventListener('input', () => {
-        if (inp.dataset.send === 'reverb') MUZE.Mixer.setChannelReverbSend(ch, +inp.value);
-        else MUZE.Mixer.setChannelDelaySend(ch, +inp.value);
-      });
-    });
-
-    // Wire pan
-    el.querySelector('.strip-pan input').addEventListener('input', function() {
-      MUZE.Mixer.setChannelPan(ch, +this.value);
-    });
 
     // Wire fader
     const fader = el.querySelector('.strip-fader input');
     const faderVal = el.querySelector('.fader-val');
     fader.addEventListener('input', () => {
-      MUZE.Mixer.setChannelVolume(ch, +fader.value);
-      faderVal.textContent = fader.value;
+      const v = +fader.value;
+      MUZE.Mixer.setChannelVolume(ch, v);
+      faderVal.textContent = v > -60 ? v : '-inf';
     });
 
     // Wire mute/solo
@@ -287,15 +298,23 @@ MUZE.MixerUI = {
       this.classList.toggle('active', soloed);
     });
 
-    // Disable pan for binaural (stereo separation is internal)
-    if (ch === 'binaural') {
-      el.querySelector('.strip-pan input').disabled = true;
-      el.querySelector('.strip-pan input').style.opacity = '0.3';
+    // Tap label -> open detail
+    el.querySelector('.strip-label').addEventListener('click', () => {
+      this._openDetail(ch);
+    });
+
+    // Tap pan indicator -> open detail (for adjusting pan in detail view)
+    const panInd = el.querySelector('.strip-pan-indicator');
+    if (ch !== 'binaural') {
+      panInd.addEventListener('click', () => {
+        this._openDetail(ch);
+      });
     }
 
     return el;
   },
 
+  // ---- Build master strip ----
   _buildMasterStrip() {
     const m = MUZE.Mixer.master;
     const el = document.createElement('div');
@@ -303,42 +322,289 @@ MUZE.MixerUI = {
     el.style.setProperty('--strip-color', '#fff');
 
     el.innerHTML = `
-      <div class="strip-label" style="background:#fff;color:#000">MSTR</div>
-      <div class="strip-eq">
-        <div class="eq-slider"><label>H</label><input type="range" data-band="high" min="-12" max="12" step="0.5" value="${m.eqHigh}"></div>
-        <div class="eq-slider"><label>M</label><input type="range" data-band="mid" min="-12" max="12" step="0.5" value="${m.eqMid}"></div>
-        <div class="eq-slider"><label>L</label><input type="range" data-band="low" min="-12" max="12" step="0.5" value="${m.eqLow}"></div>
+      <div class="strip-label">MSTR</div>
+      <div class="strip-fader-area">
+        <div class="strip-meter">
+          <div class="strip-meter-fill" data-meter="master"></div>
+        </div>
+        <div class="strip-fader">
+          <input type="range" min="-60" max="6" step="0.5" value="${m.volume}" orient="vertical">
+          <div class="fader-val">${m.volume}</div>
+        </div>
       </div>
-      <div class="strip-sends">
-        <div class="send-knob"><label>LIM</label><input type="range" min="-12" max="0" step="0.5" value="${m.limiterThreshold}"></div>
-      </div>
-      <div class="strip-pan"><label>&nbsp;</label><input type="range" disabled style="opacity:0.2"></div>
-      <div class="strip-fader">
-        <input type="range" min="-60" max="6" step="0.5" value="${m.volume}" orient="vertical">
-        <div class="fader-val">${m.volume}</div>
-      </div>
+      <div class="master-limiter-val">LIM ${m.limiterThreshold}dB</div>
       <div class="strip-buttons"></div>
     `;
-
-    // Wire master EQ
-    el.querySelectorAll('.eq-slider input').forEach(inp => {
-      inp.addEventListener('input', () => MUZE.Mixer.setMasterEQ(inp.dataset.band, +inp.value));
-    });
-
-    // Wire limiter
-    el.querySelector('.send-knob input').addEventListener('input', function() {
-      MUZE.Mixer.setMasterLimiter(+this.value);
-    });
 
     // Wire master fader
     const fader = el.querySelector('.strip-fader input');
     const faderVal = el.querySelector('.fader-val');
     fader.addEventListener('input', () => {
-      MUZE.Mixer.setMasterVolume(+fader.value);
-      faderVal.textContent = fader.value;
+      const v = +fader.value;
+      MUZE.Mixer.setMasterVolume(v);
+      faderVal.textContent = v > -60 ? v : '-inf';
+    });
+
+    // Tap label -> open master detail
+    el.querySelector('.strip-label').addEventListener('click', () => {
+      this._openDetail('master');
     });
 
     return el;
+  },
+
+  // ---- Open detail panel for a channel ----
+  _openDetail(ch) {
+    const detail = document.getElementById('mixer-detail');
+    const strips = document.getElementById('mixer-strips');
+    const isMaster = (ch === 'master');
+    const data = isMaster ? MUZE.Mixer.master : MUZE.Mixer.channels[ch];
+    const color = isMaster ? '#fff' : data.color;
+    const label = isMaster ? 'MASTER' : ch.toUpperCase();
+
+    this._detailOpen = true;
+    this._detailCh = ch;
+
+    // Build detail content
+    let html = `
+      <div class="detail-header">
+        <div class="detail-ch-name" style="background:${color};color:#000">${label}</div>
+        <button class="detail-back">BACK</button>
+      </div>
+      <div class="detail-content" style="--detail-color:${color}">
+    `;
+
+    // EQ section
+    const eqLow = isMaster ? data.eqLow : data.eqLow;
+    const eqMid = isMaster ? data.eqMid : data.eqMid;
+    const eqHigh = isMaster ? data.eqHigh : data.eqHigh;
+
+    html += `
+        <div class="detail-eq">
+          <div class="detail-section-label">EQUALIZER</div>
+          <div class="detail-eq-sliders">
+            <div class="detail-eq-band">
+              <label>LOW</label>
+              <input type="range" data-band="low" min="-12" max="12" step="0.5" value="${eqLow}" orient="vertical">
+              <div class="detail-eq-val" data-eq-val="low">${eqLow > 0 ? '+' : ''}${eqLow} dB</div>
+            </div>
+            <div class="detail-eq-band">
+              <label>MID</label>
+              <input type="range" data-band="mid" min="-12" max="12" step="0.5" value="${eqMid}" orient="vertical">
+              <div class="detail-eq-val" data-eq-val="mid">${eqMid > 0 ? '+' : ''}${eqMid} dB</div>
+            </div>
+            <div class="detail-eq-band">
+              <label>HIGH</label>
+              <input type="range" data-band="high" min="-12" max="12" step="0.5" value="${eqHigh}" orient="vertical">
+              <div class="detail-eq-val" data-eq-val="high">${eqHigh > 0 ? '+' : ''}${eqHigh} dB</div>
+            </div>
+          </div>
+        </div>
+    `;
+
+    // Sends section (channels only — not master)
+    if (!isMaster) {
+      html += `
+        <div class="detail-sends">
+          <div class="detail-section-label">SENDS</div>
+          <div class="detail-send-row">
+            <label>REVERB</label>
+            <div class="detail-send-slider">
+              <input type="range" data-send="reverb" min="0" max="1" step="0.01" value="${data.reverbSend}">
+              <div class="detail-send-val" data-send-val="reverb">${Math.round(data.reverbSend * 100)}%</div>
+            </div>
+          </div>
+          <div class="detail-send-row">
+            <label>DELAY</label>
+            <div class="detail-send-slider">
+              <input type="range" data-send="delay" min="0" max="1" step="0.01" value="${data.delaySend}">
+              <div class="detail-send-val" data-send-val="delay">${Math.round(data.delaySend * 100)}%</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Limiter threshold (master only)
+    if (isMaster) {
+      html += `
+        <div class="detail-sends">
+          <div class="detail-section-label">LIMITER</div>
+          <div class="detail-send-row">
+            <label>THRESHOLD</label>
+            <div class="detail-send-slider">
+              <input type="range" data-limiter min="-12" max="0" step="0.5" value="${data.limiterThreshold}">
+              <div class="detail-send-val" data-limiter-val>${data.limiterThreshold} dB</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Pan section (channels only, not binaural)
+    if (!isMaster && ch !== 'binaural') {
+      html += `
+        <div class="detail-pan">
+          <div class="detail-section-label">PAN</div>
+          <div class="detail-pan-slider">
+            <input type="range" min="-1" max="1" step="0.05" value="${data.pan}">
+            <div class="detail-pan-val">${data.pan === 0 ? 'C' : (data.pan < 0 ? Math.round(Math.abs(data.pan) * 100) + 'L' : Math.round(data.pan * 100) + 'R')}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    html += '</div>'; // close detail-content
+
+    detail.innerHTML = html;
+
+    // Wire detail back button
+    detail.querySelector('.detail-back').addEventListener('click', () => {
+      this._closeDetail();
+    });
+
+    // Wire EQ sliders
+    detail.querySelectorAll('.detail-eq-band input').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const band = inp.dataset.band;
+        const v = +inp.value;
+        if (isMaster) {
+          MUZE.Mixer.setMasterEQ(band, v);
+        } else {
+          MUZE.Mixer.setChannelEQ(ch, band, v);
+        }
+        const valEl = detail.querySelector(`[data-eq-val="${band}"]`);
+        if (valEl) valEl.textContent = (v > 0 ? '+' : '') + v + ' dB';
+      });
+    });
+
+    // Wire send sliders (channels only)
+    if (!isMaster) {
+      detail.querySelectorAll('.detail-send-slider input[data-send]').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const v = +inp.value;
+          if (inp.dataset.send === 'reverb') {
+            MUZE.Mixer.setChannelReverbSend(ch, v);
+            const valEl = detail.querySelector('[data-send-val="reverb"]');
+            if (valEl) valEl.textContent = Math.round(v * 100) + '%';
+          } else {
+            MUZE.Mixer.setChannelDelaySend(ch, v);
+            const valEl = detail.querySelector('[data-send-val="delay"]');
+            if (valEl) valEl.textContent = Math.round(v * 100) + '%';
+          }
+        });
+      });
+    }
+
+    // Wire limiter slider (master only)
+    if (isMaster) {
+      const limInp = detail.querySelector('[data-limiter]');
+      if (limInp) {
+        limInp.addEventListener('input', () => {
+          const v = +limInp.value;
+          MUZE.Mixer.setMasterLimiter(v);
+          const valEl = detail.querySelector('[data-limiter-val]');
+          if (valEl) valEl.textContent = v + ' dB';
+          // Also update the strip view limiter display
+          const limDisp = document.querySelector('.master-limiter-val');
+          if (limDisp) limDisp.textContent = 'LIM ' + v + 'dB';
+        });
+      }
+    }
+
+    // Wire pan slider (channels only)
+    if (!isMaster && ch !== 'binaural') {
+      const panInp = detail.querySelector('.detail-pan-slider input');
+      if (panInp) {
+        panInp.addEventListener('input', () => {
+          const v = +panInp.value;
+          MUZE.Mixer.setChannelPan(ch, v);
+          const valEl = detail.querySelector('.detail-pan-val');
+          if (valEl) valEl.textContent = v === 0 ? 'C' : (v < 0 ? Math.round(Math.abs(v) * 100) + 'L' : Math.round(v * 100) + 'R');
+          // Update pan dot in strip view
+          const panDot = document.querySelector(`.mixer-strip[data-ch="${ch}"] .pan-dot`);
+          if (panDot) panDot.style.left = ((v + 1) / 2 * 100) + '%';
+        });
+      }
+    }
+
+    // Show detail, hide strips
+    detail.classList.remove('hidden');
+    // Force reflow before adding open class for transition
+    detail.offsetHeight;
+    detail.classList.add('open');
+  },
+
+  // ---- Close detail panel ----
+  _closeDetail() {
+    const detail = document.getElementById('mixer-detail');
+    detail.classList.remove('open');
+    this._detailOpen = false;
+    this._detailCh = null;
+    // Wait for transition to finish before hiding
+    setTimeout(() => {
+      if (!this._detailOpen) {
+        detail.classList.add('hidden');
+      }
+    }, 350);
+  },
+
+  // ---- Meter Animation ----
+  _startMeters() {
+    if (this._metersRunning) return;
+    this._metersRunning = true;
+    this._updateMeters();
+  },
+
+  _stopMeters() {
+    this._metersRunning = false;
+    if (this._meterRAF) {
+      cancelAnimationFrame(this._meterRAF);
+      this._meterRAF = null;
+    }
+  },
+
+  _updateMeters() {
+    if (!this._metersRunning) return;
+
+    // Update channel meters
+    for (const ch of MUZE.Mixer.CHANNEL_ORDER) {
+      const meterFill = document.querySelector(`[data-meter="${ch}"]`);
+      if (!meterFill) continue;
+
+      let level = 0;
+      const node = MUZE.Audio._nodes[ch];
+      if (node) {
+        // Use Tone.Meter if available, otherwise approximate from gain value
+        if (node.meter) {
+          const db = node.meter.getValue();
+          // Convert dB to 0-100 range (-60dB = 0%, 0dB = 100%)
+          level = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
+        } else {
+          // Fallback: use gain value as rough proxy
+          const g = node.gain.gain.value;
+          level = Math.max(0, Math.min(100, g * 100));
+        }
+      }
+
+      meterFill.style.height = level + '%';
+    }
+
+    // Update master meter
+    const masterFill = document.querySelector('[data-meter="master"]');
+    if (masterFill) {
+      let level = 0;
+      if (MUZE.Audio._masterMeter) {
+        const db = MUZE.Audio._masterMeter.getValue();
+        level = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
+      } else if (MUZE.Audio._masterGain) {
+        const g = MUZE.Audio._masterGain.gain.value;
+        level = Math.max(0, Math.min(100, g * 100));
+      }
+      masterFill.style.height = level + '%';
+    }
+
+    this._meterRAF = requestAnimationFrame(() => this._updateMeters());
   }
 };
 

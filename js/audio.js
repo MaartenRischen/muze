@@ -54,6 +54,8 @@ MUZE.Audio = {
     this.analyser.toDestination();
 
     this._masterGain = new Tone.Gain(1).connect(this._limiter);
+    this._masterMeter = new Tone.Meter();
+    this._masterGain.connect(this._masterMeter);
     this._masterEQ = new Tone.EQ3(0, 0, 0).connect(this._masterGain);
     this._masterFilterGain = new Tone.Gain(1).connect(this._masterEQ);
     this._masterFilter = new Tone.Filter({ frequency: 2000, type: 'lowpass', rolloff: -24, Q: 1.2 }).connect(this._masterFilterGain);
@@ -176,7 +178,11 @@ MUZE.Audio = {
     gain.connect(delaySend);
     delaySend.connect(this._delayBus);
 
-    this._nodes[name] = { eq, panner, gain, reverbSend, delaySend };
+    // Metering: connect gain to a Tone.Meter for real-time level readout
+    const meter = new Tone.Meter();
+    gain.connect(meter);
+
+    this._nodes[name] = { eq, panner, gain, reverbSend, delaySend, meter };
   },
 
   // ============================================================

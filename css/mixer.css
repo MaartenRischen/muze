@@ -1,0 +1,677 @@
+/* ============================================================
+   MUZE — Mixer Panel (Professional Mobile DAW Design)
+   ============================================================
+   Progressive disclosure: Strip view = fader + meter + pan + M/S
+   Detail panel = EQ + sends + pan (slide-up sheet)
+   ============================================================ */
+
+/* ---- CSS Custom Properties for Mixer ---- */
+:root {
+  --mixer-bg: rgba(6, 6, 10, 0.96);
+  --mixer-blur: 32px;
+  --mixer-strip-w: 64px;
+  --mixer-master-w: 76px;
+  --mixer-fader-min-h: 150px;
+  --mixer-btn-size: 36px;
+  --mixer-meter-w: 3px;
+  --mixer-font: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  --mixer-red: #ef4444;
+  --mixer-yellow: #eab308;
+  --mixer-green: #22c55e;
+}
+
+/* ============================================================
+   MIXER PANEL — Fixed bottom, slides up
+   ============================================================ */
+#mixer-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 52vh;
+  z-index: 16;
+  background: var(--mixer-bg);
+  backdrop-filter: blur(var(--mixer-blur));
+  -webkit-backdrop-filter: blur(var(--mixer-blur));
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  transform: translateY(100%);
+  transition: transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#mixer-panel.open {
+  transform: translateY(0);
+}
+
+/* ---- Header Bar ---- */
+#mixer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+#mixer-header span {
+  color: var(--muze-text);
+  font: 700 10px/1 var(--mixer-font);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+#mixer-close {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--muze-text-muted);
+  font-size: 22px;
+  cursor: pointer;
+  padding: 8px 12px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+
+#mixer-close:active {
+  color: var(--muze-text);
+}
+
+/* ============================================================
+   STRIP CONTAINER — Horizontal scroll
+   ============================================================ */
+#mixer-strips {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+  padding: 0;
+  gap: 0;
+  scrollbar-width: none;
+  min-height: 0;
+}
+
+#mixer-strips::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
+   INDIVIDUAL CHANNEL STRIP
+   ============================================================ */
+.mixer-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: var(--mixer-strip-w);
+  width: var(--mixer-strip-w);
+  padding: 0 0 8px;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  position: relative;
+  gap: 0;
+}
+
+/* ---- Color-coded Header Label ---- */
+.strip-label {
+  font: 700 8px/1 var(--mixer-font);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 6px 4px 5px;
+  background: var(--strip-color, var(--muze-text-muted));
+  color: #000;
+  text-align: center;
+  width: 100%;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: filter 0.1s;
+  flex-shrink: 0;
+}
+
+.strip-label:active {
+  filter: brightness(0.8);
+}
+
+/* ---- Fader + Meter Container ---- */
+.strip-fader-area {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--mixer-fader-min-h);
+  padding: 8px 6px 4px;
+  gap: 3px;
+  position: relative;
+}
+
+/* ---- Level Meter ---- */
+.strip-meter {
+  width: var(--mixer-meter-w);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+.strip-meter-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 0%;
+  border-radius: 2px;
+  background: linear-gradient(
+    to top,
+    var(--mixer-green) 0%,
+    var(--mixer-green) 60%,
+    var(--mixer-yellow) 80%,
+    var(--mixer-red) 100%
+  );
+  transform-origin: bottom;
+  will-change: height;
+  transition: height 0.06s linear;
+}
+
+/* ---- Vertical Fader ---- */
+.strip-fader {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: stretch;
+  position: relative;
+  min-width: 28px;
+}
+
+.strip-fader input[type=range] {
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 32px;
+  height: 100%;
+  min-height: var(--mixer-fader-min-h);
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+}
+
+/* Webkit vertical slider track */
+.strip-fader input[type=range]::-webkit-slider-runnable-track {
+  width: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+/* Webkit vertical slider thumb */
+.strip-fader input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 26px;
+  height: 10px;
+  background: var(--strip-color, #fff);
+  border-radius: 2px;
+  cursor: grab;
+  box-shadow:
+    0 0 8px rgba(0, 0, 0, 0.6),
+    0 0 4px color-mix(in srgb, var(--strip-color, #fff) 40%, transparent);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.strip-fader input[type=range]::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  box-shadow:
+    0 0 12px rgba(0, 0, 0, 0.8),
+    0 0 8px color-mix(in srgb, var(--strip-color, #fff) 60%, transparent);
+}
+
+/* Firefox vertical slider */
+.strip-fader input[type=range]::-moz-range-track {
+  width: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  border: none;
+}
+
+.strip-fader input[type=range]::-moz-range-thumb {
+  width: 26px;
+  height: 10px;
+  background: var(--strip-color, #fff);
+  border-radius: 2px;
+  cursor: grab;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+}
+
+/* Fader value readout */
+.strip-fader .fader-val {
+  font: 400 8px/1 var(--mixer-font);
+  color: var(--muze-text-muted);
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+/* ---- Pan Indicator ---- */
+.strip-pan-indicator {
+  width: 100%;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+
+.pan-line {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  position: relative;
+  border-radius: 1px;
+}
+
+.pan-dot {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%);
+  transition: left 0.1s ease;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+.strip-pan-indicator.disabled {
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+/* ---- Mute / Solo Buttons ---- */
+.strip-buttons {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 2px 0 0;
+}
+
+.strip-buttons button {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muze-text-muted);
+  font: 700 9px/1 var(--mixer-font);
+  width: var(--mixer-btn-size);
+  height: 28px;
+  min-height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.strip-buttons button:active {
+  transform: scale(0.92);
+}
+
+.strip-buttons .mute-btn.active {
+  background: var(--mixer-red);
+  border-color: var(--mixer-red);
+  color: #000;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+.strip-buttons .solo-btn.active {
+  background: var(--mixer-yellow);
+  border-color: var(--mixer-yellow);
+  color: #000;
+  box-shadow: 0 0 8px rgba(234, 179, 8, 0.4);
+}
+
+/* ============================================================
+   MASTER STRIP — Pinned right, wider
+   ============================================================ */
+.mixer-strip.master-strip {
+  min-width: var(--mixer-master-w);
+  width: var(--mixer-master-w);
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+  border-right: none;
+  background: rgba(255, 255, 255, 0.02);
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+
+.mixer-strip.master-strip .strip-label {
+  background: #fff;
+  color: #000;
+  font-weight: 800;
+}
+
+.mixer-strip.master-strip .strip-fader input[type=range]::-webkit-slider-thumb {
+  background: #fff;
+  box-shadow:
+    0 0 8px rgba(0, 0, 0, 0.6),
+    0 0 6px rgba(255, 255, 255, 0.3);
+}
+
+.master-limiter-val {
+  font: 400 7px/1 var(--mixer-font);
+  color: var(--muze-text-muted);
+  letter-spacing: 0.5px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   DETAIL PANEL — Slide-up sheet for EQ + sends
+   ============================================================ */
+#mixer-detail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--mixer-bg);
+  backdrop-filter: blur(var(--mixer-blur));
+  -webkit-backdrop-filter: blur(var(--mixer-blur));
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#mixer-detail.open {
+  transform: translateY(0);
+}
+
+#mixer-detail.hidden {
+  display: none;
+}
+
+/* ---- Detail Header ---- */
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.detail-ch-name {
+  font: 700 14px/1 var(--mixer-font);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 4px;
+}
+
+.detail-back {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muze-text-dim);
+  font: 600 11px/1 var(--mixer-font);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.1s;
+}
+
+.detail-back:active {
+  background: var(--muze-surface-active);
+  transform: scale(0.95);
+}
+
+/* ---- Detail Content ---- */
+.detail-content {
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ---- Section Labels ---- */
+.detail-section-label {
+  font: 600 9px/1 var(--mixer-font);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--muze-text-muted);
+  margin-bottom: 8px;
+}
+
+/* ---- EQ Section: 3 vertical sliders side by side ---- */
+.detail-eq {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-eq-sliders {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.detail-eq-band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 50px;
+}
+
+.detail-eq-band label {
+  font: 600 10px/1 var(--mixer-font);
+  color: var(--muze-text-dim);
+  letter-spacing: 2px;
+}
+
+.detail-eq-band input[type=range] {
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 40px;
+  height: 120px;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+}
+
+.detail-eq-band input[type=range]::-webkit-slider-runnable-track {
+  width: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.detail-eq-band input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 10px;
+  background: var(--detail-color, var(--muze-accent));
+  border-radius: 3px;
+  cursor: grab;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detail-eq-band input[type=range]::-moz-range-track {
+  width: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  border: none;
+}
+
+.detail-eq-band input[type=range]::-moz-range-thumb {
+  width: 22px;
+  height: 10px;
+  background: var(--detail-color, var(--muze-accent));
+  border-radius: 3px;
+  cursor: grab;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detail-eq-val {
+  font: 400 9px/1 var(--mixer-font);
+  color: var(--muze-text-muted);
+}
+
+/* ---- Send Sliders (horizontal, full width) ---- */
+.detail-sends {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detail-send-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-send-row label {
+  font: 600 9px/1 var(--mixer-font);
+  color: var(--muze-text-dim);
+  letter-spacing: 2px;
+}
+
+.detail-send-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.detail-send-slider input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.detail-send-slider input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  background: var(--detail-color, var(--muze-accent));
+  border-radius: 50%;
+  cursor: grab;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.detail-send-slider input[type=range]::-moz-range-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  border: none;
+}
+
+.detail-send-slider input[type=range]::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  background: var(--detail-color, var(--muze-accent));
+  border-radius: 50%;
+  cursor: grab;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.detail-send-val {
+  font: 400 10px/1 var(--mixer-font);
+  color: var(--muze-text-muted);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ---- Pan Slider (horizontal, full width in detail) ---- */
+.detail-pan {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-pan-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.detail-pan-slider input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.detail-pan-slider input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: grab;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.detail-pan-slider input[type=range]::-moz-range-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  border: none;
+}
+
+.detail-pan-slider input[type=range]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: grab;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.detail-pan-val {
+  font: 400 10px/1 var(--mixer-font);
+  color: var(--muze-text-muted);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ---- Utility ---- */
+.hidden {
+  display: none !important;
+}

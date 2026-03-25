@@ -8,12 +8,12 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>MUZE</title>
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/mixer.css">
 <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
 </head>
 <body>
 
 <video id="cam" autoplay playsinline muted></video>
-<canvas id="bg-canvas"></canvas>
 <canvas id="overlay"></canvas>
 
 <!-- Drum touch zones -->
@@ -136,11 +136,14 @@
 <!-- Mixer Panel (slides up from bottom) -->
 <div id="mixer-panel">
   <div id="mixer-header">
-    <span>Mixer</span>
+    <span>MIXER</span>
     <button id="mixer-close">&times;</button>
   </div>
   <div id="mixer-strips">
-    <!-- Populated by MixerUI.init() -->
+    <!-- Built by MixerUI.init() -->
+  </div>
+  <div id="mixer-detail" class="hidden">
+    <!-- Built by MixerUI._openDetail() -->
   </div>
 </div>
 
@@ -155,7 +158,6 @@
 <!-- JS Modules -->
 <script src="js/config.js"></script>
 <script src="js/tracking.js"></script>
-<script src="js/bgblur.js"></script>
 <script src="js/music.js"></script>
 <script src="js/mixer.js"></script>
 <script src="js/audio.js"></script>
@@ -230,8 +232,6 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       }
     });
 
-    MUZE.BgBlur.init();
-    MUZE.BgBlur.activate();
     MUZE.Loop.init();
 
     // Fade out start screen
