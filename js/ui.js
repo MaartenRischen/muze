@@ -196,8 +196,8 @@ MUZE.SynthMenu = {
 };
 
 // ============================================================
-// MIXER UI — Professional mobile DAW mixer with progressive disclosure
-// Strip view: fader + meter + pan + M/S
+// MIXER UI — Premium mobile DAW mixer with progressive disclosure
+// Strip view: custom fader + segmented meter + pan + M/S
 // Detail panel: EQ + sends + pan (slide-up sheet)
 // ============================================================
 MUZE.MixerUI = {
@@ -205,6 +205,8 @@ MUZE.MixerUI = {
   _metersRunning: false,
   _detailOpen: false,
   _detailCh: null,
+  _peaks: {},           // peak hold values per channel
+  _peakTimers: {},      // peak decay timers per channel
 
   init() {
     const panel = document.getElementById('mixer-panel');
@@ -243,6 +245,143 @@ MUZE.MixerUI = {
     strips.appendChild(this._buildMasterStrip());
   },
 
+  // ---- Extract RGB from hex/named color for CSS var injection ----
+  _colorToRGB(color) {
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    return `${r}, ${g}, ${b}`;
+  },
+
+  // ---- Map dB value (-60 to +6) to percentage (0 to 1) ----
+  _dbToPercent(db) {
+    return Math.max(0, Math.min(1, (db + 60) / 66));
+  },
+
+  // ---- Map percentage (0 to 1) to dB value (-60 to +6) ----
+  _percentToDb(pct) {
+    return Math.max(-60, Math.min(6, pct * 66 - 60));
+  },
+
+  // ---- Setup custom fader touch handling ----
+  _setupFaderTouch(container, ch, isMaster) {
+    const track = container.querySelector('.fader-track');
+    const fill = container.querySelector('.fader-fill');
+    const thumb = container.querySelector('.fader-thumb');
+    const tooltip = container.querySelector('.fader-tooltip');
+    const faderVal = container.closest('.strip-fader').querySelector('.fader-val');
+    let dragging = false;
+    let startY = 0;
+    let startPct = 0;
+
+    const data = isMaster ? MUZE.Mixer.master : MUZE.Mixer.channels[ch];
+    let currentDb = data.volume;
+    let currentPct = this._dbToPercent(currentDb);
+
+    // Set initial position
+    fill.style.height = (currentPct * 100) + '%';
+    thumb.style.bottom = (currentPct * 100) + '%';
+
+    const updateVisuals = (pct, db) => {
+      fill.style.height = (pct * 100) + '%';
+      thumb.style.bottom = (pct * 100) + '%';
+      const displayVal = db <= -60 ? '-inf' : (db % 1 === 0 ? db.toString() : db.toFixed(1));
+      if (faderVal) faderVal.textContent = displayVal;
+      if (tooltip) tooltip.textContent = (db <= -60 ? '-inf' : displayVal + ' dB');
+    };
+
+    const onTouchStart = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragging = true;
+      const touch = e.changedTouches[0];
+      startY = touch.clientY;
+      startPct = currentPct;
+      thumb.classList.add('touching');
+      if (tooltip) tooltip.classList.add('visible');
+    };
+
+    const onTouchMove = (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const touch = e.changedTouches[0];
+      const trackRect = track.getBoundingClientRect();
+      const trackHeight = trackRect.height;
+      const deltaY = startY - touch.clientY;
+      const deltaPct = deltaY / trackHeight;
+      const newPct = Math.max(0, Math.min(1, startPct + deltaPct));
+      const newDb = this._percentToDb(newPct);
+      // Snap to 0.5 step
+      const snappedDb = Math.round(newDb * 2) / 2;
+      currentPct = this._dbToPercent(snappedDb);
+      currentDb = snappedDb;
+
+      updateVisuals(currentPct, currentDb);
+
+      if (isMaster) {
+        MUZE.Mixer.setMasterVolume(currentDb);
+      } else {
+        MUZE.Mixer.setChannelVolume(ch, currentDb);
+      }
+    };
+
+    const onTouchEnd = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      thumb.classList.remove('touching');
+      if (tooltip) tooltip.classList.remove('visible');
+    };
+
+    // Attach events to thumb for touch-and-drag (not tap-to-position)
+    thumb.addEventListener('touchstart', onTouchStart, { passive: false });
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd, { passive: false });
+    document.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+    // Also support mouse for desktop testing
+    thumb.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      dragging = true;
+      startY = e.clientY;
+      startPct = currentPct;
+      thumb.classList.add('touching');
+      if (tooltip) tooltip.classList.add('visible');
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const trackRect = track.getBoundingClientRect();
+      const trackHeight = trackRect.height;
+      const deltaY = startY - e.clientY;
+      const deltaPct = deltaY / trackHeight;
+      const newPct = Math.max(0, Math.min(1, startPct + deltaPct));
+      const newDb = this._percentToDb(newPct);
+      const snappedDb = Math.round(newDb * 2) / 2;
+      currentPct = this._dbToPercent(snappedDb);
+      currentDb = snappedDb;
+      updateVisuals(currentPct, currentDb);
+      if (isMaster) {
+        MUZE.Mixer.setMasterVolume(currentDb);
+      } else {
+        MUZE.Mixer.setChannelVolume(ch, currentDb);
+      }
+    });
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      thumb.classList.remove('touching');
+      if (tooltip) tooltip.classList.remove('visible');
+    });
+
+    // Store update function for external access (when detail panel changes values)
+    container._updateFader = (db) => {
+      currentDb = db;
+      currentPct = this._dbToPercent(db);
+      updateVisuals(currentPct, currentDb);
+    };
+  },
+
   // ---- Build a channel strip (progressive: fader + meter + pan + M/S) ----
   _buildStrip(ch) {
     const data = MUZE.Mixer.channels[ch];
@@ -250,6 +389,7 @@ MUZE.MixerUI = {
     el.className = 'mixer-strip';
     el.dataset.ch = ch;
     el.style.setProperty('--strip-color', data.color);
+    el.style.setProperty('--strip-color-rgb', this._colorToRGB(data.color));
 
     // Short label (max 4 chars)
     const label = ch.toUpperCase().slice(0, 4);
@@ -257,14 +397,24 @@ MUZE.MixerUI = {
     // Pan position as percentage for the dot
     const panPct = ((data.pan + 1) / 2) * 100;
 
+    // Calculate initial fader position
+    const faderPct = this._dbToPercent(data.volume) * 100;
+
     el.innerHTML = `
       <div class="strip-label" data-ch="${ch}">${label}</div>
       <div class="strip-fader-area">
         <div class="strip-meter">
           <div class="strip-meter-fill" data-meter="${ch}"></div>
+          <div class="strip-meter-peak" data-meter-peak="${ch}"></div>
         </div>
         <div class="strip-fader">
-          <input type="range" min="-60" max="6" step="0.5" value="${data.volume}" orient="vertical">
+          <div class="fader-container">
+            <div class="fader-track">
+              <div class="fader-fill" style="height:${faderPct}%"></div>
+              <div class="fader-thumb" style="bottom:${faderPct}%"></div>
+            </div>
+            <div class="fader-tooltip">${data.volume > -60 ? data.volume : '-inf'} dB</div>
+          </div>
           <div class="fader-val">${data.volume > -60 ? data.volume : '-inf'}</div>
         </div>
       </div>
@@ -279,14 +429,9 @@ MUZE.MixerUI = {
       </div>
     `;
 
-    // Wire fader
-    const fader = el.querySelector('.strip-fader input');
-    const faderVal = el.querySelector('.fader-val');
-    fader.addEventListener('input', () => {
-      const v = +fader.value;
-      MUZE.Mixer.setChannelVolume(ch, v);
-      faderVal.textContent = v > -60 ? v : '-inf';
-    });
+    // Wire custom fader
+    const faderContainer = el.querySelector('.fader-container');
+    this._setupFaderTouch(faderContainer, ch, false);
 
     // Wire mute/solo
     el.querySelector('.mute-btn').addEventListener('click', function() {
@@ -320,15 +465,25 @@ MUZE.MixerUI = {
     const el = document.createElement('div');
     el.className = 'mixer-strip master-strip';
     el.style.setProperty('--strip-color', '#fff');
+    el.style.setProperty('--strip-color-rgb', '255, 255, 255');
+
+    const faderPct = this._dbToPercent(m.volume) * 100;
 
     el.innerHTML = `
       <div class="strip-label">MSTR</div>
       <div class="strip-fader-area">
         <div class="strip-meter">
           <div class="strip-meter-fill" data-meter="master"></div>
+          <div class="strip-meter-peak" data-meter-peak="master"></div>
         </div>
         <div class="strip-fader">
-          <input type="range" min="-60" max="6" step="0.5" value="${m.volume}" orient="vertical">
+          <div class="fader-container">
+            <div class="fader-track">
+              <div class="fader-fill" style="height:${faderPct}%"></div>
+              <div class="fader-thumb" style="bottom:${faderPct}%"></div>
+            </div>
+            <div class="fader-tooltip">${m.volume} dB</div>
+          </div>
           <div class="fader-val">${m.volume}</div>
         </div>
       </div>
@@ -336,14 +491,9 @@ MUZE.MixerUI = {
       <div class="strip-buttons"></div>
     `;
 
-    // Wire master fader
-    const fader = el.querySelector('.strip-fader input');
-    const faderVal = el.querySelector('.fader-val');
-    fader.addEventListener('input', () => {
-      const v = +fader.value;
-      MUZE.Mixer.setMasterVolume(v);
-      faderVal.textContent = v > -60 ? v : '-inf';
-    });
+    // Wire custom master fader
+    const faderContainer = el.querySelector('.fader-container');
+    this._setupFaderTouch(faderContainer, 'master', true);
 
     // Tap label -> open master detail
     el.querySelector('.strip-label').addEventListener('click', () => {
@@ -564,47 +714,86 @@ MUZE.MixerUI = {
     }
   },
 
+  // ---- Get dB level for a channel (returns raw dB) ----
+  _getChannelDb(ch) {
+    if (ch === 'master') {
+      if (MUZE.Audio._masterMeter) return MUZE.Audio._masterMeter.getValue();
+      if (MUZE.Audio._masterGain) {
+        const g = MUZE.Audio._masterGain.gain.value;
+        return g > 0 ? 20 * Math.log10(g) : -60;
+      }
+      return -60;
+    }
+    const node = MUZE.Audio._nodes[ch];
+    if (!node) return -60;
+    if (node.meter) return node.meter.getValue();
+    const g = node.gain.gain.value;
+    return g > 0 ? 20 * Math.log10(g) : -60;
+  },
+
   _updateMeters() {
     if (!this._metersRunning) return;
 
-    // Update channel meters
-    for (const ch of MUZE.Mixer.CHANNEL_ORDER) {
+    const allChannels = [...MUZE.Mixer.CHANNEL_ORDER, 'master'];
+
+    for (const ch of allChannels) {
       const meterFill = document.querySelector(`[data-meter="${ch}"]`);
       if (!meterFill) continue;
 
-      let level = 0;
-      const node = MUZE.Audio._nodes[ch];
-      if (node) {
-        // Use Tone.Meter if available, otherwise approximate from gain value
-        if (node.meter) {
-          const db = node.meter.getValue();
-          // Convert dB to 0-100 range (-60dB = 0%, 0dB = 100%)
-          level = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
-        } else {
-          // Fallback: use gain value as rough proxy
-          const g = node.gain.gain.value;
-          level = Math.max(0, Math.min(100, g * 100));
-        }
-      }
+      const db = this._getChannelDb(ch);
+      // Convert dB to 0-100 range (-60dB = 0%, 0dB = 100%)
+      const level = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
 
       meterFill.style.height = level + '%';
-    }
 
-    // Update master meter
-    const masterFill = document.querySelector('[data-meter="master"]');
-    if (masterFill) {
-      let level = 0;
-      if (MUZE.Audio._masterMeter) {
-        const db = MUZE.Audio._masterMeter.getValue();
-        level = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
-      } else if (MUZE.Audio._masterGain) {
-        const g = MUZE.Audio._masterGain.gain.value;
-        level = Math.max(0, Math.min(100, g * 100));
+      // Apply hot / clipping classes based on dB level
+      if (db > -1) {
+        meterFill.classList.add('clipping');
+        meterFill.classList.remove('hot');
+      } else if (db > -6) {
+        meterFill.classList.add('hot');
+        meterFill.classList.remove('clipping');
+      } else {
+        meterFill.classList.remove('hot', 'clipping');
       }
-      masterFill.style.height = level + '%';
+
+      // Peak hold indicator
+      const peakEl = document.querySelector(`[data-meter-peak="${ch}"]`);
+      if (peakEl) {
+        const prevPeak = this._peaks[ch] || 0;
+        if (level > prevPeak) {
+          // New peak
+          this._peaks[ch] = level;
+          peakEl.style.bottom = level + '%';
+          peakEl.style.opacity = '1';
+          // Reset decay timer
+          clearTimeout(this._peakTimers[ch]);
+          this._peakTimers[ch] = setTimeout(() => {
+            this._decayPeak(ch, peakEl);
+          }, 800);
+        }
+      }
     }
 
     this._meterRAF = requestAnimationFrame(() => this._updateMeters());
+  },
+
+  // ---- Decay peak hold indicator ----
+  _decayPeak(ch, peakEl) {
+    const decay = () => {
+      if (!this._metersRunning) return;
+      let currentPeak = this._peaks[ch] || 0;
+      currentPeak -= 1.5; // fall rate: 1.5% per frame
+      if (currentPeak <= 0) {
+        this._peaks[ch] = 0;
+        peakEl.style.opacity = '0';
+        return;
+      }
+      this._peaks[ch] = currentPeak;
+      peakEl.style.bottom = currentPeak + '%';
+      requestAnimationFrame(decay);
+    };
+    requestAnimationFrame(decay);
   }
 };
 

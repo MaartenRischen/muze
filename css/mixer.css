@@ -1,5 +1,5 @@
 /* ============================================================
-   MUZE — Mixer Panel (Professional Mobile DAW Design)
+   MUZE — Mixer Panel (Premium Audio Hardware Design)
    ============================================================
    Progressive disclosure: Strip view = fader + meter + pan + M/S
    Detail panel = EQ + sends + pan (slide-up sheet)
@@ -7,17 +7,21 @@
 
 /* ---- CSS Custom Properties for Mixer ---- */
 :root {
-  --mixer-bg: rgba(6, 6, 10, 0.96);
+  --mixer-bg: rgba(14, 14, 17, 0.96);
   --mixer-blur: 32px;
   --mixer-strip-w: 64px;
   --mixer-master-w: 76px;
   --mixer-fader-min-h: 150px;
   --mixer-btn-size: 36px;
-  --mixer-meter-w: 3px;
-  --mixer-font: 'SF Mono', 'Menlo', 'Consolas', monospace;
-  --mixer-red: #ef4444;
-  --mixer-yellow: #eab308;
-  --mixer-green: #22c55e;
+  --mixer-meter-w: 6px;
+  --mixer-font: var(--font-data, 'SF Mono', 'JetBrains Mono', 'Menlo', monospace);
+  --mixer-font-ui: var(--font-ui, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+
+  /* Premium meter colors (iZotope-inspired turquoise -> amber -> red) */
+  --mixer-red: #EF4444;
+  --mixer-yellow: #FBBF24;
+  --mixer-green: #0D9488;
+  --mixer-green-bright: #2DD4BF;
 }
 
 /* ============================================================
@@ -41,6 +45,20 @@
   overflow: hidden;
 }
 
+/* Noise texture for mixer panel */
+#mixer-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+  z-index: 0;
+}
+
 #mixer-panel.open {
   transform: translateY(0);
 }
@@ -53,11 +71,13 @@
   padding: 10px 16px 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
 }
 
 #mixer-header span {
-  color: var(--muze-text);
-  font: 700 10px/1 var(--mixer-font);
+  color: var(--muze-text, #E8E8EC);
+  font: 700 10px/1 var(--mixer-font-ui);
   letter-spacing: 4px;
   text-transform: uppercase;
 }
@@ -66,7 +86,7 @@
   appearance: none;
   border: none;
   background: none;
-  color: var(--muze-text-muted);
+  color: var(--muze-text-muted, #52525A);
   font-size: 22px;
   cursor: pointer;
   padding: 8px 12px;
@@ -79,7 +99,7 @@
 }
 
 #mixer-close:active {
-  color: var(--muze-text);
+  color: var(--muze-text, #E8E8EC);
 }
 
 /* ============================================================
@@ -95,6 +115,8 @@
   gap: 0;
   scrollbar-width: none;
   min-height: 0;
+  position: relative;
+  z-index: 1;
 }
 
 #mixer-strips::-webkit-scrollbar {
@@ -119,11 +141,11 @@
 
 /* ---- Color-coded Header Label ---- */
 .strip-label {
-  font: 700 8px/1 var(--mixer-font);
+  font: 700 8px/1 var(--mixer-font-ui);
   letter-spacing: 1.5px;
   text-transform: uppercase;
   padding: 6px 4px 5px;
-  background: var(--strip-color, var(--muze-text-muted));
+  background: var(--strip-color, var(--muze-text-muted, #52525A));
   color: #000;
   text-align: center;
   width: 100%;
@@ -151,11 +173,16 @@
   position: relative;
 }
 
-/* ---- Level Meter ---- */
+/* ============================================================
+   PREMIUM LEVEL METER — Recessed well + segmented fill
+   ============================================================ */
 .strip-meter {
   width: var(--mixer-meter-w);
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 2px;
+  background: #0A0A0E;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.8),
+    0 1px 0 rgba(255, 255, 255, 0.02);
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
@@ -168,20 +195,61 @@
   left: 0;
   width: 100%;
   height: 0%;
-  border-radius: 2px;
+  border-radius: 3px;
+  /* Turquoise -> amber -> red gradient (iZotope-inspired) */
   background: linear-gradient(
     to top,
     var(--mixer-green) 0%,
-    var(--mixer-green) 60%,
+    var(--mixer-green-bright) 50%,
     var(--mixer-yellow) 80%,
-    var(--mixer-red) 100%
+    var(--mixer-red) 95%,
+    #FF0000 100%
+  );
+  /* Segmented look via CSS mask */
+  -webkit-mask-image: repeating-linear-gradient(
+    to top,
+    black 0px,
+    black 3px,
+    transparent 3px,
+    transparent 4px
+  );
+  mask-image: repeating-linear-gradient(
+    to top,
+    black 0px,
+    black 3px,
+    transparent 3px,
+    transparent 4px
   );
   transform-origin: bottom;
   will-change: height;
   transition: height 0.06s linear;
 }
 
-/* ---- Vertical Fader ---- */
+/* Glow effect at high levels */
+.strip-meter-fill.hot {
+  box-shadow: 0 0 8px rgba(45, 212, 191, 0.3);
+}
+
+.strip-meter-fill.clipping {
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+}
+
+/* Peak hold indicator */
+.strip-meter-peak {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+  bottom: 0%;
+  transition: bottom 0.05s linear;
+  z-index: 2;
+}
+
+/* ============================================================
+   CUSTOM FADER — Replaces native range input
+   ============================================================ */
 .strip-fader {
   flex: 1;
   display: flex;
@@ -192,71 +260,130 @@
   min-width: 28px;
 }
 
+/* Hide native range inputs (replaced by custom faders) */
 .strip-fader input[type=range] {
-  -webkit-appearance: slider-vertical;
-  appearance: slider-vertical;
-  writing-mode: vertical-lr;
-  direction: rtl;
-  width: 32px;
-  height: 100%;
+  display: none;
+}
+
+/* Custom fader container */
+.fader-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
   min-height: var(--mixer-fader-min-h);
-  background: transparent;
-  outline: none;
-  cursor: pointer;
-  margin: 0;
-  padding: 0;
+  position: relative;
+  touch-action: none;
 }
 
-/* Webkit vertical slider track */
-.strip-fader input[type=range]::-webkit-slider-runnable-track {
-  width: 3px;
-  background: rgba(255, 255, 255, 0.1);
+/* Recessed fader groove */
+.fader-track {
+  width: 4px;
+  height: 100%;
+  background: #1a1a1e;
   border-radius: 2px;
-}
-
-/* Webkit vertical slider thumb */
-.strip-fader input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 26px;
-  height: 10px;
-  background: var(--strip-color, #fff);
-  border-radius: 2px;
-  cursor: grab;
   box-shadow:
-    0 0 8px rgba(0, 0, 0, 0.6),
-    0 0 4px color-mix(in srgb, var(--strip-color, #fff) 40%, transparent);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+    inset 0 1px 3px rgba(0, 0, 0, 0.8),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.03),
+    0 0 0 1px rgba(0, 0, 0, 0.3);
+  position: relative;
 }
 
-.strip-fader input[type=range]::-webkit-slider-thumb:active {
+/* Filled portion below thumb */
+.fader-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  border-radius: 2px;
+  background: rgba(var(--strip-color-rgb, 255, 255, 255), 0.25);
+  pointer-events: none;
+}
+
+/* Fader thumb/cap — gradient with grip lines */
+.fader-thumb {
+  position: absolute;
+  width: 32px;
+  height: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 50%;
+  margin-bottom: -6px;
+  background: linear-gradient(180deg, #555 0%, #3a3a3a 40%, #2a2a2a 100%);
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  /* Horizontal grip lines */
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.04) 2px,
+    rgba(255, 255, 255, 0.04) 3px
+  );
+  cursor: grab;
+  touch-action: none;
+  /* 48x48 touch target via padding */
+  padding: 0;
+  z-index: 2;
+}
+
+/* Touch target expander (invisible, 48x48 min) */
+.fader-thumb::before {
+  content: '';
+  position: absolute;
+  top: -18px;
+  left: -8px;
+  width: 48px;
+  height: 48px;
+  background: transparent;
+}
+
+.fader-thumb.touching {
   cursor: grabbing;
   box-shadow:
-    0 0 12px rgba(0, 0, 0, 0.8),
-    0 0 8px color-mix(in srgb, var(--strip-color, #fff) 60%, transparent);
+    0 0 12px rgba(var(--strip-color-rgb, 255, 255, 255), 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  transform: translateX(-50%) scaleX(1.05);
+  transition: box-shadow 0.1s ease, transform 0.1s ease;
 }
 
-/* Firefox vertical slider */
-.strip-fader input[type=range]::-moz-range-track {
-  width: 3px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-  border: none;
+/* Value tooltip — appears only during touch, positioned right of track */
+.fader-tooltip {
+  position: absolute;
+  left: calc(50% + 22px);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font: 500 11px/1 var(--mixer-font-ui);
+  font-feature-settings: 'tnum';
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.15s, transform 0.15s;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+  top: 50%;
+  margin-top: -10px;
 }
 
-.strip-fader input[type=range]::-moz-range-thumb {
-  width: 26px;
-  height: 10px;
-  background: var(--strip-color, #fff);
-  border-radius: 2px;
-  cursor: grab;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+.fader-tooltip.visible {
+  opacity: 1;
+  transform: translateX(0);
 }
 
-/* Fader value readout */
+/* Fader value readout (below fader) */
 .strip-fader .fader-val {
   font: 400 8px/1 var(--mixer-font);
-  color: var(--muze-text-muted);
+  font-feature-settings: 'tnum';
+  color: var(--muze-text-muted, #52525A);
   margin-top: 3px;
   flex-shrink: 0;
 }
@@ -311,8 +438,8 @@
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
-  color: var(--muze-text-muted);
-  font: 700 9px/1 var(--mixer-font);
+  color: var(--muze-text-muted, #52525A);
+  font: 700 9px/1 var(--mixer-font-ui);
   width: var(--mixer-btn-size);
   height: 28px;
   min-height: 28px;
@@ -333,7 +460,8 @@
   background: var(--mixer-red);
   border-color: var(--mixer-red);
   color: #000;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+  text-shadow: 0 0 4px rgba(239, 68, 68, 0.6);
 }
 
 .strip-buttons .solo-btn.active {
@@ -363,16 +491,23 @@
   font-weight: 800;
 }
 
-.mixer-strip.master-strip .strip-fader input[type=range]::-webkit-slider-thumb {
-  background: #fff;
-  box-shadow:
-    0 0 8px rgba(0, 0, 0, 0.6),
-    0 0 6px rgba(255, 255, 255, 0.3);
+/* Master fader thumb is white/brighter */
+.mixer-strip.master-strip .fader-thumb {
+  background: linear-gradient(180deg, #888 0%, #666 40%, #444 100%);
+  border-color: rgba(255, 255, 255, 0.15);
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.06) 2px,
+    rgba(255, 255, 255, 0.06) 3px
+  );
 }
 
 .master-limiter-val {
   font: 400 7px/1 var(--mixer-font);
-  color: var(--muze-text-muted);
+  font-feature-settings: 'tnum';
+  color: var(--muze-text-muted, #52525A);
   letter-spacing: 0.5px;
   text-align: center;
   flex-shrink: 0;
@@ -418,7 +553,7 @@
 }
 
 .detail-ch-name {
-  font: 700 14px/1 var(--mixer-font);
+  font: 700 14px/1 var(--mixer-font-ui);
   letter-spacing: 3px;
   text-transform: uppercase;
   padding: 4px 12px;
@@ -429,8 +564,8 @@
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
-  color: var(--muze-text-dim);
-  font: 600 11px/1 var(--mixer-font);
+  color: var(--muze-text-dim, #8E8E96);
+  font: 600 11px/1 var(--mixer-font-ui);
   padding: 8px 16px;
   border-radius: 6px;
   cursor: pointer;
@@ -444,7 +579,7 @@
 }
 
 .detail-back:active {
-  background: var(--muze-surface-active);
+  background: var(--muze-surface-active, #1E1E22);
   transform: scale(0.95);
 }
 
@@ -459,10 +594,10 @@
 
 /* ---- Section Labels ---- */
 .detail-section-label {
-  font: 600 9px/1 var(--mixer-font);
+  font: 600 9px/1 var(--mixer-font-ui);
   letter-spacing: 3px;
   text-transform: uppercase;
-  color: var(--muze-text-muted);
+  color: var(--muze-text-muted, #52525A);
   margin-bottom: 8px;
 }
 
@@ -488,8 +623,8 @@
 }
 
 .detail-eq-band label {
-  font: 600 10px/1 var(--mixer-font);
-  color: var(--muze-text-dim);
+  font: 600 10px/1 var(--mixer-font-ui);
+  color: var(--muze-text-dim, #8E8E96);
   letter-spacing: 2px;
 }
 
@@ -515,7 +650,7 @@
   -webkit-appearance: none;
   width: 22px;
   height: 10px;
-  background: var(--detail-color, var(--muze-accent));
+  background: var(--detail-color, var(--muze-accent, #e8a948));
   border-radius: 3px;
   cursor: grab;
   box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
@@ -532,7 +667,7 @@
 .detail-eq-band input[type=range]::-moz-range-thumb {
   width: 22px;
   height: 10px;
-  background: var(--detail-color, var(--muze-accent));
+  background: var(--detail-color, var(--muze-accent, #e8a948));
   border-radius: 3px;
   cursor: grab;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -540,7 +675,8 @@
 
 .detail-eq-val {
   font: 400 9px/1 var(--mixer-font);
-  color: var(--muze-text-muted);
+  font-feature-settings: 'tnum';
+  color: var(--muze-text-muted, #52525A);
 }
 
 /* ---- Send Sliders (horizontal, full width) ---- */
@@ -557,8 +693,8 @@
 }
 
 .detail-send-row label {
-  font: 600 9px/1 var(--mixer-font);
-  color: var(--muze-text-dim);
+  font: 600 9px/1 var(--mixer-font-ui);
+  color: var(--muze-text-dim, #8E8E96);
   letter-spacing: 2px;
 }
 
@@ -583,7 +719,7 @@
   -webkit-appearance: none;
   width: 22px;
   height: 22px;
-  background: var(--detail-color, var(--muze-accent));
+  background: var(--detail-color, var(--muze-accent, #e8a948));
   border-radius: 50%;
   cursor: grab;
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
@@ -600,7 +736,7 @@
 .detail-send-slider input[type=range]::-moz-range-thumb {
   width: 22px;
   height: 22px;
-  background: var(--detail-color, var(--muze-accent));
+  background: var(--detail-color, var(--muze-accent, #e8a948));
   border-radius: 50%;
   cursor: grab;
   border: 2px solid rgba(255, 255, 255, 0.15);
@@ -608,7 +744,8 @@
 
 .detail-send-val {
   font: 400 10px/1 var(--mixer-font);
-  color: var(--muze-text-muted);
+  font-feature-settings: 'tnum';
+  color: var(--muze-text-muted, #52525A);
   min-width: 36px;
   text-align: right;
 }
@@ -666,7 +803,8 @@
 
 .detail-pan-val {
   font: 400 10px/1 var(--mixer-font);
-  color: var(--muze-text-muted);
+  font-feature-settings: 'tnum';
+  color: var(--muze-text-muted, #52525A);
   min-width: 36px;
   text-align: right;
 }

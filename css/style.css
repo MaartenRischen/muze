@@ -1,20 +1,52 @@
 /* ============================================================
-   MUZE — Style System
+   MUZE — Premium Style System
+   Design Language: Output (depth) + NI (hardware) + TE (precision)
    ============================================================ */
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 :root {
-  --muze-bg: #050508;
-  --muze-surface: rgba(255, 255, 255, 0.04);
-  --muze-surface-active: rgba(255, 255, 255, 0.10);
+  /* === BACKGROUNDS — Warm-neutral elevation system === */
+  --muze-bg: #0E0E11;
+  --muze-surface: #161619;
+  --muze-surface-active: #1E1E22;
+  --muze-elevated: #262629;
+  --muze-recessed: #08080B;
+
+  /* === ELEVATION LEVELS === */
+  --elevation-0: #0E0E11;
+  --elevation-1: #161619;
+  --elevation-2: #1E1E22;
+  --elevation-3: #262629;
+  --elevation-4: #2E2E32;
+
+  /* === BORDERS === */
   --muze-border: rgba(255, 255, 255, 0.08);
-  --muze-text: rgba(255, 255, 255, 0.9);
-  --muze-text-dim: rgba(255, 255, 255, 0.5);
-  --muze-text-muted: rgba(255, 255, 255, 0.2);
+  --muze-border-subtle: rgba(255, 255, 255, 0.05);
+  --muze-border-emphasis: rgba(255, 255, 255, 0.12);
+
+  /* === TEXT === */
+  --muze-text: #E8E8EC;
+  --muze-text-dim: #8E8E96;
+  --muze-text-muted: #52525A;
+
+  /* === ACCENT (warm amber) === */
   --muze-accent: #e8a948;
   --muze-accent-rgb: 232, 169, 72;
   --muze-accent-glow: rgba(232, 169, 72, 0.25);
+  --muze-accent-subtle: rgba(232, 169, 72, 0.08);
+
+  /* === RADIUS === */
   --muze-radius: 12px;
   --muze-blur: 16px;
+
+  /* === TYPOGRAPHY === */
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-data: 'SF Mono', 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
+
+  /* === SHADOWS === */
+  --shadow-recessed: inset 0 1px 3px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.02);
+  --shadow-raised: 0 1px 0 rgba(255,255,255,0.04), 0 2px 8px rgba(0,0,0,0.3);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -23,10 +55,30 @@ html, body {
   width: 100%; height: 100%;
   overflow: hidden;
   background: var(--muze-bg);
-  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-ui);
   touch-action: none;
   -webkit-user-select: none; user-select: none;
   -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   NOISE TEXTURE — Applied via .surface-textured class
+   SVG feTurbulence at 3% opacity for physical surface feel
+   ============================================================ */
+.surface-textured {
+  position: relative;
+}
+.surface-textured::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+  z-index: 1;
 }
 
 /* ---- Camera & Overlay ---- */
@@ -34,12 +86,6 @@ html, body {
   position: fixed; top: 0; left: 0;
   width: 100%; height: 100%;
   object-fit: cover; transform: scaleX(-1); z-index: 0;
-}
-#bg-canvas {
-  position: fixed; top: 0; left: 0;
-  width: 100%; height: 100%;
-  object-fit: cover; transform: scaleX(-1);
-  z-index: 1; pointer-events: none;
 }
 #overlay {
   position: fixed; top: 0; left: 0;
@@ -61,7 +107,7 @@ html, body {
 .drum-cell::after {
   content: attr(data-label);
   color: var(--muze-text-muted);
-  font: 500 10px/1 monospace;
+  font: 500 10px/1 var(--font-ui);
   letter-spacing: 2px;
   text-transform: uppercase;
   opacity: 0.6;
@@ -78,36 +124,38 @@ html, body {
 #chord-zone {
   position: fixed; bottom: 0; left: 0; width: 100%; height: 52px;
   z-index: 3; display: flex; flex-direction: row; touch-action: none;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--elevation-1);
   backdrop-filter: blur(var(--muze-blur)); -webkit-backdrop-filter: blur(var(--muze-blur));
-  border-top: 1px solid var(--muze-border);
+  border-top: 1px solid var(--muze-border-subtle);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 .chord-btn {
   flex: 1; display: flex; align-items: center; justify-content: center;
   color: var(--muze-text-muted);
-  font: 600 13px/1 'SF Mono', monospace;
+  font: 600 14px/1 var(--font-ui);
   letter-spacing: 0.5px;
   border-right: 1px solid rgba(255, 255, 255, 0.03);
-  transition: all 0.2s ease;
+  transition: color 0.15s, background 0.15s;
   position: relative;
 }
 .chord-btn:last-child { border-right: none; }
 .chord-btn.active {
   color: var(--muze-accent);
-  background: rgba(var(--muze-accent-rgb), 0.08);
+  background: var(--muze-accent-subtle);
 }
 .chord-btn.active::after {
   content: '';
   position: absolute; bottom: 0; left: 20%; right: 20%;
   height: 2px; border-radius: 1px;
   background: var(--muze-accent);
+  box-shadow: 0 0 8px var(--muze-accent-glow);
   animation: chord-glow 0.3s ease-out;
 }
 @keyframes chord-glow {
   from { opacity: 0; left: 40%; right: 40%; }
   to { opacity: 1; left: 20%; right: 20%; }
 }
-.chord-btn:active { background: var(--muze-surface-active); }
+.chord-btn:active { background: var(--elevation-2); }
 
 /* ---- Riser Overlay ---- */
 #riser-overlay {
@@ -139,6 +187,18 @@ html, body {
   align-items: center; justify-content: center; gap: 20px;
   overflow: hidden;
 }
+/* Noise texture for start screen */
+#start-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+  z-index: 0;
+}
 #start-screen::before {
   content: '';
   position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
@@ -156,6 +216,7 @@ html, body {
 }
 #start-screen h1 {
   color: #fff;
+  font-family: var(--font-ui);
   font-size: 56px;
   font-weight: 200;
   letter-spacing: 20px;
@@ -166,6 +227,7 @@ html, body {
 }
 #start-screen p {
   color: var(--muze-text-dim);
+  font-family: var(--font-ui);
   font-size: 14px;
   max-width: 280px;
   text-align: center;
@@ -178,6 +240,7 @@ html, body {
   border: 1px solid rgba(var(--muze-accent-rgb), 0.4);
   background: rgba(var(--muze-accent-rgb), 0.06);
   color: #fff;
+  font-family: var(--font-ui);
   font-size: 15px;
   font-weight: 400;
   padding: 16px 44px;
@@ -200,6 +263,7 @@ html, body {
 #start-screen.loading #start-btn { opacity: 0.3; pointer-events: none; animation: none; }
 #loading-text {
   color: var(--muze-text-dim);
+  font-family: var(--font-ui);
   font-size: 12px;
   letter-spacing: 1px;
   display: none;
@@ -238,8 +302,8 @@ html, body {
 }
 #freeze-btn {
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--muze-border-emphasis);
+  background: var(--elevation-1);
   color: var(--muze-text-dim);
   font-size: 18px; width: 38px; height: 38px; border-radius: 50%;
   backdrop-filter: blur(var(--muze-blur)); -webkit-backdrop-filter: blur(var(--muze-blur));
@@ -248,7 +312,7 @@ html, body {
   pointer-events: auto;
   transition: all 0.2s;
 }
-#freeze-btn:active { background: var(--muze-surface-active); }
+#freeze-btn:active { background: var(--elevation-2); }
 #freeze-btn.frozen {
   border-color: rgba(var(--muze-accent-rgb), 0.6);
   color: var(--muze-accent);
@@ -256,26 +320,44 @@ html, body {
 }
 #mode-hud {
   pointer-events: none; text-align: center;
-  font: bold 28px/1.2 'SF Mono', monospace;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 14px 28px; border-radius: var(--muze-radius);
-  backdrop-filter: blur(var(--muze-blur)); -webkit-backdrop-filter: blur(var(--muze-blur));
-  border: 1px solid transparent;
+  font: 600 24px/1.2 var(--font-ui);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--muze-text);
+  background: var(--elevation-1);
+  padding: 16px 32px; border-radius: var(--muze-radius);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--muze-border-subtle);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
   transition: border-color 0.3s;
+  position: relative;
+}
+/* Noise texture for mode HUD */
+#mode-hud::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+  z-index: 1;
 }
 #mode-hud.frozen { border-color: rgba(var(--muze-accent-rgb), 0.3); }
 #mode-hud .valence-bar {
-  margin-top: 10px; height: 4px; width: 200px;
-  background: rgba(255, 255, 255, 0.1);
+  margin-top: 10px; height: 3px; width: 200px;
+  background: var(--muze-recessed);
   border-radius: 2px; position: relative; overflow: hidden;
+  box-shadow: var(--shadow-recessed);
 }
 #mode-hud .valence-bar .fill {
   position: absolute; top: 0; height: 100%; border-radius: 2px;
   transition: left 0.2s ease, width 0.2s ease, background 0.3s ease;
 }
 #mode-hud .valence-label {
-  font-size: 11px; font-weight: 400;
+  font: 400 11px/1 var(--font-ui);
   color: var(--muze-text-dim);
   margin-top: 6px; letter-spacing: 1px;
 }
@@ -285,8 +367,9 @@ html, body {
   position: fixed; bottom: 46%; left: 50%; transform: translateX(-50%);
   z-index: 5;
   color: var(--muze-accent);
-  font: 600 10px/1 monospace;
+  font: 600 10px/1 var(--font-ui);
   letter-spacing: 3px;
+  text-transform: uppercase;
   pointer-events: none;
   opacity: 0; transition: opacity 0.3s;
 }
@@ -306,17 +389,34 @@ html, body {
 }
 .toolbar-btn {
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--muze-border-emphasis);
+  background: var(--elevation-1);
   color: var(--muze-text-dim);
   width: 36px; height: 36px; border-radius: 50%;
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   font-size: 16px;
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease, filter 0.15s ease, background 0.15s ease;
+  position: relative;
 }
-.toolbar-btn:active { background: var(--muze-surface-active); transform: scale(0.93); }
+/* Noise texture on toolbar buttons */
+.toolbar-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+}
+.toolbar-btn:active {
+  background: var(--elevation-2);
+  transform: scale(0.95);
+  filter: brightness(0.9);
+}
 .toolbar-btn.recording {
   border-color: rgba(255, 50, 50, 0.7);
   background: rgba(255, 0, 0, 0.12);
@@ -325,6 +425,11 @@ html, body {
   content: ''; position: absolute; top: 6px; right: 6px;
   width: 7px; height: 7px; border-radius: 50%; background: #f44;
   animation: rec-blink 1s infinite;
+  /* Override noise texture for recording indicator */
+  opacity: 1;
+  background-image: none;
+  mix-blend-mode: normal;
+  inset: auto;
 }
 @keyframes rec-blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
 .toolbar-btn.paused {
@@ -333,10 +438,10 @@ html, body {
 }
 .toolbar-label {
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--muze-border);
+  background: var(--elevation-1);
   color: var(--muze-text-dim);
-  font: 500 8px/1 monospace;
+  font: 500 8px/1 var(--font-ui);
   letter-spacing: 0.5px;
   padding: 0 8px; height: 36px; border-radius: 18px;
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
@@ -344,7 +449,7 @@ html, body {
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
 }
-.toolbar-label:active { background: var(--muze-surface-active); }
+.toolbar-label:active { background: var(--elevation-2); }
 
 /* ---- Sample Switcher ---- */
 #sample-bar {
@@ -356,10 +461,10 @@ html, body {
 }
 .sample-btn {
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--muze-border);
+  background: var(--elevation-1);
   color: var(--muze-text-dim);
-  font: 400 10px/1.3 monospace;
+  font: 400 10px/1.3 var(--font-ui);
   padding: 6px 10px;
   border-radius: 8px;
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
@@ -368,11 +473,11 @@ html, body {
   transition: all 0.15s;
   max-width: 120px;
 }
-.sample-btn:active { background: var(--muze-surface-active); }
+.sample-btn:active { background: var(--elevation-2); }
 .sample-btn .label {
   display: block;
   color: var(--muze-text-muted);
-  font-size: 8px;
+  font: 500 8px/1 var(--font-ui);
   letter-spacing: 1px;
   text-transform: uppercase;
   margin-bottom: 2px;
@@ -383,7 +488,7 @@ html, body {
 #synth-panel {
   position: fixed; top: 0; right: -300px; width: 300px; height: 100%;
   z-index: 15;
-  background: rgba(8, 8, 12, 0.94);
+  background: var(--elevation-1);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow-y: auto;
@@ -391,16 +496,30 @@ html, body {
   -webkit-overflow-scrolling: touch;
   border-left: 1px solid var(--muze-border);
 }
+/* Noise texture for synth panel */
+#synth-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+  z-index: 0;
+}
 #synth-panel.open { right: 0; }
 #synth-tabs {
   display: flex; gap: 0;
   margin-top: 48px; margin-bottom: 16px;
   border-bottom: 1px solid var(--muze-border);
+  position: relative; z-index: 1;
 }
 .synth-tab {
   flex: 1; appearance: none; border: none; background: none;
   color: var(--muze-text-muted);
-  font: 500 9px/1 monospace;
+  font: 500 9px/1 var(--font-ui);
   letter-spacing: 1.5px;
   text-transform: uppercase;
   padding: 10px 4px; cursor: pointer;
@@ -408,27 +527,28 @@ html, body {
   transition: all 0.2s;
 }
 .synth-tab.active { color: var(--muze-accent); border-bottom-color: var(--muze-accent); }
-.synth-tab-content { display: none; }
+.synth-tab-content { display: none; position: relative; z-index: 1; }
 .synth-tab-content.active { display: block; }
 #synth-panel h3 {
   color: var(--muze-text-muted);
-  font: 500 9px/1 monospace;
-  letter-spacing: 2px;
+  font: 600 9px/1 var(--font-ui);
+  letter-spacing: 2.5px;
   text-transform: uppercase;
   margin: 16px 0 10px;
 }
 .synth-row {
   display: flex; align-items: center; gap: 10px; margin: 8px 0;
+  position: relative; z-index: 1;
 }
 .synth-row label {
   color: var(--muze-text-dim);
-  font: 400 11px/1 monospace;
+  font: 500 11px/1 var(--font-ui);
   width: 56px; flex-shrink: 0;
 }
 .synth-row input[type=range] {
   flex: 1; height: 3px;
   -webkit-appearance: none; appearance: none;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--elevation-2);
   border-radius: 2px; outline: none;
 }
 .synth-row input[type=range]::-webkit-slider-thumb {
@@ -440,41 +560,48 @@ html, body {
 }
 .synth-row .val {
   color: var(--muze-text-muted);
-  font: 400 10px/1 monospace;
+  font: 400 10px/1 var(--font-data);
+  font-feature-settings: 'tnum';
   width: 36px; text-align: right;
 }
 .synth-select {
   flex: 1; appearance: none;
-  background: var(--muze-surface);
+  background: var(--elevation-2);
   border: 1px solid var(--muze-border);
   color: var(--muze-text);
-  font: 400 11px/1 monospace;
+  font: 400 11px/1 var(--font-ui);
   padding: 6px 10px; border-radius: 8px;
+  position: relative; z-index: 1;
 }
 
 /* ---- Tutorial Picker ---- */
 #tut-picker {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   z-index: 30;
-  background: rgba(0, 0, 0, 0.88);
+  background: rgba(14, 14, 17, 0.92);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   display: none; flex-direction: column;
   align-items: center; justify-content: center; gap: 20px;
 }
 #tut-picker.open { display: flex; }
 #tut-picker h2 {
-  color: #fff; font-size: 22px; font-weight: 300;
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 22px; font-weight: 300;
   letter-spacing: 6px; text-transform: uppercase;
 }
 #tut-picker p {
   color: var(--muze-text-dim);
+  font-family: var(--font-ui);
   font-size: 13px; max-width: 260px; text-align: center; line-height: 1.6;
 }
 .tut-choice {
   appearance: none;
   border: 1px solid rgba(var(--muze-accent-rgb), 0.25);
   background: rgba(var(--muze-accent-rgb), 0.04);
-  color: #fff; font-size: 14px;
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 14px;
   padding: 14px 32px; border-radius: 30px; cursor: pointer;
   letter-spacing: 1px; width: 220px; text-align: center;
   transition: all 0.2s;
@@ -486,7 +613,9 @@ html, body {
 }
 #tut-close-pick {
   appearance: none; border: none; background: none;
-  color: var(--muze-text-muted); font-size: 13px;
+  color: var(--muze-text-muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
   cursor: pointer; margin-top: 8px; letter-spacing: 1px;
 }
 
@@ -499,34 +628,60 @@ html, body {
 #tut-overlay.active { display: block; }
 #tut-card {
   pointer-events: auto; max-width: 360px; margin: 0 auto;
-  background: rgba(8, 8, 12, 0.92);
+  background: var(--elevation-1);
   border: 1px solid var(--muze-border);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-radius: 16px; padding: 22px; text-align: center;
+  position: relative;
+}
+/* Noise texture for tutorial cards */
+#tut-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+  z-index: 0;
 }
 #tut-card .tut-step-label {
   color: var(--muze-accent);
-  font: 500 9px/1 monospace;
+  font: 500 9px/1 var(--font-ui);
   letter-spacing: 2px;
   text-transform: uppercase;
   margin-bottom: 10px;
+  position: relative; z-index: 1;
 }
 #tut-card .tut-title {
-  color: #fff; font-size: 18px; font-weight: 500; margin-bottom: 8px;
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 18px; font-weight: 500; margin-bottom: 8px;
+  position: relative; z-index: 1;
 }
 #tut-card .tut-desc {
-  color: var(--muze-text-dim); font-size: 13px;
+  color: var(--muze-text-dim);
+  font-family: var(--font-ui);
+  font-size: 13px;
   line-height: 1.6; margin-bottom: 18px;
+  position: relative; z-index: 1;
 }
-#tut-card .tut-nav { display: flex; gap: 10px; justify-content: center; }
+#tut-card .tut-nav {
+  display: flex; gap: 10px; justify-content: center;
+  position: relative; z-index: 1;
+}
 #tut-card .tut-nav button {
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: transparent; color: #fff; font-size: 13px;
+  border: 1px solid var(--muze-border-emphasis);
+  background: transparent; color: #fff;
+  font-family: var(--font-ui);
+  font-size: 13px;
   padding: 8px 22px; border-radius: 20px; cursor: pointer;
   transition: all 0.15s;
 }
-#tut-card .tut-nav button:active { background: var(--muze-surface-active); }
+#tut-card .tut-nav button:active { background: var(--elevation-2); }
 #tut-card .tut-nav .tut-skip {
   border-color: transparent; color: var(--muze-text-muted);
 }
