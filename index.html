@@ -674,8 +674,8 @@ MUZE.BgBlur = {
     this._blurCtx.drawImage(this._sharpCanvas, 0, 0);
     this._blurCtx.filter = 'none';
 
-    // Segment — use confidence mask for smooth edges
-    const result = this._segmenter.segmentForVideo(video, ts);
+    // Segment the drawn canvas (matches canvas resolution)
+    const result = this._segmenter.segmentForVideo(this._sharpCanvas, ts);
     if (!result || !result.confidenceMasks || !result.confidenceMasks.length) return;
     const conf = result.confidenceMasks[0].getAsFloat32Array();
 
