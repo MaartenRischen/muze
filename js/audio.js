@@ -118,12 +118,14 @@ MUZE.Audio = {
     });
     this._createChannelStrip('snare', this.snareSynth);
 
-    this.hatSynth = new Tone.MetalSynth({
-      frequency: 400,
-      envelope: { attack: 0.001, decay: 0.08, release: 0.05 },
-      harmonicity: 5.1, modulationIndex: 32, resonance: 8000, octaves: 1.5
+    // Hat: NoiseSynth + highpass filter (MetalSynth has routing issues with EQ3)
+    this.hatSynth = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 }
     });
-    this._createChannelStrip('hat', this.hatSynth);
+    this._hatFilter = new Tone.Filter({ frequency: 8000, type: 'highpass', rolloff: -12 });
+    this.hatSynth.connect(this._hatFilter);
+    this._createChannelStrip('hat', this._hatFilter);
 
     // ---- Binaural → Channel Strip ----
     // Hard L/R panning is internal; channel strip panner stays at 0
@@ -260,7 +262,7 @@ MUZE.Audio = {
     switch (type) {
       case 'kick': this.kickSynth.triggerAttackRelease('C1', '8n', now, vel); break;
       case 'snare': this.snareSynth.triggerAttackRelease('8n', now, vel); break;
-      case 'hat': this.hatSynth.triggerAttackRelease('32n', now, vel); break;
+      case 'hat': this.hatSynth.triggerAttackRelease('32n', now); break;
     }
   },
 
