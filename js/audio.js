@@ -27,8 +27,7 @@ MUZE.Audio = {
   // Arp filter
   _arpFilter: null, _arpFilterEnv: null,
 
-  // Arp stereo widener (ping-pong)
-  _arpPingPong: null,
+  // (Removed: _arpPingPong — shared delay bus handles this)
 
   // Melody vibrato LFO
   _melodyVibrato: null, _melodyVibratoGain: null,
@@ -80,8 +79,7 @@ MUZE.Audio = {
     this.analyser.toDestination();
 
     this._masterGain = new Tone.Gain(1).connect(this._limiter);
-    this._masterMeter = new Tone.Meter();
-    this._masterGain.connect(this._masterMeter);
+    // PERF: Removed _masterMeter (Tone.Meter does FFT every frame). Use gain.value as proxy.
     this._masterEQ = new Tone.EQ3(0, 0, 0).connect(this._masterGain);
 
     // Tape saturation — very subtle warmth on the master bus
@@ -98,17 +96,9 @@ MUZE.Audio = {
     // ============================================================
     // SEND BUSES (shared reverb + delay, returns bypass face filter)
     // ============================================================
-    // Subtle modulation on reverb tail for lushness
-    this._reverbMod = new Tone.Chorus({
-      frequency: 0.3,
-      delayTime: 3.5,
-      depth: 0.15,
-      wet: 0.3
-    });
-    this._reverbMod.start();
-    this._reverbMod.connect(this._masterSaturation);
+    // (Removed: reverb modulation chorus — unnecessary CPU for barely audible effect)
 
-    this._reverbBus = new Tone.Reverb({ decay: 3.2, preDelay: 0.035 }).connect(this._reverbMod);
+    this._reverbBus = new Tone.Reverb({ decay: 3.2, preDelay: 0.035 }).connect(this._masterSaturation);
     await this._reverbBus.ready;
     this._reverbBus.wet.value = 1; // fully wet — send level controls amount
 
@@ -118,10 +108,10 @@ MUZE.Audio = {
     // SYNTHS — Professional quality
     // ============================================================
 
-    // ---- PAD SYNTH: FM + detuning + sub oscillator ----
-    // Main pad with ±5 cent detuning for width
+    // ---- PAD SYNTH: FM + sub oscillator ----
+    // PERF: maxPolyphony 3 (plays 3-note chords), removed _padDetune2 entirely
     this.padSynth = new Tone.PolySynth(Tone.FMSynth, {
-      maxPolyphony: 6,
+      maxPolyphony: 3,
       voice: {
         harmonicity: 2, modulationIndex: 1.2,
         oscillator: { type: 'sine' },
@@ -135,7 +125,7 @@ MUZE.Audio = {
 
     // Sub oscillator: one octave down, sine, subtle
     this._padSub = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 6,
+      maxPolyphony: 3,
       oscillator: { type: 'sine' },
       envelope: { attack: 1.2, decay: 0.5, sustain: 0.9, release: 3.0 },
     });
@@ -145,24 +135,11 @@ MUZE.Audio = {
     this._padChorus = new Tone.Chorus({ frequency: 1.2, delayTime: 4.0, depth: 0, wet: 0.5 });
     this._padChorus.start();
 
-    // Second detuned pad layer for unison width (detuned -5 cents)
-    this._padDetune2 = new Tone.PolySynth(Tone.FMSynth, {
-      maxPolyphony: 6,
-      voice: {
-        harmonicity: 2, modulationIndex: 1.2,
-        oscillator: { type: 'sine' },
-        envelope: { attack: 1.0, decay: 0.4, sustain: 0.85, release: 2.5 },
-        modulation: { type: 'triangle' },
-        modulationEnvelope: { attack: 0.6, decay: 0.3, sustain: 0.7, release: 2.0 }
-      }
-    });
-    this._padDetune2.set({ detune: -5 });
-    this._padDetune2.volume.value = -6; // slightly quieter for depth
+    // (Removed: _padDetune2 — single pad layer + sub is enough, saves 3 FMSynth voices)
 
-    // Wire all pad layers through chorus
+    // Wire pad layers through chorus
     this.padSynth.connect(this._padChorus);
     this._padSub.connect(this._padChorus);
-    this._padDetune2.connect(this._padChorus);
     this._createChannelStrip('pad', this._padChorus);
 
     // ---- ARPEGGIO SYNTH: Filter envelope + stereo ping-pong ----
@@ -180,16 +157,10 @@ MUZE.Audio = {
       Q: 2
     });
 
-    // Stereo ping-pong delay (insert, very subtle for width)
-    this._arpPingPong = new Tone.PingPongDelay({
-      delayTime: '16n',
-      feedback: 0.15,
-      wet: 0.2
-    });
+    // (Removed: _arpPingPong — shared delay bus handles stereo width)
 
     this.leadSynth.connect(this._arpFilter);
-    this._arpFilter.connect(this._arpPingPong);
-    this._createChannelStrip('arp', this._arpPingPong);
+    this._createChannelStrip('arp', this._arpFilter);
 
     // ---- MELODY SYNTH: Expressive filter envelope + vibrato ----
     this.melodySynth = new Tone.MonoSynth({
@@ -327,11 +298,8 @@ MUZE.Audio = {
     gain.connect(delaySend);
     delaySend.connect(this._delayBus);
 
-    // Metering: connect gain to a Tone.Meter for real-time level readout
-    const meter = new Tone.Meter();
-    gain.connect(meter);
-
-    this._nodes[name] = { eq, panner, gain, reverbSend, delaySend, meter };
+    // PERF: Removed per-channel Tone.Meter (9 FFT nodes). Use gain.value as proxy.
+    this._nodes[name] = { eq, panner, gain, reverbSend, delaySend };
   },
 
   // ============================================================
@@ -384,10 +352,8 @@ MUZE.Audio = {
   // ============================================================
   triggerPad(notes) {
     this.padSynth.releaseAll();
-    this._padDetune2.releaseAll();
     this._padSub.releaseAll();
     this.padSynth.triggerAttack(notes, Tone.now(), 0.4);
-    this._padDetune2.triggerAttack(notes, Tone.now(), 0.35);
     // Sub: one octave down
     const subNotes = notes.map(n => {
       const freq = Tone.Frequency(n).toFrequency();
@@ -397,7 +363,6 @@ MUZE.Audio = {
   },
   releasePad() {
     this.padSynth.releaseAll();
-    this._padDetune2.releaseAll();
     this._padSub.releaseAll();
   },
 
@@ -640,17 +605,16 @@ MUZE.Audio = {
   tapeStop() {
     const orig = Tone.Transport.bpm.value;
     Tone.Transport.bpm.rampTo(20, 0.4);
-    [this.padSynth, this._padDetune2, this._padSub, this.leadSynth, this.melodySynth].forEach(s => {
+    [this.padSynth, this._padSub, this.leadSynth, this.melodySynth].forEach(s => {
       if (s) { s.set({ detune: 0 }); s.set({ detune: -2400 }); }
     });
     setTimeout(() => {
       Tone.Transport.bpm.rampTo(orig, 0.15);
-      [this.padSynth, this._padDetune2, this.leadSynth, this.melodySynth].forEach(s => {
+      [this.padSynth, this.leadSynth, this.melodySynth].forEach(s => {
         if (s) s.set({ detune: 0 });
       });
       // Restore pad detuning
       this.padSynth.set({ detune: 5 });
-      this._padDetune2.set({ detune: -5 });
       this._padSub.set({ detune: 0 });
     }, 500);
   },
@@ -698,12 +662,6 @@ MUZE.Audio = {
 
     // Pad synth params — oscillator types switch immediately, envelopes ramp
     this.padSynth.set({
-      oscillator: { type: P.padOsc },
-      harmonicity: P.padHarm,
-      modulationIndex: P.padMod,
-      envelope: { attack: P.padAttack, release: P.padRelease }
-    });
-    this._padDetune2.set({
       oscillator: { type: P.padOsc },
       harmonicity: P.padHarm,
       modulationIndex: P.padMod,
@@ -788,7 +746,6 @@ MUZE.Audio = {
     if (!this._padSampleMode) {
       this._padSampleMode = true;
       this.padSynth.volume.rampTo(-60, 0.3);
-      this._padDetune2.volume.rampTo(-60, 0.3);
       this._padSub.volume.rampTo(-60, 0.3);
       this._padGrain.volume.rampTo(-14, 0.3);
       this._padGrain.start();
@@ -798,7 +755,6 @@ MUZE.Audio = {
     this._padSampleMode = false;
     MUZE.State.padSampleId = null;
     this.padSynth.volume.rampTo(-14, 0.3);
-    this._padDetune2.volume.rampTo(-6, 0.3);
     this._padSub.volume.rampTo(-20, 0.3);
     this._padGrain.volume.rampTo(-60, 0.3);
     setTimeout(() => { try { this._padGrain.stop(); } catch(e) {} }, 400);

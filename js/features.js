@@ -482,7 +482,6 @@ MUZE.SceneManager = {
     // Oscillator types (instant — no crossfade for these)
     if (scene.padOsc) {
       MUZE.Audio.padSynth.set({ oscillator: { type: scene.padOsc } });
-      MUZE.Audio._padDetune2.set({ oscillator: { type: scene.padOsc } });
     }
     if (scene.arpOsc) {
       MUZE.Audio.leadSynth.set({ oscillator: { type: scene.arpOsc } });

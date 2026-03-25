@@ -183,26 +183,21 @@ MUZE.SynthMenu = {
     });
     this._bind('bin-hz', (v) => MUZE.Audio.setBinauralBeatHz(+v));
 
-    // Pad synth (update both layers)
+    // Pad synth (single layer now — _padDetune2 removed for performance)
     this._bind('pad-osc', (v) => {
       MUZE.Audio.padSynth.set({ oscillator: { type: v } });
-      MUZE.Audio._padDetune2.set({ oscillator: { type: v } });
     }, true);
     this._bind('pad-harm', (v) => {
       MUZE.Audio.padSynth.set({ harmonicity: +v });
-      MUZE.Audio._padDetune2.set({ harmonicity: +v });
     });
     this._bind('pad-mod', (v) => {
       MUZE.Audio.padSynth.set({ modulationIndex: +v });
-      MUZE.Audio._padDetune2.set({ modulationIndex: +v });
     });
     this._bind('pad-atk', (v) => {
       MUZE.Audio.padSynth.set({ envelope: { attack: +v } });
-      MUZE.Audio._padDetune2.set({ envelope: { attack: +v } });
     });
     this._bind('pad-rel', (v) => {
       MUZE.Audio.padSynth.set({ envelope: { release: +v } });
-      MUZE.Audio._padDetune2.set({ envelope: { release: +v } });
     });
   },
 
@@ -910,10 +905,9 @@ MUZE.MixerUI = {
     }
   },
 
-  // ---- Get dB level for a channel (returns raw dB) ----
+  // ---- Get dB level for a channel (uses gain.value as proxy — no Tone.Meter FFT overhead) ----
   _getChannelDb(ch) {
     if (ch === 'master') {
-      if (MUZE.Audio._masterMeter) return MUZE.Audio._masterMeter.getValue();
       if (MUZE.Audio._masterGain) {
         const g = MUZE.Audio._masterGain.gain.value;
         return g > 0 ? 20 * Math.log10(g) : -60;
@@ -922,7 +916,6 @@ MUZE.MixerUI = {
     }
     const node = MUZE.Audio._nodes[ch];
     if (!node) return -60;
-    if (node.meter) return node.meter.getValue();
     const g = node.gain.gain.value;
     return g > 0 ? 20 * Math.log10(g) : -60;
   },

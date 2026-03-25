@@ -34,15 +34,15 @@
   width: 100%;
   height: 52vh;
   z-index: 16;
-  background: var(--mixer-bg);
-  backdrop-filter: blur(var(--mixer-blur));
-  -webkit-backdrop-filter: blur(var(--mixer-blur));
+  /* PERF: Solid background instead of backdrop-filter blur (very expensive on mobile) */
+  background: #0E0E11;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   transform: translateY(100%);
   transition: transform var(--transition-panel);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  will-change: transform; /* PERF: promote to own compositing layer */
 }
 
 /* Noise texture for mixer panel */
@@ -526,9 +526,8 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: var(--mixer-bg);
-  backdrop-filter: blur(var(--mixer-blur));
-  -webkit-backdrop-filter: blur(var(--mixer-blur));
+  /* PERF: Solid background instead of backdrop-filter blur */
+  background: #0E0E11;
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -536,6 +535,7 @@
   transition: transform var(--transition-panel);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  will-change: transform; /* PERF: promote to own compositing layer */
 }
 
 #mixer-detail.open {

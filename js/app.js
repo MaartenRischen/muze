@@ -6,6 +6,8 @@ MUZE.Loop = {
   _running: false, _lastDetect: 0, _currentPadKey: null,
   _prevMelodyNote: null, _prevBrow: 0, _lastBrowSpike: 0,
   _debugEl: null, _modeHudEl: null,
+  _lastHUDUpdate: 0, _hudThrottleMs: 200, // PERF: throttle HUD to ~5fps
+  _prevHUDModeName: '', _prevHUDRootName: '', _prevHUDBPM: 0, _prevHUDValence: null,
 
   init() {
     MUZE.Visualizer.init();
@@ -123,19 +125,36 @@ MUZE.Loop = {
     // Draw
     MUZE.Visualizer.draw();
     MUZE.Recorder.drawFrame();
-    this._updateHUD(S);
+    // PERF: Throttle HUD updates to ~5fps (every 200ms) to avoid DOM reflow every frame
+    if (now - this._lastHUDUpdate >= this._hudThrottleMs) {
+      this._lastHUDUpdate = now;
+      this._updateHUD(S);
+    }
   },
 
   _updateHUD(S) {
     // Mode HUD — uses current accent color for cohesive look
     const modeName = MUZE.Music.getScaleName(S.currentScale).toUpperCase();
+    const rootName = MUZE.Config.ROOT_NAMES[S.rootOffset];
+    const bpm = MUZE.Audio.getBPM();
     const v = S.lipCorner;
+    const vRounded = v.toFixed(2);
+
+    // PERF: Skip DOM update if nothing changed
+    if (modeName === this._prevHUDModeName && rootName === this._prevHUDRootName &&
+        bpm === this._prevHUDBPM && vRounded === this._prevHUDValence) {
+      return;
+    }
+    this._prevHUDModeName = modeName;
+    this._prevHUDRootName = rootName;
+    this._prevHUDBPM = bpm;
+    this._prevHUDValence = vRounded;
+
     const pct = ((v + 1) / 2) * 100;
     const barW = 10;
     const left = Math.max(0, Math.min(100 - barW, pct - barW / 2));
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--muze-accent').trim() || '#e8a948';
-    const rootName = MUZE.Config.ROOT_NAMES[S.rootOffset];
-    const bpm = MUZE.Audio.getBPM();
+    // PERF: Cache accent color from CSS variable (only changes on mode change, already handled above)
+    const accent = MUZE.Config.MODE_COLORS[S.currentModeName]?.accent || '#e8a948';
     // Show loop state in HUD meta if looping
     let loopInfo = '';
     if (MUZE.LoopRecorder && MUZE.LoopRecorder._state !== 'empty') {
@@ -151,7 +170,7 @@ MUZE.Loop = {
       `<div class="mode-name">${modeName}</div>` +
       `<div class="hud-meta">${rootName} &middot; ${bpm} BPM${loopInfo}</div>` +
       `<div class="valence-bar"><div class="fill" style="left:${left}%;width:${barW}%;background:${accent}"></div></div>` +
-      `<div class="valence-label">valence <span class="valence-value">${v.toFixed(2)}</span></div>`;
+      `<div class="valence-label">valence <span class="valence-value">${vRounded}</span></div>`;
 
     // Debug (only update if visible)
     if (S.debugVisible) {
@@ -160,9 +179,7 @@ MUZE.Loop = {
       this._debugEl.innerHTML =
         `<div style="font:10px/1.5 var(--font-data, 'SF Mono', monospace);font-feature-settings:'tnum';color:rgba(255,255,255,0.6);` +
         `background:var(--elevation-1, #161619);padding:6px 10px;border-radius:8px;` +
-        `border:1px solid rgba(255,255,255,0.05);` +
-        `backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);` +
-        `box-shadow:0 2px 8px rgba(0,0,0,0.3)">` +
+        `border:1px solid rgba(255,255,255,0.05);box-shadow:0 2px 8px rgba(0,0,0,0.3)">` +
         `${S.faceDetected?'face':'...'} | ${sc} | chord ${S.chordIndex} | ${rootName}${4 + Math.floor(S.rootOffset / 12)}<br>` +
         `smile:${S.lipCorner.toFixed(2)} brow:${S.browHeight.toFixed(2)} eyes:${S.eyeOpenness.toFixed(2)}<br>` +
         `pitch:${S.headPitch.toFixed(2)} yaw:${S.headYaw.toFixed(2)} roll:${S.headRoll.toFixed(2)}<br>` +

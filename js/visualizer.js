@@ -8,7 +8,11 @@ MUZE.Visualizer = {
   _width: 0,
   _height: 0,
   _particles: [],
-  _maxParticles: 80,
+  _maxParticles: 40, // PERF: reduced from 80
+  // PERF: Cache CSS variables (only update on mode change)
+  _cachedAccent: '#e8a948',
+  _cachedAccentRgb: '232,169,72',
+  _cachedModeName: '',
 
   init() {
     this._canvas = document.getElementById('overlay');
@@ -44,10 +48,18 @@ MUZE.Visualizer = {
     }
     energy = energy / waveform.length;
 
-    // Get current accent color
-    const style = getComputedStyle(document.documentElement);
-    const accent = style.getPropertyValue('--muze-accent').trim() || '#e8a948';
-    const accentRgb = style.getPropertyValue('--muze-accent-rgb').trim() || '232,169,72';
+    // PERF: Use cached accent color (updated only on mode change, avoids getComputedStyle per frame)
+    const currentMode = MUZE.State.currentModeName;
+    if (currentMode !== this._cachedModeName) {
+      this._cachedModeName = currentMode;
+      const colors = MUZE.Config.MODE_COLORS[currentMode];
+      if (colors) {
+        this._cachedAccent = colors.accent;
+        this._cachedAccentRgb = colors.rgb;
+      }
+    }
+    const accent = this._cachedAccent;
+    const accentRgb = this._cachedAccentRgb;
 
     // ---- Circular waveform ring ----
     const cx = w / 2;

@@ -159,8 +159,8 @@ html, body {
 #chord-zone {
   position: fixed; bottom: 0; left: 0; width: 100%; height: 52px;
   z-index: 3; display: flex; flex-direction: row; touch-action: none;
+  /* PERF: Solid background instead of backdrop-filter */
   background: var(--elevation-1);
-  backdrop-filter: blur(var(--muze-blur)); -webkit-backdrop-filter: blur(var(--muze-blur));
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
@@ -439,7 +439,7 @@ html, body {
   background: linear-gradient(180deg, var(--elevation-3) 0%, var(--elevation-2) 100%);
   color: var(--muze-text-dim);
   font-size: 18px; width: 38px; height: 38px; border-radius: 50%;
-  backdrop-filter: blur(var(--muze-blur)); -webkit-backdrop-filter: blur(var(--muze-blur));
+  /* PERF: Removed backdrop-filter */
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   pointer-events: auto;
@@ -484,7 +484,7 @@ html, body {
   color: var(--muze-text);
   background: var(--elevation-1);
   padding: 16px 36px; border-radius: var(--muze-radius);
-  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  /* PERF: Removed backdrop-filter */
   border: 1px solid var(--muze-border-subtle);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.03) inset;
   transition: border-color var(--transition-panel), box-shadow var(--transition-panel);
@@ -591,7 +591,7 @@ html, body {
   background: linear-gradient(180deg, var(--elevation-3) 0%, var(--elevation-2) 100%);
   color: var(--muze-text-dim);
   width: 36px; height: 36px; border-radius: 50%;
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  /* PERF: Removed backdrop-filter */
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   font-family: var(--font-ui);
@@ -654,7 +654,7 @@ html, body {
   font: 500 8px/1 var(--font-ui);
   letter-spacing: 0.5px;
   padding: 0 8px; height: 36px; border-radius: 18px;
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  /* PERF: Removed backdrop-filter */
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all var(--transition-control);
@@ -687,7 +687,7 @@ html, body {
   font: 400 10px/1.3 var(--font-ui);
   padding: 6px 10px;
   border-radius: 8px;
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  /* PERF: Removed backdrop-filter */
   cursor: pointer;
   text-align: left;
   transition: all var(--transition-control);
@@ -716,14 +716,15 @@ html, body {
 #synth-panel {
   position: fixed; top: 0; right: -300px; width: 300px; height: 100%;
   z-index: 15;
+  /* PERF: Solid background instead of backdrop-filter (saves heavy GPU compositing) */
   background: var(--elevation-1);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   transition: right var(--transition-panel);
   overflow-y: auto;
   padding: env(safe-area-inset-top, 12px) 20px 24px 20px;
   -webkit-overflow-scrolling: touch;
   border-left: 1px solid var(--muze-border);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+  will-change: transform; /* PERF: promote to own compositing layer */
 }
 /* Noise texture for synth panel */
 #synth-panel::after {
@@ -871,8 +872,8 @@ html, body {
 #tut-picker {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   z-index: 30;
-  background: rgba(8, 8, 11, 0.95);
-  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  background: rgba(8, 8, 11, 0.98);
+  /* PERF: Removed backdrop-filter */
   display: none; flex-direction: column;
   align-items: center; justify-content: center; gap: 20px;
 }
@@ -935,7 +936,7 @@ html, body {
   pointer-events: auto; max-width: 360px; margin: 0 auto;
   background: var(--elevation-1);
   border: 1px solid var(--muze-border);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  /* PERF: Removed backdrop-filter */
   border-radius: 16px; padding: 22px; text-align: center;
   position: relative;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
@@ -1042,8 +1043,7 @@ body::after {
   font: 400 10px/1.3 var(--font-ui);
   padding: 5px 8px;
   border-radius: 8px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  /* PERF: Removed backdrop-filter */
   cursor: pointer;
   text-align: left;
   transition: all var(--transition-control);
@@ -1084,8 +1084,7 @@ body::after {
   left: 8px;
   z-index: 21;
   background: var(--elevation-1);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  /* PERF: Removed backdrop-filter */
   border: 1px solid var(--muze-border);
   border-radius: var(--muze-radius);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
@@ -1251,8 +1250,7 @@ body::after {
   align-items: center;
   gap: 6px;
   background: var(--elevation-1);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  /* PERF: Removed backdrop-filter */
   border: 1px solid var(--muze-border);
   border-radius: 24px;
   padding: 4px 8px;
@@ -1513,8 +1511,7 @@ body::after {
   flex-direction: column;
   gap: 4px;
   background: var(--elevation-1);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  /* PERF: Removed backdrop-filter */
   border: 1px solid var(--muze-border);
   border-radius: 8px;
   padding: 6px 8px;
@@ -1591,8 +1588,7 @@ body::after {
   letter-spacing: 1px;
   padding: 5px 8px;
   border-radius: 8px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  /* PERF: Removed backdrop-filter */
   cursor: pointer;
   display: flex;
   flex-direction: column;
