@@ -1,88 +1,88 @@
 /* ============================================================
-   MUZE — Background Blur (DSLR-style DOF)
-   CSS blurs the video, canvas draws sharp person with soft
-   radial falloff centered on face — no hard edges.
+   MUZE — Background Blur (MediaPipe Selfie Segmenter)
    ============================================================ */
 
 MUZE.BgBlur = {
   _active: false,
+  _segmenter: null,
   _bgCanvas: null, _bgCtx: null,
+  _tmpCanvas: null, _tmpCtx: null,
+  _w: 0, _h: 0,
+  _ready: false,
 
-  init() {
+  async init(ImageSegmenter, vision) {
     this._bgCanvas = document.getElementById('bg-canvas');
-    if (this._bgCanvas) {
-      this._bgCtx = this._bgCanvas.getContext('2d');
+    this._bgCtx = this._bgCanvas.getContext('2d', { willReadFrequently: true });
+    this._tmpCanvas = document.createElement('canvas');
+    this._tmpCtx = this._tmpCanvas.getContext('2d', { willReadFrequently: true });
+
+    try {
+      this._segmenter = await ImageSegmenter.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite',
+          delegate: 'GPU'
+        },
+        runningMode: 'VIDEO',
+        outputCategoryMask: false,
+        outputConfidenceMasks: true
+      });
+      console.log('BgBlur: segmenter loaded');
+      this._ready = true;
+    } catch (e) {
+      console.warn('BgBlur: segmenter failed, falling back to CSS-only blur', e);
+      this._ready = false;
     }
   },
 
   activate() {
     this._active = true;
+    // CSS blur as base — always works
+    document.getElementById('cam').style.filter = 'blur(12px) brightness(0.85)';
+    // Size canvases when video is ready
     const check = () => {
       const v = MUZE.Camera.video;
       if (v && v.videoWidth) {
-        this._bgCanvas.width = v.videoWidth;
-        this._bgCanvas.height = v.videoHeight;
-        this._bgCanvas.style.width = '100%';
-        this._bgCanvas.style.height = '100%';
-        this._bgCanvas.style.objectFit = 'cover';
-        this._bgCanvas.style.transform = 'scaleX(-1)';
-      } else setTimeout(check, 100);
+        this._w = v.videoWidth;
+        this._h = v.videoHeight;
+        this._bgCanvas.width = this._w;
+        this._bgCanvas.height = this._h;
+        this._tmpCanvas.width = this._w;
+        this._tmpCanvas.height = this._h;
+      } else setTimeout(check, 200);
     };
     check();
   },
 
-  render(video, faceLandmarks) {
-    if (!this._active || !this._bgCtx || !video || video.readyState < 2) return;
-    const w = this._bgCanvas.width, h = this._bgCanvas.height;
-    if (!w) return;
-    const ctx = this._bgCtx;
+  render(video, ts) {
+    if (!this._active || !this._ready || !this._segmenter) return;
+    if (!video || video.readyState < 2 || !this._w) return;
 
-    if (!faceLandmarks || !faceLandmarks.length) {
-      ctx.clearRect(0, 0, w, h);
-      return;
+    const w = this._w, h = this._h;
+
+    // Draw sharp video to temp canvas
+    this._tmpCtx.drawImage(video, 0, 0, w, h);
+
+    // Run segmenter
+    let result;
+    try {
+      result = this._segmenter.segmentForVideo(video, ts);
+    } catch (e) { return; }
+
+    if (!result || !result.confidenceMasks || !result.confidenceMasks.length) return;
+
+    const mask = result.confidenceMasks[0].getAsFloat32Array();
+    const imgData = this._tmpCtx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+    const pixels = Math.min(mask.length, d.length / 4);
+
+    // Set alpha based on mask — person = opaque, background = transparent
+    for (let i = 0; i < pixels; i++) {
+      d[i * 4 + 3] = mask[i] * 255 | 0;
     }
 
-    const lm = faceLandmarks[0];
+    this._bgCtx.clearRect(0, 0, w, h);
+    this._bgCtx.putImageData(imgData, 0, 0);
 
-    // Face center and size
-    const noseTip = lm[1];
-    const forehead = lm[10];
-    const chin = lm[152];
-    const leftEar = lm[234];
-    const rightEar = lm[454];
-
-    const cx = noseTip.x * w;
-    const faceTop = forehead.y * h;
-    const faceBottom = chin.y * h;
-    const faceH = faceBottom - faceTop;
-    const faceW = (rightEar.x - leftEar.x) * w;
-
-    // Sharp column centered on person — head to bottom of frame
-    const pcx = cx;
-    const columnW = faceW * 1.2;
-
-    // Draw sharp video
-    ctx.clearRect(0, 0, w, h);
-    ctx.drawImage(video, 0, 0, w, h);
-
-    // Erase sides with horizontal gradient — keep a vertical column sharp
-    ctx.save();
-    ctx.globalCompositeOperation = 'destination-in';
-
-    // Horizontal gradient: transparent → solid → solid → transparent
-    const grad = ctx.createLinearGradient(0, 0, w, 0);
-    const leftEdge = Math.max(0, (pcx - columnW) / w);
-    const leftIn = Math.max(0, (pcx - columnW * 0.6) / w);
-    const rightIn = Math.min(1, (pcx + columnW * 0.6) / w);
-    const rightEdge = Math.min(1, (pcx + columnW) / w);
-    grad.addColorStop(0, 'rgba(255,255,255,0)');
-    grad.addColorStop(leftEdge, 'rgba(255,255,255,0)');
-    grad.addColorStop(leftIn, 'rgba(255,255,255,1)');
-    grad.addColorStop(rightIn, 'rgba(255,255,255,1)');
-    grad.addColorStop(rightEdge, 'rgba(255,255,255,0)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
-    ctx.restore();
+    result.confidenceMasks[0].close();
   }
 };

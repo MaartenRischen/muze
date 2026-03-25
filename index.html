@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <title>MUZE</title>
-<link rel="stylesheet" href="css/style.css?v=9">
+<link rel="stylesheet" href="css/style.css?v=12">
 <link rel="stylesheet" href="css/mixer.css">
 <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
 </head>
@@ -159,7 +159,7 @@
 <!-- JS Modules -->
 <script src="js/config.js"></script>
 <script src="js/tracking.js"></script>
-<script src="js/bgblur.js?v=11"></script>
+<script src="js/bgblur.js?v=12"></script>
 <script src="js/music.js"></script>
 <script src="js/mixer.js"></script>
 <script src="js/audio.js"></script>
@@ -170,7 +170,7 @@
 
 <!-- Bootstrap (ES module for MediaPipe import) -->
 <script type="module">
-import { FaceLandmarker, HandLandmarker, FilesetResolver }
+import { FaceLandmarker, HandLandmarker, ImageSegmenter, FilesetResolver }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs';
 
 document.getElementById('start-btn').addEventListener('click', async () => {
@@ -234,8 +234,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       }
     });
 
-    MUZE.BgBlur.init();
-    MUZE.BgBlur.activate();
+    MUZE.BgBlur.init(ImageSegmenter, vision).then(() => MUZE.BgBlur.activate());
     MUZE.Loop.init();
 
     // Fade out start screen
