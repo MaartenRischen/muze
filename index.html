@@ -109,16 +109,6 @@
   }
   #freeze-btn:active { background: rgba(255,255,255,0.15); }
   #freeze-btn.frozen { border-color: rgba(100,200,255,0.6); color: rgba(100,200,255,0.9); }
-  #blur-btn {
-    appearance: none; border: 1px solid rgba(255,255,255,0.2);
-    background: rgba(0,0,0,0.5); color: rgba(255,255,255,0.5);
-    font-size: 18px; width: 36px; height: 36px; border-radius: 50%;
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    pointer-events: auto;
-  }
-  #blur-btn:active { background: rgba(255,255,255,0.15); }
-  #blur-btn.active { border-color: rgba(100,200,255,0.6); color: rgba(100,200,255,0.9); }
   #mode-hud {
     pointer-events: none; text-align: center;
     font: bold 32px/1.2 monospace; color: #fff;
@@ -343,7 +333,6 @@
 <div id="mode-hud-wrap">
   <button id="freeze-btn">&#10052;</button>
   <div id="mode-hud"></div>
-  <button id="blur-btn">&#9676;</button>
 </div>
 
 <canvas id="rec-canvas"></canvas>
@@ -1871,10 +1860,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       document.getElementById('freeze-btn').classList.toggle('frozen', MUZE.State.modeFrozen);
       document.getElementById('mode-hud').classList.toggle('frozen', MUZE.State.modeFrozen);
     });
-    document.getElementById('blur-btn').addEventListener('click', () => {
-      const on = MUZE.BgBlur.toggle();
-      document.getElementById('blur-btn').classList.toggle('active', on);
-    });
+    MUZE.BgBlur.toggle(); // on by default
     MUZE.Loop.init();
 
     // Pause button
