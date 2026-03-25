@@ -98,10 +98,11 @@ html, body {
    All visual effects derive from calc() + var() — zero reflow.
    ============================================================ */
 
-/* ---------- Gradient overlay (full-screen mode wash) ---------- */
-#mood-gradient-overlay {
-  position: fixed; inset: 0;
-  pointer-events: none; z-index: 1;
+/* ---------- Mood overlays DISABLED — they darken the camera too much ---------- */
+#mood-gradient-overlay, #mood-edge-glow, #mood-edge-glow-inner, #mood-breath-bar {
+  display: none !important;
+}
+#mood-gradient-overlay_DISABLED {
   /* Keep very subtle so camera stays visible */
   opacity: calc(0.02 + var(--mood-energy, 0) * 0.02 + var(--mood-breath, 0.3) * 0.01);
   transition: background 1.5s ease;
@@ -1603,20 +1604,10 @@ html, body {
 #rec-canvas { display: none; }
 
 /* ============================================================
-   GLOBAL VIGNETTE — Subtle edge darkening for cinematic depth
+   GLOBAL VIGNETTE — DISABLED (was darkening camera too much)
    ============================================================ */
 body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 99;
-  background: radial-gradient(
-    ellipse at 50% 50%,
-    transparent 55%,
-    rgba(0, 0, 0, 0.25) 100%
-  );
-  opacity: var(--vignette-opacity, 0.25);
+  display: none;
   transition: opacity 0.15s ease;
 }
 

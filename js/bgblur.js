@@ -157,7 +157,7 @@ MUZE.BgBlur = {
 
     // Apply video blur only after first successful segmentation
     if (!this._blurApplied) {
-      document.getElementById('cam').style.filter = 'blur(12px)';
+      document.getElementById('cam').style.filter = 'blur(8px) brightness(1.1)';
       this._blurApplied = true;
     }
 
