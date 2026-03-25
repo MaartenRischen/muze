@@ -24,6 +24,12 @@
     width: 100%; height: 100%;
     object-fit: cover; transform: scaleX(-1); z-index: 0;
   }
+  #bg-canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0; pointer-events: none;
+  }
+  #cam.hidden { opacity: 0; }
   #overlay {
     position: fixed; top: 0; left: 0;
     width: 100%; height: 100%;
@@ -103,6 +109,16 @@
   }
   #freeze-btn:active { background: rgba(255,255,255,0.15); }
   #freeze-btn.frozen { border-color: rgba(100,200,255,0.6); color: rgba(100,200,255,0.9); }
+  #blur-btn {
+    appearance: none; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(0,0,0,0.5); color: rgba(255,255,255,0.5);
+    font-size: 18px; width: 36px; height: 36px; border-radius: 50%;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    pointer-events: auto;
+  }
+  #blur-btn:active { background: rgba(255,255,255,0.15); }
+  #blur-btn.active { border-color: rgba(100,200,255,0.6); color: rgba(100,200,255,0.9); }
   #mode-hud {
     pointer-events: none; text-align: center;
     font: bold 32px/1.2 monospace; color: #fff;
@@ -304,6 +320,7 @@
 <body>
 
 <video id="cam" autoplay playsinline muted></video>
+<canvas id="bg-canvas"></canvas>
 <canvas id="overlay"></canvas>
 
 <div id="touch-zone">
@@ -326,6 +343,7 @@
 <div id="mode-hud-wrap">
   <button id="freeze-btn">&#10052;</button>
   <div id="mode-hud"></div>
+  <button id="blur-btn">&#9676;</button>
 </div>
 
 <canvas id="rec-canvas"></canvas>
@@ -599,6 +617,121 @@ MUZE.HandFeatures = {
     return {handPresent:true, handX:1-hX, handY:hY, handOpen:(aT/pS)>1.7};
   },
   _d(a,b){return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2+((a.z||0)-(b.z||0))**2);}
+};
+</script>
+
+<!-- Background Blur -->
+<script>
+MUZE.BgBlur = {
+  _segmenter: null, _active: false,
+  _bgCanvas: null, _bgCtx: null,
+  _tempCanvas: null, _tempCtx: null,
+  _maskCanvas: null, _maskCtx: null,
+  _blurAmount: 20,
+
+  async init(ImageSegmenter, vision) {
+    this._bgCanvas = document.getElementById('bg-canvas');
+    this._bgCtx = this._bgCanvas.getContext('2d');
+    this._tempCanvas = document.createElement('canvas');
+    this._tempCtx = this._tempCanvas.getContext('2d');
+    this._maskCanvas = document.createElement('canvas');
+    this._maskCtx = this._maskCanvas.getContext('2d');
+
+    this._segmenter = await ImageSegmenter.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite', delegate: 'GPU' },
+      runningMode: 'VIDEO',
+      outputCategoryMask: true,
+      outputConfidenceMasks: false
+    });
+  },
+
+  resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    // Use half resolution for performance
+    const scale = Math.min(1, 360 / w);
+    this._w = Math.round(w * scale);
+    this._h = Math.round(h * scale);
+    this._bgCanvas.width = this._w;
+    this._bgCanvas.height = this._h;
+    this._bgCanvas.style.width = w + 'px';
+    this._bgCanvas.style.height = h + 'px';
+    this._tempCanvas.width = this._w;
+    this._tempCanvas.height = this._h;
+    this._maskCanvas.width = this._w;
+    this._maskCanvas.height = this._h;
+  },
+
+  toggle() {
+    this._active = !this._active;
+    document.getElementById('cam').classList.toggle('hidden', this._active);
+    if (this._active) this.resize();
+    return this._active;
+  },
+
+  render(video, ts) {
+    if (!this._active || !this._segmenter || video.readyState < 2) return;
+    const w = this._w, h = this._h;
+    const ctx = this._bgCtx;
+    const tmp = this._tempCtx;
+    const msk = this._maskCtx;
+
+    // Draw video (mirrored, cover-cropped)
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const canvasRatio = w / h, vidRatio = vw / vh;
+    let sx = 0, sy = 0, sw = vw, sh = vh;
+    if (vidRatio > canvasRatio) { sw = vh * canvasRatio; sx = (vw - sw) / 2; }
+    else { sh = vw / canvasRatio; sy = (vh - sh) / 2; }
+
+    tmp.save();
+    tmp.translate(w, 0);
+    tmp.scale(-1, 1);
+    tmp.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+    tmp.restore();
+
+    // Segment
+    const result = this._segmenter.segmentForVideo(video, ts);
+    if (!result || !result.categoryMask) return;
+    const mask = result.categoryMask.getAsUint8Array();
+
+    // Build mask image
+    const maskImg = msk.createImageData(w, h);
+    const d = maskImg.data;
+    // Segmenter mask: category 0 = background, 1+ = person
+    // But selfie segmenter uses confidence, category mask: 0=bg, 255=person
+    for (let i = 0; i < mask.length; i++) {
+      const a = mask[i] > 0 ? 255 : 0;
+      d[i * 4] = 255;
+      d[i * 4 + 1] = 255;
+      d[i * 4 + 2] = 255;
+      d[i * 4 + 3] = a;
+    }
+    msk.putImageData(maskImg, 0, 0);
+
+    // Draw blurred background
+    ctx.filter = `blur(${this._blurAmount}px)`;
+    ctx.drawImage(this._tempCanvas, 0, 0);
+    ctx.filter = 'none';
+
+    // Draw sharp person using mask as clip
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.drawImage(this._maskCanvas, 0, 0);
+    ctx.restore();
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.drawImage(this._tempCanvas, 0, 0);
+    ctx.restore();
+
+    // Outline glow around person
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.filter = `blur(3px)`;
+    ctx.globalAlpha = 0.4;
+    ctx.drawImage(this._maskCanvas, 0, 0);
+    ctx.restore();
+
+    result.categoryMask.close();
+  }
 };
 </script>
 
@@ -1621,6 +1754,9 @@ MUZE.Loop = {
         S.handY=MUZE.Smooth.update('handY',r.handY,C.SMOOTH_HAND);
         S.handOpen=r.handOpen;
       } else { S.handPresent=false; }
+
+      // Background blur
+      MUZE.BgBlur.render(video, ts + 2);
     }
 
     if(S.faceDetected&&S.audioReady){
@@ -1702,7 +1838,7 @@ MUZE.Loop = {
 
 <!-- Bootstrap -->
 <script type="module">
-import { FaceLandmarker, HandLandmarker, FilesetResolver }
+import { FaceLandmarker, HandLandmarker, ImageSegmenter, FilesetResolver }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs';
 
 document.getElementById('start-btn').addEventListener('click', async () => {
@@ -1722,6 +1858,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     await Promise.all([
       MUZE.FaceTracker.init(FaceLandmarker, vision),
       MUZE.HandTracker.init(HandLandmarker, vision),
+      MUZE.BgBlur.init(ImageSegmenter, vision),
     ]);
 
     // Init modules
@@ -1733,6 +1870,10 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       MUZE.State.modeFrozen = !MUZE.State.modeFrozen;
       document.getElementById('freeze-btn').classList.toggle('frozen', MUZE.State.modeFrozen);
       document.getElementById('mode-hud').classList.toggle('frozen', MUZE.State.modeFrozen);
+    });
+    document.getElementById('blur-btn').addEventListener('click', () => {
+      const on = MUZE.BgBlur.toggle();
+      document.getElementById('blur-btn').classList.toggle('active', on);
     });
     MUZE.Loop.init();
 
