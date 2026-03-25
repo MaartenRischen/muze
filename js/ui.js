@@ -121,7 +121,6 @@ MUZE.Touch = {
 
     // Drum already fired on touchstart — nothing to do here
     // (double-tap detection above handles auto-rhythm toggle)
-    }
     this._touchStart = null;
   }
 };
