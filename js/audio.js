@@ -70,6 +70,28 @@ MUZE.Audio = {
     await Tone.start();
     Tone.Transport.bpm.value = MUZE.Config.BPM_DEFAULT;
 
+    // iOS AudioContext recovery: resume on interruption (phone call, tab switch, screen lock)
+    const ctx = Tone.context.rawContext;
+    if (ctx) {
+      ctx.addEventListener('statechange', () => {
+        if (ctx.state === 'interrupted' || ctx.state === 'suspended') {
+          const resume = () => {
+            ctx.resume().then(() => { Tone.Transport.start(); });
+            document.removeEventListener('touchstart', resume);
+            document.removeEventListener('click', resume);
+          };
+          document.addEventListener('touchstart', resume, { once: true });
+          document.addEventListener('click', resume, { once: true });
+        }
+      });
+      // Also handle visibility change
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && ctx.state !== 'running') {
+          ctx.resume().catch(() => {});
+        }
+      });
+    }
+
     // ============================================================
     // MASTER CHAIN: Saturation → Filter → EQ → Gain → Limiter → Analyser → Out
     // ============================================================
@@ -125,7 +147,7 @@ MUZE.Audio = {
     // ---- PAD SYNTH: FM + sub oscillator ----
     // PERF: maxPolyphony 3 (plays 3-note chords), removed _padDetune2 entirely
     this.padSynth = new Tone.PolySynth(Tone.FMSynth, {
-      maxPolyphony: 4,
+      maxPolyphony: 8,
       voice: {
         harmonicity: 1.5, modulationIndex: 2.5,
         oscillator: { type: 'fatsine', count: 3, spread: 18 },
@@ -139,7 +161,7 @@ MUZE.Audio = {
 
     // Sub oscillator: one octave down, sine, subtle
     this._padSub = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 4,
+      maxPolyphony: 8,
       oscillator: { type: 'sine' },
       envelope: { attack: 1.2, decay: 0.5, sustain: 0.9, release: 3.0 },
     });
@@ -276,7 +298,7 @@ MUZE.Audio = {
     this._riserFilter = new Tone.Filter({ frequency: 200, type: 'bandpass', Q: 2 });
     this._riserGain = new Tone.Gain(0).connect(this._riserFilter);
     this.riserSynth = new Tone.Noise('pink').connect(this._riserGain);
-    this.riserSynth.start();
+    // Don't start noise here — only start on startRiser(), stop after fadeout
     this._createChannelStrip('riser', this._riserFilter);
 
     // ---- GrainPlayer for sample-based pad ----
@@ -471,6 +493,7 @@ MUZE.Audio = {
   _preRiserGains: {},
 
   startRiser() {
+    if (this.riserSynth.state !== 'started') this.riserSynth.start();
     this._riserGain.gain.rampTo(0.3, 4);
     this._riserFilter.frequency.rampTo(4000, 4);
     // Duck pad + drums via their channel gains
@@ -486,6 +509,7 @@ MUZE.Audio = {
   dropRiser() {
     this._riserGain.gain.rampTo(0, 0.05);
     this._riserFilter.frequency.rampTo(200, 0.1);
+    setTimeout(() => { try { this.riserSynth.stop(); } catch(e) {} }, 200);
     // Big kick hit
     this.kickSynth.triggerAttackRelease('C1', '4n', Tone.now(), 1);
     this._kickClick.triggerAttackRelease('32n', Tone.now(), 0.8);
@@ -518,6 +542,7 @@ MUZE.Audio = {
   cancelRiser() {
     this._riserGain.gain.rampTo(0, 0.3);
     this._riserFilter.frequency.rampTo(200, 0.3);
+    setTimeout(() => { try { this.riserSynth.stop(); } catch(e) {} }, 400);
     for (const ch of ['pad', 'kick', 'snare', 'hat']) {
       const node = this._nodes[ch];
       if (!node) continue;
