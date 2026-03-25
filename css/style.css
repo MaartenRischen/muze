@@ -1848,3 +1848,38 @@ body::after {
    UTILITY
    ============================================================ */
 .hidden { display: none !important; }
+
+/* ---- Loop Progress Top Bar ---- */
+#loop-progress-bar {
+  position: fixed; top: 0; left: 0; width: 100%; height: 3px;
+  z-index: 50; background: rgba(0,0,0,0.5);
+}
+#loop-progress-bar #loop-progress-fill {
+  height: 100%; width: 0%; border-radius: 0 2px 2px 0;
+  background: linear-gradient(90deg, #0d9488, #2dd4bf);
+  transition: width 0.1s linear;
+}
+#loop-progress-bar.recording #loop-progress-fill { background: #ef4444; }
+#loop-progress-bar.overdubbing #loop-progress-fill { background: #f59e0b; }
+
+/* ---- Synth Panel Header (MIX button) ---- */
+#synth-panel-header {
+  display: flex; justify-content: flex-end;
+  padding: env(safe-area-inset-top, 8px) 16px 0 16px;
+}
+.synth-panel-mix-btn {
+  appearance: none;
+  background: var(--elevation-2);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--muze-accent);
+  font: 600 11px/1 var(--font-ui);
+  letter-spacing: 1.5px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--transition-control, 150ms);
+}
+.synth-panel-mix-btn:active {
+  transform: scale(0.95);
+  filter: brightness(0.9);
+}

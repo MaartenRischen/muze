@@ -49,45 +49,46 @@
   <div id="mode-hud"></div>
 </div>
 
-<!-- Toolbar -->
+<!-- Toolbar (minimal: 4 buttons) -->
 <div class="toolbar">
-  <button class="toolbar-label" id="rec-multitrack">STEREO</button>
+  <button class="toolbar-btn" id="pause-btn" aria-label="Play">&#9654;</button>
   <button class="toolbar-btn" id="rec-btn" aria-label="Record">&#9679;</button>
-  <button class="toolbar-btn" id="pause-btn" aria-label="Pause">&#10074;&#10074;</button>
   <button class="toolbar-btn" id="help-btn" aria-label="Help" style="font-weight:bold">?</button>
-  <button class="toolbar-btn" id="mixer-btn" aria-label="Mixer" style="font-size:10px;font-weight:600;letter-spacing:0.5px">MIX</button>
   <button class="toolbar-btn" id="synth-menu-btn" aria-label="Settings">&#9881;</button>
-  <button class="toolbar-btn" id="gyro-btn" aria-label="Gyroscope" style="font-size:12px">&#8635;</button>
 </div>
 
-<!-- Loop Recorder -->
-<div id="loop-bar">
-  <button id="loop-rec-btn" class="loop-btn" aria-label="Loop Record">&#9673;</button>
-  <div id="loop-progress"><div id="loop-progress-fill"></div><div id="loop-progress-head"></div></div>
-  <button id="loop-overdub-btn" class="loop-btn" aria-label="Overdub" disabled>+</button>
-  <button id="loop-undo-btn" class="loop-btn" aria-label="Undo Layer" disabled>&#8630;</button>
-  <button id="loop-clear-btn" class="loop-btn" aria-label="Clear Loop" disabled>&#10005;</button>
+<!-- Loop progress (thin top bar, only visible when loop is active) -->
+<div id="loop-progress-bar" class="hidden">
+  <div id="loop-progress-fill"></div>
 </div>
 
-<!-- Scene Slots -->
-<div id="scene-bar">
-  <button class="scene-slot" data-scene="0">1</button>
-  <button class="scene-slot" data-scene="1">2</button>
-  <button class="scene-slot" data-scene="2">3</button>
-  <button class="scene-slot" data-scene="3">4</button>
-  <button id="scene-save-btn" class="scene-save">SAVE</button>
-</div>
-
-<!-- Gyroscope indicator -->
-<div id="gyro-indicator" class="hidden">
-  <div class="gyro-axis"><span>TILT</span><div class="gyro-bar"><div id="gyro-lr-fill" class="gyro-fill"></div></div></div>
-  <div class="gyro-axis"><span>PITCH</span><div class="gyro-bar"><div id="gyro-fb-fill" class="gyro-fill"></div></div></div>
-</div>
-
-<!-- Sample switcher -->
-<div id="sample-bar">
-  <button class="sample-btn" id="pad-sample-btn"><span class="label">PAD</span>FM Synth</button>
-  <button class="sample-btn" id="lead-sample-btn"><span class="label">LEAD</span>Synth</button>
+<!-- Hidden but functional elements (accessed via synth panel) -->
+<div style="display:none">
+  <button class="toolbar-label" id="rec-multitrack">STEREO</button>
+  <button id="gyro-btn">gyro</button>
+  <div id="loop-bar">
+    <button id="loop-rec-btn" class="loop-btn">&#9673;</button>
+    <div id="loop-progress"><div id="loop-progress-head"></div></div>
+    <button id="loop-overdub-btn" class="loop-btn" disabled>+</button>
+    <button id="loop-undo-btn" class="loop-btn" disabled>&#8630;</button>
+    <button id="loop-clear-btn" class="loop-btn" disabled>&#10005;</button>
+  </div>
+  <div id="scene-bar">
+    <button class="scene-slot" data-scene="0">1</button>
+    <button class="scene-slot" data-scene="1">2</button>
+    <button class="scene-slot" data-scene="2">3</button>
+    <button class="scene-slot" data-scene="3">4</button>
+    <button id="scene-save-btn" class="scene-save">SAVE</button>
+  </div>
+  <div id="gyro-indicator">
+    <div class="gyro-axis"><span>TILT</span><div class="gyro-bar"><div id="gyro-lr-fill" class="gyro-fill"></div></div></div>
+    <div class="gyro-axis"><span>PITCH</span><div class="gyro-bar"><div id="gyro-fb-fill" class="gyro-fill"></div></div></div>
+  </div>
+  <div id="sample-bar">
+    <button class="sample-btn" id="pad-sample-btn"><span class="label">PAD</span>FM Synth</button>
+    <button class="sample-btn" id="lead-sample-btn"><span class="label">LEAD</span>Synth</button>
+  </div>
+  <div id="beat-repeat-overlay"></div>
 </div>
 
 <!-- Recording canvas -->
@@ -114,13 +115,13 @@
   </div>
 </div>
 
-<!-- Preset / Performance Bar -->
-<div id="perf-bar">
-  <button id="preset-btn" class="perf-btn"><span class="perf-label">PRESET</span><span id="preset-name">Default</span></button>
-  <button id="bpm-btn" class="perf-btn"><span class="perf-label">BPM</span><span id="bpm-val">85</span></button>
-  <button id="key-btn" class="perf-btn"><span class="perf-label">KEY</span><span id="key-val">C</span></button>
-  <button id="scale-btn" class="perf-btn"><span class="perf-label">SCALE</span><span id="scale-val">modal</span></button>
-  <button id="auto-chord-btn"><span class="perf-label">CHORDS</span><span id="auto-chord-val">OFF</span></button>
+<!-- Performance controls (hidden, referenced by PerfBar JS) -->
+<div style="display:none">
+  <button id="preset-btn"></button><span id="preset-name">Default</span>
+  <button id="bpm-btn"></button><span id="bpm-val">85</span>
+  <button id="key-btn"></button><span id="key-val">C</span>
+  <button id="scale-btn"></button><span id="scale-val">modal</span>
+  <button id="auto-chord-btn"></button><span id="auto-chord-val">OFF</span>
 </div>
 
 <!-- BPM Popup -->
@@ -151,11 +152,42 @@
 
 <!-- Synth Panel -->
 <div id="synth-panel">
+  <!-- MIX button inside panel header -->
+  <div id="synth-panel-header">
+    <button id="mixer-btn" class="synth-panel-mix-btn">MIX</button>
+  </div>
   <div id="synth-tabs">
+    <button class="synth-tab" data-tab="tab-perf">Perform</button>
     <button class="synth-tab active" data-tab="tab-arp">Arp</button>
     <button class="synth-tab" data-tab="tab-mel">Melody</button>
     <button class="synth-tab" data-tab="tab-pad">Pad</button>
     <button class="synth-tab" data-tab="tab-bin">Binaural</button>
+  </div>
+
+  <!-- Performance tab -->
+  <div class="synth-tab-content" id="tab-perf">
+    <h3>Preset</h3>
+    <div class="synth-row"><label>preset</label><button class="synth-select" id="perf-preset-btn" style="text-align:center">Default</button></div>
+    <h3>Tempo</h3>
+    <div class="synth-row"><label>BPM</label><input type="range" id="perf-bpm" min="40" max="200" step="1" value="85"><span class="val">85</span></div>
+    <div class="synth-row"><label>swing</label><input type="range" id="perf-swing" min="0" max="80" step="1" value="0"><span class="val">0%</span></div>
+    <button id="tap-tempo-btn" class="synth-select" style="text-align:center;margin:8px 0;width:100%">TAP TEMPO</button>
+    <h3>Key &amp; Scale</h3>
+    <div class="synth-row"><label>key</label><button class="synth-select" id="perf-key-btn" style="text-align:center">C</button></div>
+    <div class="synth-row"><label>scale</label><button class="synth-select" id="perf-scale-btn" style="text-align:center">Modal (face)</button></div>
+    <h3>Chords</h3>
+    <div class="synth-row"><label>auto</label><button class="synth-select" id="perf-chords-btn" style="text-align:center">OFF</button></div>
+    <h3>Scenes</h3>
+    <div style="display:flex;gap:6px;margin:8px 0">
+      <button class="synth-select scene-slot-panel" data-scene="0" style="flex:1;text-align:center">1</button>
+      <button class="synth-select scene-slot-panel" data-scene="1" style="flex:1;text-align:center">2</button>
+      <button class="synth-select scene-slot-panel" data-scene="2" style="flex:1;text-align:center">3</button>
+      <button class="synth-select scene-slot-panel" data-scene="3" style="flex:1;text-align:center">4</button>
+      <button class="synth-select" id="scene-save-panel-btn" style="flex:1;text-align:center">SAVE</button>
+    </div>
+    <h3>Samples</h3>
+    <div class="synth-row"><label>pad</label><button class="synth-select" id="pad-sample-panel-btn" style="text-align:center">FM Synth</button></div>
+    <div class="synth-row"><label>lead</label><button class="synth-select" id="lead-sample-panel-btn" style="text-align:center">Synth</button></div>
   </div>
 
   <div class="synth-tab-content active" id="tab-arp">
