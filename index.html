@@ -44,12 +44,19 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
 <!-- Audio-reactive beat flash -->
 <div id="beat-flash-overlay"></div>
 
-<!-- Instrument toggles — spaced around the camera view -->
+<!-- Instrument toggles — right side, vertical -->
 <div id="instrument-toggles">
   <button class="inst-toggle" id="toggle-pad" data-inst="pad"><span class="inst-icon">◈</span><span class="inst-label">PAD</span></button>
   <button class="inst-toggle" id="toggle-arp" data-inst="arp"><span class="inst-icon">♪</span><span class="inst-label">ARP</span></button>
+  <button class="inst-toggle" id="toggle-melody" data-inst="melody"><span class="inst-icon">🎵</span><span class="inst-label">MEL</span></button>
   <button class="inst-toggle" id="toggle-beat" data-inst="beat"><span class="inst-icon">◉</span><span class="inst-label">BEAT</span></button>
   <button class="inst-toggle" id="toggle-bin" data-inst="bin"><span class="inst-icon">∿</span><span class="inst-label">BIN</span></button>
+</div>
+<!-- Volume slider popup (shown on long-press) -->
+<div id="vol-slider-popup">
+  <div id="vol-slider-label">VOL</div>
+  <input type="range" id="vol-slider-range" min="-30" max="6" step="1" value="0">
+  <div id="vol-slider-db">0 dB</div>
 </div>
 
 <!-- Chord bar -->
@@ -456,6 +463,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     if (MUZE.Mixer) {
       MUZE.Mixer.toggleMute('pad');
       MUZE.Mixer.toggleMute('arp');
+      MUZE.Mixer.toggleMute('melody');
     }
     // Beat and binaural already start off (InstrumentToggles defaults)
 

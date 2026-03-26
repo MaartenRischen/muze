@@ -363,7 +363,7 @@ html, body {
    ============================================================ */
 #instrument-toggles {
   position: fixed;
-  left: 8px;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 4;
@@ -404,10 +404,58 @@ html, body {
 
 #toggle-pad.active .inst-icon { color: #60a5fa; text-shadow: 0 0 12px rgba(96,165,250,0.5); }
 #toggle-arp.active .inst-icon { color: #4ade80; text-shadow: 0 0 12px rgba(74,222,128,0.5); }
+#toggle-melody.active .inst-icon { color: #c084fc; text-shadow: 0 0 12px rgba(192,132,252,0.5); }
 #toggle-beat.active .inst-icon { color: #f87171; text-shadow: 0 0 12px rgba(248,113,113,0.5); }
 #toggle-bin.active .inst-icon { color: #22d3ee; text-shadow: 0 0 12px rgba(34,211,238,0.5); }
 
 .inst-toggle:active { transform: scale(0.93); }
+
+/* Volume slider popup (long-press) */
+#vol-slider-popup {
+  position: fixed;
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  padding: 10px 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: auto;
+  touch-action: none;
+}
+#vol-slider-popup.visible { display: flex; }
+#vol-slider-label {
+  font: 700 9px/1 var(--font-ui, sans-serif);
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+}
+#vol-slider-db {
+  font: 600 10px/1 var(--font-ui, sans-serif);
+  color: rgba(255, 255, 255, 0.5);
+}
+#vol-slider-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 120px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  outline: none;
+}
+#vol-slider-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
 
 /* --- Base chord button --- */
 .chord-btn {

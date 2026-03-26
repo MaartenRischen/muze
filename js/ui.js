@@ -6,27 +6,107 @@
 MUZE.InstrumentToggles = {
   _padActive: false,
   _arpActive: false,
+  _melodyActive: false,
   _beatActive: false,
   _binActive: false,
+  _longPressTimer: null,
+  _longPressTriggered: false,
+
+  // Map each button to its mixer channel(s)
+  _channelMap: {
+    pad: 'pad',
+    arp: 'arp',
+    melody: 'melody',
+    beat: 'kick',   // beat controls kick/snare/hat — show kick volume
+    bin: 'binaural',
+  },
 
   init() {
-    const pad = document.getElementById('toggle-pad');
-    const arp = document.getElementById('toggle-arp');
-    const beat = document.getElementById('toggle-beat');
-    const bin = document.getElementById('toggle-bin');
+    const ids = ['toggle-pad', 'toggle-arp', 'toggle-melody', 'toggle-beat', 'toggle-bin'];
+    const handlers = {
+      'toggle-pad': () => this._togglePad(),
+      'toggle-arp': () => this._toggleArp(),
+      'toggle-melody': () => this._toggleMelody(),
+      'toggle-beat': () => this._toggleBeat(),
+      'toggle-bin': () => this._toggleBin(),
+    };
 
-    // All start OFF — user toggles them on
-    if (pad) { pad.addEventListener('click', () => this._togglePad()); }
-    if (arp) { arp.addEventListener('click', () => this._toggleArp()); }
-    if (beat) { beat.addEventListener('click', () => this._toggleBeat()); }
-    if (bin) { bin.addEventListener('click', () => this._toggleBin()); }
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      // Long-press detection (touch + mouse)
+      const startLongPress = (e) => {
+        this._longPressTriggered = false;
+        this._longPressTimer = setTimeout(() => {
+          this._longPressTriggered = true;
+          this._showVolumeSlider(el);
+        }, 400);
+      };
+      const cancelLongPress = () => {
+        if (this._longPressTimer) { clearTimeout(this._longPressTimer); this._longPressTimer = null; }
+      };
+      const endPress = (e) => {
+        cancelLongPress();
+        if (this._longPressTriggered) { e.preventDefault(); return; }
+        handlers[id]();
+      };
+
+      el.addEventListener('touchstart', startLongPress, { passive: true });
+      el.addEventListener('touchend', endPress);
+      el.addEventListener('touchcancel', cancelLongPress);
+      el.addEventListener('mousedown', startLongPress);
+      el.addEventListener('mouseup', endPress);
+      el.addEventListener('mouseleave', cancelLongPress);
+    });
+
+    // Dismiss volume slider on outside tap
+    document.addEventListener('pointerdown', (e) => {
+      const popup = document.getElementById('vol-slider-popup');
+      if (popup.classList.contains('visible') && !popup.contains(e.target) && !e.target.closest('.inst-toggle')) {
+        popup.classList.remove('visible');
+      }
+    });
+  },
+
+  _showVolumeSlider(btn) {
+    const inst = btn.dataset.inst;
+    const ch = this._channelMap[inst];
+    if (!ch || !MUZE.Mixer.channels[ch]) return;
+
+    const popup = document.getElementById('vol-slider-popup');
+    const slider = document.getElementById('vol-slider-range');
+    const dbLabel = document.getElementById('vol-slider-db');
+    const nameLabel = document.getElementById('vol-slider-label');
+
+    nameLabel.textContent = inst.toUpperCase() + ' VOL';
+    slider.value = MUZE.Mixer.channels[ch].volume;
+    dbLabel.textContent = Math.round(MUZE.Mixer.channels[ch].volume) + ' dB';
+
+    // Position to the left of the button
+    const rect = btn.getBoundingClientRect();
+    popup.style.top = rect.top + rect.height / 2 + 'px';
+    popup.style.right = (window.innerWidth - rect.left + 8) + 'px';
+    popup.style.transform = 'translateY(-50%)';
+    popup.style.left = '';
+    popup.classList.add('visible');
+
+    // Wire up slider
+    slider.oninput = () => {
+      const db = parseFloat(slider.value);
+      dbLabel.textContent = Math.round(db) + ' dB';
+      MUZE.Mixer.setChannelVolume(ch, db);
+      // For beat, also set snare + hat proportionally
+      if (inst === 'beat') {
+        MUZE.Mixer.setChannelVolume('snare', db - 4);
+        MUZE.Mixer.setChannelVolume('hat', db - 10);
+      }
+    };
   },
 
   _togglePad() {
     this._padActive = !this._padActive;
     document.getElementById('toggle-pad').classList.toggle('active', this._padActive);
     MUZE.Mixer.toggleMute('pad');
-    // Trigger default chord so pad sounds even without face detection
     if (this._padActive && MUZE.Audio.triggerPad) {
       const root = MUZE.Music.getEffectiveRoot ? MUZE.Music.getEffectiveRoot() : 60;
       const scale = MUZE.State.currentScale || MUZE.Config.SCALE_DORIAN;
@@ -41,7 +121,6 @@ MUZE.InstrumentToggles = {
     document.getElementById('toggle-arp').classList.toggle('active', this._arpActive);
     MUZE.Mixer.toggleMute('arp');
     if (this._arpActive) {
-      // Seed with default notes so arp plays even without face detection
       if (!MUZE.Audio._arpNotes || MUZE.Audio._arpNotes.length === 0) {
         const root = MUZE.Music.getEffectiveRoot ? MUZE.Music.getEffectiveRoot() : 60;
         MUZE.Audio.updateArpNotes(MUZE.State.currentScale || MUZE.Config.SCALE_DORIAN, root);
@@ -50,6 +129,12 @@ MUZE.InstrumentToggles = {
     } else {
       MUZE.Audio.stopArpeggio();
     }
+  },
+
+  _toggleMelody() {
+    this._melodyActive = !this._melodyActive;
+    document.getElementById('toggle-melody').classList.toggle('active', this._melodyActive);
+    MUZE.Mixer.toggleMute('melody');
   },
 
   _toggleBeat() {
