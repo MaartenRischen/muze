@@ -195,8 +195,13 @@ MUZE.Audio = {
 
     // (Removed: _arpPingPong — shared delay bus handles stereo width)
 
+    // Chorus insert for arp (shimmer, controlled by head roll like pad)
+    this._arpChorus = new Tone.Chorus({ frequency: 1.2, delayTime: 4.0, depth: 0.35, wet: 0.4 });
+    this._arpChorus.start();
+
     this.leadSynth.connect(this._arpFilter);
-    this._createChannelStrip('arp', this._arpFilter);
+    this._arpFilter.connect(this._arpChorus);
+    this._createChannelStrip('arp', this._arpChorus);
 
     // ---- MELODY SYNTH: Expressive filter envelope + vibrato ----
     this.melodySynth = new Tone.MonoSynth({
@@ -388,11 +393,12 @@ MUZE.Audio = {
       }
     }
 
-    // Chorus: head roll (pad insert only)
+    // Chorus: head roll (pad + arp inserts)
     const rollN = Math.min(1, Math.abs(state.headRoll) / 0.35);
     const chorusDepth = C.CHORUS_DEPTH_MIN + rollN * (C.CHORUS_DEPTH_MAX - C.CHORUS_DEPTH_MIN);
     if (Math.abs(chorusDepth - this._lastChorusDepth) / (this._lastChorusDepth || 0.001) > 0.005) {
       this._padChorus.depth = chorusDepth;
+      if (this._arpChorus) this._arpChorus.depth = chorusDepth * 0.7;
       this._lastChorusDepth = chorusDepth;
     }
 

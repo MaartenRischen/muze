@@ -2,12 +2,64 @@
    MUZE — UI (Touch, Synth Menu, Tutorial, Recorder, Samples)
    ============================================================ */
 
-// ---- Touch Handler ----
-MUZE.Touch = {
-  _cooldown: {}, _touchStart: null, _lastTapTime: 0, _holdTimer: null, _isHolding: false,
-
+// ---- Drum Toggle Button (replaces drum zones) ----
+MUZE.DrumToggle = {
   init() {
-    // Chord zone
+    document.getElementById('drum-toggle-btn').addEventListener('click', () => {
+      const active = MUZE.AutoRhythm.toggle();
+      MUZE.State.autoRhythm = active;
+      const btn = document.getElementById('drum-toggle-btn');
+      btn.classList.toggle('active-feature', active);
+      document.getElementById('rhythm-indicator').classList.toggle('visible', active);
+    });
+  }
+};
+
+// ---- Riser Button (replaces hold+swipe gesture) ----
+MUZE.RiserBtn = {
+  _active: false,
+  init() {
+    const btn = document.getElementById('riser-btn');
+    btn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this._active = true;
+      MUZE.Audio.startRiser();
+      MUZE.State.riserActive = true;
+      btn.classList.add('active-feature');
+      document.getElementById('riser-overlay')?.classList.add('active');
+    });
+    btn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (!this._active) return;
+      this._active = false;
+      MUZE.Audio.dropRiser();
+      MUZE.State.riserActive = false;
+      btn.classList.remove('active-feature');
+      document.getElementById('riser-overlay')?.classList.remove('active');
+      if (MUZE.Visualizer.triggerExplosion) {
+        MUZE.Visualizer.triggerExplosion(window.innerWidth / 2, window.innerHeight * 0.4, 120);
+      }
+    });
+    // Also support mouse for desktop
+    btn.addEventListener('mousedown', (e) => {
+      this._active = true;
+      MUZE.Audio.startRiser();
+      MUZE.State.riserActive = true;
+      btn.classList.add('active-feature');
+    });
+    btn.addEventListener('mouseup', (e) => {
+      if (!this._active) return;
+      this._active = false;
+      MUZE.Audio.dropRiser();
+      MUZE.State.riserActive = false;
+      btn.classList.remove('active-feature');
+    });
+  }
+};
+
+// ---- Chord Bar (extracted from old Touch module) ----
+MUZE.ChordBar = {
+  init() {
     const selectChord = (el) => {
       if (el && el.dataset.chord !== undefined) {
         const idx = parseInt(el.dataset.chord);
@@ -23,110 +75,7 @@ MUZE.Touch = {
     document.querySelectorAll('.chord-btn').forEach(btn => {
       btn.addEventListener('click', () => selectChord(btn));
     });
-
-    // Drum zone
-    const z = document.getElementById('touch-zone');
-    z.addEventListener('touchstart', this._onStart.bind(this), { passive: false });
-    z.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-    z.addEventListener('touchend', this._onEnd.bind(this), { passive: false });
-    z.addEventListener('touchcancel', this._onEnd.bind(this), { passive: false });
-
-    // Premium drum hit visual feedback
-    if (MUZE.DrumFX) MUZE.DrumFX.init();
-
     document.querySelector('.chord-btn[data-chord="0"]').classList.add('active');
-  },
-
-  _onStart(e) {
-    e.preventDefault();
-    const t = e.changedTouches[0];
-    const now = performance.now();
-    this._touchStart = { x: t.clientX, y: t.clientY, time: now };
-    this._isHolding = false;
-
-    // INSTANT drum trigger on touchstart (zero latency)
-    const target = document.elementFromPoint(t.clientX, t.clientY);
-    if (target) {
-      const drum = target.dataset.drum || target.parentElement?.dataset?.drum;
-      if (drum && (!this._cooldown[drum] || now - this._cooldown[drum] > 120)) {
-        this._cooldown[drum] = now;
-        MUZE.Audio.triggerDrum(drum, 0.7);
-        if (MUZE.DrumFX) MUZE.DrumFX.trigger(drum, t.clientX, t.clientY);
-        if (MUZE.LoopRecorder) MUZE.LoopRecorder.recordHit(drum);
-        const el = document.getElementById('zone-' + drum);
-        if (el) { el.classList.add('hit'); setTimeout(() => el.classList.remove('hit'), 180); }
-        this._drumFiredOnStart = true;
-      }
-    }
-
-    this._holdTimer = setTimeout(() => {
-      this._isHolding = true;
-      MUZE.Audio.startRiser();
-      MUZE.State.riserActive = true;
-      document.getElementById('riser-overlay').classList.add('active');
-    }, MUZE.Config.HOLD_TIME);
-  },
-
-  _onEnd(e) {
-    e.preventDefault();
-    if (!e.changedTouches || !e.changedTouches.length) {
-      clearTimeout(this._holdTimer);
-      this._touchStart = null;
-      return;
-    }
-    if (!this._touchStart) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - this._touchStart.x;
-    const dy = t.clientY - this._touchStart.y;
-    const dt = performance.now() - this._touchStart.time;
-    clearTimeout(this._holdTimer);
-
-    if (this._isHolding) {
-      if (dy < -MUZE.Config.SWIPE_THRESHOLD) {
-        MUZE.Audio.dropRiser();
-        if (MUZE.Visualizer.triggerExplosion) {
-          const w = window.innerWidth, h = window.innerHeight;
-          MUZE.Visualizer.triggerExplosion(w / 2, h * 0.4, 120);
-        }
-      } else {
-        MUZE.Audio.cancelRiser();
-      }
-      MUZE.State.riserActive = false;
-      document.getElementById('riser-overlay').classList.remove('active');
-      this._isHolding = false;
-      this._touchStart = null;
-      return;
-    }
-
-    const C = MUZE.Config, ax = Math.abs(dx), ay = Math.abs(dy);
-    if (dt < C.SWIPE_MAX_TIME && (ax > C.SWIPE_THRESHOLD || ay > C.SWIPE_THRESHOLD)) {
-      if (ax > ay) {
-        if (dx > C.SWIPE_THRESHOLD) MUZE.AutoRhythm.nextPattern();
-        else if (dx < -C.SWIPE_THRESHOLD) MUZE.AutoRhythm.prevPattern();
-      } else if (dy > C.SWIPE_THRESHOLD) {
-        MUZE.Audio.tapeStop();
-      } else if (dy < -C.SWIPE_THRESHOLD) {
-        MUZE.Audio.reverbThrow();
-      }
-      this._touchStart = null;
-      return;
-    }
-
-    // Double-tap → toggle auto rhythm
-    const now = performance.now();
-    if (now - this._lastTapTime < C.DOUBLE_TAP_TIME) {
-      const active = MUZE.AutoRhythm.toggle();
-      MUZE.State.autoRhythm = active;
-      document.getElementById('rhythm-indicator').classList.toggle('visible', active);
-      this._lastTapTime = 0;
-      this._touchStart = null;
-      return;
-    }
-    this._lastTapTime = now;
-
-    // Drum already fired on touchstart — nothing to do here
-    // (double-tap detection above handles auto-rhythm toggle)
-    this._touchStart = null;
   }
 };
 
@@ -1283,23 +1232,21 @@ MUZE.Tutorial = {
   _steps: [], _idx: 0, _active: false,
 
   FIRST_TOUCH: [
-    { title: 'Press Play', desc: 'Hit the play button (top right). Music starts immediately \u2014 a pad, arpeggio, and drums respond to your face.' },
+    { title: 'Press Play', desc: 'Hit the play button (top right). Music starts immediately \u2014 a pad and arpeggio respond to your face.' },
     { title: 'Smile & Frown', desc: 'Smile \u2014 the music gets brighter. Frown \u2014 it gets darker. Your expression chooses the musical mode in real-time. Watch the mode name change in the top-left corner.' },
     { title: 'Move Your Hand', desc: 'Hold up your free hand to the camera. A melody synth follows your hand up and down. Open palm = smooth legato. Closed fist = short staccato.' },
-    { title: 'Tap Drums', desc: 'The lower half of the screen is three drum zones: hi-hat (top), snare (middle), kick (bottom). Tap to play. Double-tap to start auto-rhythm.' },
+    { title: 'Toggle Drums', desc: 'Tap the drum button in the toolbar to toggle auto-rhythm on and off. The pattern plays automatically in sync with your music.' },
     { title: 'Change Chords', desc: 'The bottom bar has 6 chord buttons (I ii iii IV V vi). Tap any chord and everything follows \u2014 pad, arpeggio, melody, all in key. You\'re performing!' },
   ],
 
   EXPLORING: [
     { title: 'Head Tilt = Filter', desc: 'Tilt your chin down \u2014 the sound gets muffled and warm as a lowpass filter closes. Chin up/forward = bright and open. This affects pad, arp, and melody.' },
     { title: 'Eyes = Space', desc: 'Open your eyes wide \u2014 reverb and delay increase, creating a spacious wash. Squint \u2014 the sound becomes dry and intimate. This is how you control the room size.' },
-    { title: 'Head Roll = Shimmer', desc: 'Tilt your head sideways. Chorus depth increases, making the pad shimmer and widen in stereo. Great for dreamy moments.' },
+    { title: 'Head Roll = Shimmer', desc: 'Tilt your head sideways. Chorus depth increases, making both the pad AND the arpeggio shimmer and widen in stereo. Great for dreamy moments.' },
     { title: 'Eyebrows = Octave', desc: 'Raise your eyebrows to shift the melody and arpeggio up an octave. Lower them to come back down. Combine with hand position for a huge pitch range.' },
-    { title: 'Riser & Drop', desc: 'Hold your finger on a drum zone for 400ms \u2014 a riser noise builds while drums and pad duck. Swipe up to drop: massive kick hit + reverb wash. Release without swiping to cancel.' },
-    { title: 'Tape Stop', desc: 'Swipe down on the drum zone for a tape stop effect \u2014 pitch drops and tempo crawls, then snaps back. Dramatic for transitions.' },
-    { title: 'Reverb Throw', desc: 'Swipe up (without holding first) for a reverb throw \u2014 the current sound explodes into a massive reverb wash that fades naturally.' },
-    { title: 'Drum Patterns', desc: 'With auto-rhythm running (double-tap to start), swipe left or right to cycle through 6+ drum patterns including Euclidean rhythms.' },
-    { title: 'Beat Repeat', desc: 'Triple-tap any drum zone for a 2-second stutter effect that accelerates from 8th to 16th to 32nd notes. Perfect for build-ups before a drop.' },
+    { title: 'Riser & Drop', desc: 'Hold the riser button (\u2191) in the toolbar to build a riser noise while drums and pad duck. Release to drop: massive kick hit + reverb wash + visual explosion.' },
+    { title: 'Tape Stop', desc: 'Available as a dramatic transition effect \u2014 pitch drops and tempo crawls, then snaps back.' },
+    { title: 'Auto-Rhythm', desc: 'Tap the drum button in the toolbar to toggle auto-rhythm. Drum patterns play automatically in sync with your music.' },
     { title: 'Visual Effects', desc: 'Notice the glowing face contour, iris lights, and hand trail? These react to the music in real-time. The ring visualization pulses with the beat. Everything is connected.' },
   ],
 
@@ -1310,6 +1257,7 @@ MUZE.Tutorial = {
     { title: 'Key & Scale', desc: 'Choose from 12 keys (C through B) and 14+ scales including pentatonic, harmonic minor, whole tone, blues, phrygian dominant, hirajoshi, and melodic minor. "Modal (face)" lets your expression choose the scale.' },
     { title: 'The Mixer', desc: 'Tap MIX (top right) to open the mixing desk. 8 channel strips (pad, arp, melody, kick, snare, hat, binaural, riser) + master. Each has volume fader, pan, 3-band EQ, reverb send, and delay send.' },
     { title: 'Channel Detail', desc: 'In the mixer, tap any channel label to open its detail panel with large EQ knobs, send controls, and pan. Mute (M) and Solo (S) buttons on each strip. Master strip has a limiter.' },
+    { title: 'Chorus Shimmer', desc: 'Head roll controls chorus depth on both the pad AND the arpeggio synth. Tilt your head sideways to add lush stereo shimmer to both voices simultaneously.' },
     { title: 'Pad Samples', desc: 'In the Perform tab, tap the pad/lead buttons to cycle through sample-based sounds alongside the FM synth. Any recorded sample can be used as a pad or lead.' },
     { title: 'Binaural Beats', desc: 'In the Binaural tab: toggle on for a subtle low-frequency binaural beat. Choose "tonic" (fixed pitch) or "chord" (follows harmony). Adjust beat frequency (1-20 Hz) for different mental states.' },
   ],
@@ -1319,10 +1267,11 @@ MUZE.Tutorial = {
     { title: 'Loop Length', desc: 'Change the loop length before recording: cycle through 1, 2, 4, or 8 bars to match your musical idea. Shorter loops = tighter phrases. Longer = more freedom.' },
     { title: 'Save Scenes', desc: 'In the Perform tab, tap SAVE then a slot (1-4) to snapshot your entire setup: BPM, key, synth params, mixer levels, everything. Tap a saved slot to crossfade to that scene over 2 seconds.' },
     { title: 'Chord Auto-Advance', desc: 'In the Perform tab, toggle CHORDS to auto-cycle through I\u2192ii\u2192iii\u2192IV\u2192V\u2192vi every bar. An arrow on the chord bar shows what\'s coming next. Record a loop with auto-advance for instant chord progressions.' },
+    { title: 'Drums & Riser', desc: 'Tap the drum button to toggle auto-rhythm. Hold the riser button (\u2191) to build tension, release to drop. These two buttons give you powerful live control from the toolbar.' },
     { title: 'Gyroscope', desc: 'Tap the gyro button to enable phone tilt control. Tilt left/right pans the arp and melody in opposite directions for stereo width. Tilt forward/back modulates reverb depth.' },
     { title: 'Record Video', desc: 'Tap the record button (circle, top right) to capture your performance as video with audio. On iOS, you can share directly to camera roll. The recording includes all visual effects.' },
-    { title: 'Performance Flow', desc: 'A great live set: Start with a preset. Build a loop with your hand. Save it to Scene 1. Switch preset. Build another loop. Save to Scene 2. Now crossfade between scenes while playing drums and using effects.' },
-    { title: 'Master It', desc: 'Every parameter stacks and interacts. Face controls the mood. Hand plays the melody. Touch drives rhythm and effects. Tilt adds expression. Scenes give you structure. There are no wrong moves \u2014 only your unique performance.' },
+    { title: 'Performance Flow', desc: 'A great live set: Start with a preset. Build a loop with your hand. Save it to Scene 1. Switch preset. Build another loop. Save to Scene 2. Now crossfade between scenes while using the riser and drums for transitions.' },
+    { title: 'Master It', desc: 'Every parameter stacks and interacts. Face controls the mood. Hand plays the melody. Toolbar buttons drive rhythm and effects. Tilt adds expression. Scenes give you structure. There are no wrong moves \u2014 only your unique performance.' },
   ],
 
   init() {
@@ -1576,24 +1525,7 @@ MUZE.Recorder = {
   }
 };
 
-// ---- First-run Gesture Hints ----
+// ---- First-run Gesture Hints (disabled — drum zones removed) ----
 MUZE.Hints = {
-  init() {
-    if (localStorage.getItem('muze-seen-hints')) return;
-    const overlay = document.createElement('div');
-    overlay.id = 'gesture-hints';
-    overlay.innerHTML = `
-      <div class="hint hint-top">TAP for drums</div>
-      <div class="hint hint-mid">DOUBLE-TAP for auto-rhythm</div>
-      <div class="hint hint-bot">HOLD + RELEASE for drop</div>
-    `;
-    document.body.appendChild(overlay);
-    setTimeout(() => { overlay.classList.add('fade'); }, 5000);
-    setTimeout(() => { overlay.remove(); }, 6000);
-    document.addEventListener('touchstart', () => {
-      overlay.classList.add('fade');
-      setTimeout(() => overlay.remove(), 1000);
-      localStorage.setItem('muze-seen-hints', '1');
-    }, { once: true });
-  }
+  init() { /* no-op: drum zone hints no longer relevant */ }
 };

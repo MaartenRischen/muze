@@ -30,12 +30,7 @@
 <!-- Audio-reactive beat flash -->
 <div id="beat-flash-overlay"></div>
 
-<!-- Drum touch zones -->
-<div id="touch-zone">
-  <div id="zone-hat" class="drum-cell" data-drum="hat" data-label="hat"></div>
-  <div id="zone-snare" class="drum-cell" data-drum="snare" data-label="snare"></div>
-  <div id="zone-kick" class="drum-cell" data-drum="kick" data-label="kick"></div>
-</div>
+<!-- Drum touch zones removed — single drum toggle button in toolbar -->
 
 <!-- Chord bar -->
 <div id="chord-zone">
@@ -62,9 +57,11 @@
   <div id="mode-hud"></div>
 </div>
 
-<!-- Toolbar (minimal: 5 buttons) -->
+<!-- Toolbar -->
 <div class="toolbar">
   <button class="toolbar-btn" id="pause-btn" aria-label="Pause">&#9208;</button>
+  <button class="toolbar-btn" id="drum-toggle-btn" aria-label="Drums">&#9835;</button>
+  <button class="toolbar-btn" id="riser-btn" aria-label="Riser">&uarr;</button>
   <button class="toolbar-btn" id="rec-btn" aria-label="Record">&#9679;</button>
   <button class="toolbar-btn" id="toolbar-mixer-btn" aria-label="Mixer" style="font-size:10px;font-weight:600;letter-spacing:0.5px;font-family:var(--font-ui)">MIX</button>
   <button class="toolbar-btn" id="help-btn" aria-label="Help" style="font-weight:bold">?</button>
@@ -364,7 +361,9 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     // Init UI
     setLoadingText('Preparing interface...');
     // Init all modules — guarded so a missing module doesn't kill the app
-    MUZE.Touch.init();
+    MUZE.DrumToggle.init();
+    MUZE.RiserBtn.init();
+    MUZE.ChordBar.init();
     MUZE.SynthMenu.init();
     if (MUZE.MixerUI) MUZE.MixerUI.init();
     if (MUZE.SampleUI) MUZE.SampleUI.init();
@@ -375,10 +374,10 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     if (MUZE.LoopRecorder) MUZE.LoopRecorder.init();
     if (MUZE.SceneManager) MUZE.SceneManager.init();
     if (MUZE.Gyroscope) MUZE.Gyroscope.init();
-    if (MUZE.BeatRepeat) MUZE.BeatRepeat.init();
+    // BeatRepeat.init() removed — no drum zones to triple-tap
     if (MUZE.ChordAdvance) MUZE.ChordAdvance.init();
     if (MUZE.MoodLight) MUZE.MoodLight.init();
-    if (MUZE.Hints) MUZE.Hints.init();
+    // Hints.init() removed — drum zone gesture hints no longer relevant
 
     // Restore saved settings
     MUZE.Storage.load();
