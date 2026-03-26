@@ -675,17 +675,19 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  flex-wrap: wrap;
+  gap: 0;
   position: relative;
   z-index: 1;
   margin-bottom: 0;
+  max-width: 95vw;
 }
 .ss-letter {
   display: inline-block;
   font-family: var(--font-ui);
-  font-size: clamp(28px, 8vw, 48px);
+  font-size: clamp(24px, 7vw, 42px);
   font-weight: 200;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.92);
   opacity: 0;
