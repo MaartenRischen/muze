@@ -5,6 +5,7 @@
 MUZE.Loop = {
   _running: false, _lastDetect: 0, _currentPadKey: null,
   _prevMelodyNote: null, _prevBrow: 0, _lastBrowSpike: 0,
+  _prevHandOpen: true,
   _debugEl: null, _modeHudEl: null,
   _lastHUDUpdate: 0, _hudThrottleMs: 200, // PERF: throttle HUD to ~5fps
   _prevHUDModeName: '', _prevHUDRootName: '', _prevHUDBPM: 0, _prevHUDValence: null,

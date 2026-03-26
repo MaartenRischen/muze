@@ -102,7 +102,6 @@
     <button class="sample-btn" id="pad-sample-btn"><span class="label">PAD</span>FM Synth</button>
     <button class="sample-btn" id="lead-sample-btn"><span class="label">LEAD</span>Synth</button>
   </div>
-  <div id="beat-repeat-overlay"></div>
 </div>
 
 <!-- Recording canvas -->
@@ -187,7 +186,7 @@
     <h3>Tempo</h3>
     <div class="synth-row"><label>BPM</label><input type="range" id="perf-bpm" min="40" max="200" step="1" value="85"><span class="val">85</span></div>
     <div class="synth-row"><label>swing</label><input type="range" id="perf-swing" min="0" max="80" step="1" value="0"><span class="val">0%</span></div>
-    <button id="tap-tempo-btn" class="synth-select" style="text-align:center;margin:8px 0;width:100%">TAP TEMPO</button>
+    <button id="perf-tap-tempo" class="synth-select" style="text-align:center;margin:8px 0;width:100%">TAP TEMPO</button>
     <h3>Key &amp; Scale</h3>
     <div class="synth-row"><label>key</label><button class="synth-select" id="perf-key-btn" style="text-align:center">C</button></div>
     <div class="synth-row"><label>scale</label><button class="synth-select" id="perf-scale-btn" style="text-align:center">Modal (face)</button></div>
@@ -370,6 +369,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     if (MUZE.MixerUI) MUZE.MixerUI.init();
     if (MUZE.SampleUI) MUZE.SampleUI.init();
     if (MUZE.Tutorial) MUZE.Tutorial.init();
+    if (MUZE.PerformTab) MUZE.PerformTab.init();
     if (MUZE.PerfBar) MUZE.PerfBar.init();
     if (MUZE.Recorder) MUZE.Recorder.init();
     if (MUZE.LoopRecorder) MUZE.LoopRecorder.init();

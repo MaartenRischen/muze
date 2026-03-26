@@ -132,7 +132,7 @@ MUZE.Audio = {
     // (Removed: reverb modulation chorus — unnecessary CPU for barely audible effect)
 
     // Reverb HF damping: single lowpass filter (replaces EQ3, saves ~4 BiquadFilter nodes)
-    this._reverbDamping = new Tone.Filter({ frequency: 6000, type: 'lowpass', rolloff: -12 }).connect(this._masterSaturation);
+    this._reverbDamping = new Tone.Filter({ frequency: 6000, type: 'lowpass', rolloff: -6 }).connect(this._masterSaturation);
 
     this._reverbBus = new Tone.Reverb({ decay: 3.2, preDelay: 0.035 }).connect(this._reverbDamping);
     await this._reverbBus.ready;
@@ -529,7 +529,7 @@ MUZE.Audio = {
   _preRiserGains: {},
 
   startRiser() {
-    if (this.riserSynth.state !== 'started') this.riserSynth.start();
+    try { this.riserSynth.start(); } catch(e) {}
     this._riserGain.gain.rampTo(0.3, 4);
     this._riserFilter.frequency.rampTo(4000, 4);
     // Duck pad + drums via their channel gains
@@ -699,38 +699,40 @@ MUZE.Audio = {
   // EFFECTS
   // ============================================================
   reverbThrow() {
+    const self = this;
     for (const ch of MUZE.Mixer.CHANNEL_ORDER) {
-      const node = this._nodes[ch];
+      const node = self._nodes[ch];
       if (!node) continue;
       node._reverbSendPre = node.reverbSend.gain.value;
       node.reverbSend.gain.rampTo(0.9, 0.05);
     }
-    // Transport-scheduled recovery prevents timing drift in background tabs
-    Tone.Transport.scheduleOnce(() => {
+    // Use setTimeout for reliable wall-clock timing (Transport time drifts with BPM changes)
+    setTimeout(() => {
       for (const ch of MUZE.Mixer.CHANNEL_ORDER) {
-        const node = this._nodes[ch];
+        const node = self._nodes[ch];
         if (!node || node._reverbSendPre === undefined) continue;
         node.reverbSend.gain.rampTo(node._reverbSendPre, 1.5);
       }
-    }, '+0.2');
+    }, 200);
   },
 
   tapeStop() {
+    const self = this;
     const orig = Tone.Transport.bpm.value;
     Tone.Transport.bpm.rampTo(20, 0.4);
-    [this.padSynth, this._padSub, this.leadSynth, this.melodySynth].forEach(s => {
+    [self.padSynth, self._padSub, self.leadSynth, self.melodySynth].forEach(s => {
       if (s) { s.set({ detune: 0 }); s.set({ detune: -2400 }); }
     });
-    // Transport-scheduled recovery prevents timing drift in background tabs
-    Tone.Transport.scheduleOnce(() => {
+    // Use setTimeout for reliable wall-clock timing (Transport slows to 20 BPM so scheduleOnce is unreliable)
+    setTimeout(() => {
       Tone.Transport.bpm.rampTo(orig, 0.15);
-      [this.padSynth, this._padSub, this.leadSynth, this.melodySynth].forEach(s => {
+      [self.padSynth, self._padSub, self.leadSynth, self.melodySynth].forEach(s => {
         if (s) s.set({ detune: 0 });
       });
       // Restore pad detuning
-      this.padSynth.set({ detune: 5 });
-      this._padSub.set({ detune: 0 });
-    }, '+0.5');
+      self.padSynth.set({ detune: 5 });
+      self._padSub.set({ detune: 0 });
+    }, 500);
   },
 
   // ============================================================

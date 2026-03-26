@@ -229,6 +229,230 @@ MUZE.SynthMenu = {
 };
 
 // ============================================================
+// PERFORM TAB — Wires buttons inside the synth panel Perform tab
+// ============================================================
+MUZE.PerformTab = {
+  _tapTimes: [],
+
+  init() {
+    // ---- Preset cycle ----
+    const presetBtn = document.getElementById('perf-preset-btn');
+    if (presetBtn) {
+      presetBtn.addEventListener('click', () => {
+        const idx = (MUZE.State.presetIdx + 1) % MUZE.Config.PRESETS.length;
+        MUZE.Audio.applyPreset(idx);
+        presetBtn.textContent = MUZE.Config.PRESETS[idx].name;
+        // Sync other displays
+        this._syncDisplays();
+      });
+    }
+
+    // ---- BPM slider ----
+    const perfBpm = document.getElementById('perf-bpm');
+    if (perfBpm) {
+      const bpmVal = perfBpm.parentElement.querySelector('.val');
+      perfBpm.addEventListener('input', () => {
+        const val = +perfBpm.value;
+        MUZE.Audio.setBPM(val);
+        if (bpmVal) bpmVal.textContent = val;
+        // Sync BPM popup slider
+        const bpmSlider = document.getElementById('bpm-slider');
+        if (bpmSlider) bpmSlider.value = val;
+        const bpmSliderVal = document.getElementById('bpm-slider-val');
+        if (bpmSliderVal) bpmSliderVal.textContent = val;
+        const bpmValEl = document.getElementById('bpm-val');
+        if (bpmValEl) bpmValEl.textContent = val;
+      });
+    }
+
+    // ---- Swing slider ----
+    const perfSwing = document.getElementById('perf-swing');
+    if (perfSwing) {
+      const swingVal = perfSwing.parentElement.querySelector('.val');
+      perfSwing.addEventListener('input', () => {
+        const val = +perfSwing.value;
+        MUZE.Audio.setSwing(val);
+        if (swingVal) swingVal.textContent = val + '%';
+        // Sync BPM popup swing slider
+        const swingSlider = document.getElementById('swing-slider');
+        if (swingSlider) swingSlider.value = val;
+        const swingValEl = document.getElementById('swing-val');
+        if (swingValEl) swingValEl.textContent = val + '%';
+      });
+    }
+
+    // ---- Tap tempo (unique id: perf-tap-tempo) ----
+    const tapBtn = document.getElementById('perf-tap-tempo');
+    if (tapBtn) {
+      tapBtn.addEventListener('click', () => {
+        const now = performance.now();
+        this._tapTimes.push(now);
+        if (this._tapTimes.length > 5) this._tapTimes.shift();
+        if (this._tapTimes.length >= 2) {
+          const last = this._tapTimes[this._tapTimes.length - 1];
+          const prev = this._tapTimes[this._tapTimes.length - 2];
+          if (last - prev > 2000) { this._tapTimes = [now]; return; }
+        }
+        if (this._tapTimes.length >= 2) {
+          let total = 0;
+          for (let i = 1; i < this._tapTimes.length; i++) {
+            total += this._tapTimes[i] - this._tapTimes[i - 1];
+          }
+          const avgMs = total / (this._tapTimes.length - 1);
+          const bpm = Math.round(60000 / avgMs);
+          const clamped = Math.max(40, Math.min(200, bpm));
+          MUZE.Audio.setBPM(clamped);
+          this._syncDisplays();
+        }
+      });
+    }
+
+    // ---- Key cycle ----
+    const keyBtn = document.getElementById('perf-key-btn');
+    if (keyBtn) {
+      keyBtn.addEventListener('click', () => {
+        MUZE.State.rootOffset = (MUZE.State.rootOffset + 1) % 12;
+        const name = MUZE.Config.ROOT_NAMES[MUZE.State.rootOffset];
+        keyBtn.textContent = name;
+        // Sync hidden key display
+        const keyVal = document.getElementById('key-val');
+        if (keyVal) keyVal.textContent = name;
+        // Force pad retrigger
+        MUZE.Loop._currentPadKey = null;
+      });
+    }
+
+    // ---- Scale cycle ----
+    const scaleBtn = document.getElementById('perf-scale-btn');
+    if (scaleBtn) {
+      const scaleNames = ['modal', ...Object.keys(MUZE.Music.EXTRA_SCALES)];
+      let scaleIdx = 0;
+      scaleBtn.addEventListener('click', () => {
+        scaleIdx = (scaleIdx + 1) % scaleNames.length;
+        const name = scaleNames[scaleIdx];
+        if (name === 'modal') {
+          MUZE.State.extraScaleMode = null;
+          MUZE.State.modeFrozen = false;
+          scaleBtn.textContent = 'Modal (face)';
+        } else {
+          MUZE.State.extraScaleMode = name;
+          MUZE.State.modeFrozen = true;
+          MUZE.State.currentScale = MUZE.Music.EXTRA_SCALES[name];
+          scaleBtn.textContent = name;
+        }
+        const scaleVal = document.getElementById('scale-val');
+        if (scaleVal) scaleVal.textContent = name === 'modal' ? 'modal' : name;
+        // Force pad retrigger
+        MUZE.Loop._currentPadKey = null;
+      });
+    }
+
+    // ---- Chord auto-advance toggle ----
+    const chordsBtn = document.getElementById('perf-chords-btn');
+    if (chordsBtn) {
+      chordsBtn.addEventListener('click', () => {
+        if (!MUZE.ChordAdvance) return;
+        MUZE.ChordAdvance._active = !MUZE.ChordAdvance._active;
+        if (MUZE.ChordAdvance._active) {
+          MUZE.ChordAdvance._start();
+          chordsBtn.textContent = 'AUTO';
+        } else {
+          MUZE.ChordAdvance._stop();
+          chordsBtn.textContent = 'OFF';
+        }
+        // Sync hidden auto-chord display
+        const acBtn = document.getElementById('auto-chord-btn');
+        if (acBtn) acBtn.classList.toggle('active', MUZE.ChordAdvance._active);
+        const acVal = document.getElementById('auto-chord-val');
+        if (acVal) acVal.textContent = MUZE.ChordAdvance._active ? 'AUTO' : 'OFF';
+      });
+    }
+
+    // ---- Scene slots in Perform tab ----
+    document.querySelectorAll('.scene-slot-panel').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.scene);
+        if (MUZE.SceneManager) {
+          if (MUZE.SceneManager._saveMode) {
+            MUZE.SceneManager._saveScene(idx);
+            MUZE.SceneManager._saveMode = false;
+          } else {
+            MUZE.SceneManager._recallScene(idx);
+          }
+          this._syncDisplays();
+        }
+      });
+    });
+
+    const sceneSaveBtn = document.getElementById('scene-save-panel-btn');
+    if (sceneSaveBtn) {
+      sceneSaveBtn.addEventListener('click', () => {
+        if (!MUZE.SceneManager) return;
+        MUZE.SceneManager._saveMode = !MUZE.SceneManager._saveMode;
+        sceneSaveBtn.classList.toggle('active', MUZE.SceneManager._saveMode);
+        document.querySelectorAll('.scene-slot-panel').forEach(s => {
+          s.classList.toggle('save-mode', MUZE.SceneManager._saveMode);
+        });
+      });
+    }
+
+    // ---- Pad sample cycle in Perform tab ----
+    const padSampleBtn = document.getElementById('pad-sample-panel-btn');
+    if (padSampleBtn) {
+      padSampleBtn.addEventListener('click', () => {
+        if (MUZE.SampleUI) MUZE.SampleUI._cyclePad();
+        // Sync label
+        const samples = MUZE.SampleLib ? MUZE.SampleLib.getAllSamples() : [];
+        const idx = MUZE.SampleUI ? MUZE.SampleUI._padIdx : -1;
+        padSampleBtn.textContent = idx === -1 ? 'FM Synth' : samples[idx]?.name || 'FM Synth';
+      });
+    }
+
+    // ---- Lead sample cycle in Perform tab ----
+    const leadSampleBtn = document.getElementById('lead-sample-panel-btn');
+    if (leadSampleBtn) {
+      leadSampleBtn.addEventListener('click', () => {
+        if (MUZE.SampleUI) MUZE.SampleUI._cycleLead();
+        const samples = MUZE.SampleLib ? MUZE.SampleLib.getAllSamples() : [];
+        const idx = MUZE.SampleUI ? MUZE.SampleUI._leadIdx : -1;
+        leadSampleBtn.textContent = idx === -1 ? 'Synth' : samples[idx]?.name || 'Synth';
+      });
+    }
+  },
+
+  // Sync BPM/key/swing displays across perform tab and popups
+  _syncDisplays() {
+    const bpm = MUZE.State.bpm;
+    const key = MUZE.Config.ROOT_NAMES[MUZE.State.rootOffset];
+    const swing = MUZE.State.swing;
+
+    // BPM
+    const perfBpm = document.getElementById('perf-bpm');
+    if (perfBpm) { perfBpm.value = bpm; const v = perfBpm.parentElement.querySelector('.val'); if (v) v.textContent = bpm; }
+    const bpmSlider = document.getElementById('bpm-slider');
+    if (bpmSlider) bpmSlider.value = bpm;
+    const bpmSliderVal = document.getElementById('bpm-slider-val');
+    if (bpmSliderVal) bpmSliderVal.textContent = bpm;
+    const bpmVal = document.getElementById('bpm-val');
+    if (bpmVal) bpmVal.textContent = bpm;
+
+    // Key
+    const perfKey = document.getElementById('perf-key-btn');
+    if (perfKey) perfKey.textContent = key;
+    const keyVal = document.getElementById('key-val');
+    if (keyVal) keyVal.textContent = key;
+
+    // Swing
+    const perfSwing = document.getElementById('perf-swing');
+    if (perfSwing) { perfSwing.value = swing; const v = perfSwing.parentElement.querySelector('.val'); if (v) v.textContent = swing + '%'; }
+    const swingSlider = document.getElementById('swing-slider');
+    if (swingSlider) swingSlider.value = swing;
+    const swingVal = document.getElementById('swing-val');
+    if (swingVal) swingVal.textContent = swing + '%';
+  }
+};
+
+// ============================================================
 // PERFORMANCE BAR — Presets, BPM, Key, Scale
 // ============================================================
 MUZE.PerfBar = {
