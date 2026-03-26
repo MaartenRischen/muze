@@ -127,14 +127,28 @@ MUZE.Loop = {
         MUZE.Audio.updateBinauralFromChord(padNotes);
       }
 
-      // Hand melody
+      // Hand melody — open palm = legato (glide), fist = staccato (re-trigger)
       if (S.handPresent) {
         const note = MUZE.Music.quantize(1 - S.handY, scale, root, C.OCTAVE_RANGE);
         S.melodyNote = note;
+
+        // Detect articulation change (open ↔ fist)
+        if (S.handOpen !== this._prevHandOpen) {
+          MUZE.Audio.setPortamento(S.handOpen || S.portamentoMode);
+          if (!S.handOpen && this._prevMelodyNote !== null) {
+            // Fist: re-trigger current note for staccato attack
+            MUZE.Audio.stopMelody();
+            MUZE.Audio.startMelody(note);
+          }
+          this._prevHandOpen = S.handOpen;
+        }
+
         if (note !== this._prevMelodyNote) {
-          if (S.portamentoMode) {
+          if (S.handOpen || S.portamentoMode) {
+            // Legato: glide to new note
             MUZE.Audio.updateMelody(note);
           } else {
+            // Staccato: stop and re-trigger
             MUZE.Audio.stopMelody();
             MUZE.Audio.startMelody(note);
           }
