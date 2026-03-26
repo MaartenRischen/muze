@@ -9,8 +9,8 @@ MUZE.Audio = {
   kickSynth: null, snareSynth: null, hatSynth: null,
   riserSynth: null,
   _binauralL: null, _binauralR: null,
-  _binauralActive: false, _binauralFollowChord: false,
-  _binauralBeatHz: 4, _binauralBaseFreq: 110,
+  _binauralActive: false, _binauralFollowChord: true,
+  _binauralBeatHz: 2.5, _binauralBaseFreq: 110,
 
   // Sub oscillator for pad
   _padSub: null,
@@ -68,6 +68,9 @@ MUZE.Audio = {
     } catch (e) { /* OK */ }
 
     await Tone.start();
+    // Ensure stereo output (iOS can sometimes collapse to mono)
+    Tone.Destination.channelCount = 2;
+    Tone.Destination.channelCountMode = 'explicit';
     Tone.Transport.bpm.value = MUZE.Config.BPM_DEFAULT;
 
     // iOS AudioContext recovery: resume on interruption (phone call, tab switch, screen lock)
@@ -293,8 +296,8 @@ MUZE.Audio = {
     const binLPan = new Tone.Panner(-1);
     const binRPan = new Tone.Panner(1);
     const binMix = new Tone.Gain(1);
-    this._binauralL = new Tone.Oscillator({ type: 'sine', frequency: 110 }).connect(binLPan);
-    this._binauralR = new Tone.Oscillator({ type: 'sine', frequency: 114 }).connect(binRPan);
+    this._binauralL = new Tone.Oscillator({ type: 'sine', frequency: 108.75 }).connect(binLPan);
+    this._binauralR = new Tone.Oscillator({ type: 'sine', frequency: 111.25 }).connect(binRPan);
     binLPan.connect(binMix);
     binRPan.connect(binMix);
     this._createChannelStrip('binaural', binMix);

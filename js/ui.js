@@ -174,6 +174,9 @@ MUZE.InstrumentToggles = {
     const on = MUZE.Audio.toggleBinaural();
     this._binActive = on;
     document.getElementById('toggle-bin').classList.toggle('active', on);
+    // Sync synth panel toggle
+    const panelBtn = document.getElementById('bin-toggle');
+    if (panelBtn) panelBtn.textContent = on ? 'ON' : 'OFF';
   }
 };
 
@@ -301,6 +304,10 @@ MUZE.SynthMenu = {
     document.getElementById('bin-toggle').addEventListener('click', function() {
       const on = MUZE.Audio.toggleBinaural();
       this.textContent = on ? 'ON' : 'OFF';
+      // Sync main UI toggle
+      const mainBtn = document.getElementById('toggle-bin');
+      if (mainBtn) mainBtn.classList.toggle('active', on);
+      MUZE.InstrumentToggles._binActive = on;
     });
     document.getElementById('bin-mode').addEventListener('click', function() {
       MUZE.Audio._binauralFollowChord = !MUZE.Audio._binauralFollowChord;
