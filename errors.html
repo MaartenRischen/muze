@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html><head><title>Jammerman Error Log</title>
+<style>
+body{background:#0a0a0a;color:#f44;font:12px/1.6 monospace;padding:16px;margin:0}
+h1{color:#fff;font-size:16px;margin:0 0 12px}
+.entry{border-bottom:1px solid #222;padding:4px 0}
+.time{color:#888}
+.clear{color:#666;cursor:pointer;float:right}
+#log{white-space:pre-wrap}
+</style></head>
+<body>
+<h1>Jammerman Error Log <span class="clear" onclick="localStorage.removeItem('_muzeErrors');location.reload()">[clear]</span></h1>
+<div id="log">Loading...</div>
+<script>
+function load(){
+  try{
+    var errs=JSON.parse(localStorage.getItem('_muzeErrors')||'[]');
+    if(!errs.length){document.getElementById('log').textContent='No errors.';return;}
+    document.getElementById('log').innerHTML=errs.map(function(e){
+      var d=new Date(e.t);
+      return '<div class="entry"><span class="time">'+d.toLocaleTimeString()+'</span> '+e.m+'</div>';
+    }).join('');
+  }catch(ex){document.getElementById('log').textContent='Could not parse: '+ex.message;}
+}
+load();
+setInterval(load,2000);
+</script>
+</body></html>

@@ -15,11 +15,19 @@
 <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
 </head>
 <body>
-<!-- Error log hidden, only visible in console -->
+<!-- Error log: persists to /errors endpoint so Claude can read remotely -->
 <script>
 window._muzeErrors=[];
-window.addEventListener('error',function(e){window._muzeErrors.push(e.message);});
-window.addEventListener('unhandledrejection',function(e){window._muzeErrors.push(e.reason?.message||String(e.reason));});
+window._muzeLog=[];
+function _logErr(msg){
+  window._muzeErrors.push(msg);
+  // Also persist to localStorage so it survives page reloads
+  try{var a=JSON.parse(localStorage.getItem('_muzeErrors')||'[]');a.push({t:Date.now(),m:msg});if(a.length>50)a=a.slice(-50);localStorage.setItem('_muzeErrors',JSON.stringify(a));}catch(e){}
+}
+window.addEventListener('error',function(e){_logErr('ERR: '+e.message+' @ '+(e.filename||'?')+':'+(e.lineno||'?'));});
+window.addEventListener('unhandledrejection',function(e){_logErr('PROMISE: '+(e.reason&&e.reason.message||e.reason));});
+var _origErr=console.error;console.error=function(){var m=Array.from(arguments).join(' ');_logErr('CERR: '+m);_origErr.apply(console,arguments);};
+var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).join(' ');window._muzeLog.push(m);_origWarn.apply(console,arguments);};
 </script>
 
 <video id="cam" autoplay playsinline muted></video>
