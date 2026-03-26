@@ -249,28 +249,9 @@ MUZE.Visualizer = {
       setTimeout(() => { document.getElementById('cam').classList.remove('bass-warp'); this._bassWarping = false; }, 150);
     }
 
-    // ---- Mode color grading (CSS filter on #cam, only on mode change) ----
-    if (currentMode !== this._cachedGradeMode) {
-      this._cachedGradeMode = currentMode;
-      const grades = {
-        phrygian:    'hue-rotate(-15deg) saturate(1.1)',
-        aeolian:     'hue-rotate(-8deg) saturate(1.05)',
-        dorian:      'none',
-        mixolydian:  'hue-rotate(5deg) saturate(1.05)',
-        ionian:      'hue-rotate(12deg) saturate(1.1) brightness(1.02)',
-        lydian:      'hue-rotate(18deg) saturate(1.15) brightness(1.04)'
-      };
-      document.getElementById('cam').style.filter = grades[currentMode] || 'none';
-    }
-
-    // ---- Edge vignette energy pulse (subtle — camera must stay visible) ----
-    // Only update CSS custom property when value changes meaningfully (avoid per-frame style writes)
-    const vignetteOpacity = 0.08 + energy * 0.12;
-    const vigRounded = Math.round(vignetteOpacity * 200) / 200; // quantize to 0.005 steps
-    if (vigRounded !== this._lastVignetteOpacity) {
-      this._lastVignetteOpacity = vigRounded;
-      document.body.style.setProperty('--vignette-opacity', vigRounded);
-    }
+    // Mode color grading REMOVED — was overwriting bgblur's filter on #cam,
+    // causing the background blur to disappear and the camera to darken.
+    // Vignette writes REMOVED — vignette is display:none.
 
     // ---- Advance geometry phase ----
     this._geoPhase += 0.003;
