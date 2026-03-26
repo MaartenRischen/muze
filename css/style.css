@@ -363,11 +363,13 @@ html, body {
    ============================================================ */
 #instrument-toggles {
   position: fixed;
-  bottom: 70px; left: 0; right: 0;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 4;
   display: flex;
-  justify-content: space-evenly;
-  padding: 0 12px;
+  flex-direction: column;
+  gap: 8px;
   pointer-events: none;
 }
 .inst-toggle {
