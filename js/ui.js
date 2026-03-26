@@ -33,33 +33,33 @@ MUZE.InstrumentToggles = {
     Object.keys(toggles).forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
+      el.style.touchAction = 'none'; // prevent browser gestures, enable pointer events
 
       let timer = null;
       let held = false;
       let startY = 0;
+      let pointerId = null;
 
-      const getY = (e) => e.touches ? e.touches[0].clientY : e.clientY;
-
-      const onDown = (e) => {
+      el.addEventListener('pointerdown', (e) => {
         held = false;
-        startY = getY(e);
+        startY = e.clientY;
+        pointerId = e.pointerId;
+        el.setPointerCapture(e.pointerId); // capture so move/up fire even if finger drifts off
         timer = setTimeout(() => {
           held = true;
           this._volStart(el, startY);
         }, 350);
-      };
+      });
 
-      const onMove = (e) => {
+      el.addEventListener('pointermove', (e) => {
         if (held && this._vol.active) {
-          e.preventDefault();
-          this._volMove(getY(e));
-        } else if (timer && Math.abs(getY(e) - startY) > 10) {
-          // Finger moved too much before hold triggered — cancel
+          this._volMove(e.clientY);
+        } else if (timer && Math.abs(e.clientY - startY) > 10) {
           clearTimeout(timer); timer = null;
         }
-      };
+      });
 
-      const onUp = (e) => {
+      el.addEventListener('pointerup', (e) => {
         if (timer) { clearTimeout(timer); timer = null; }
         if (held) {
           this._volEnd();
@@ -68,22 +68,13 @@ MUZE.InstrumentToggles = {
         }
         held = false;
         toggles[id]();
-      };
+      });
 
-      const onCancel = () => {
+      el.addEventListener('pointercancel', () => {
         if (timer) { clearTimeout(timer); timer = null; }
         if (held) this._volEnd();
         held = false;
-      };
-
-      el.addEventListener('touchstart', onDown, { passive: true });
-      el.addEventListener('touchmove', onMove, { passive: false });
-      el.addEventListener('touchend', onUp);
-      el.addEventListener('touchcancel', onCancel);
-      el.addEventListener('mousedown', onDown);
-      el.addEventListener('mousemove', onMove);
-      el.addEventListener('mouseup', onUp);
-      el.addEventListener('mouseleave', onCancel);
+      });
     });
   },
 
