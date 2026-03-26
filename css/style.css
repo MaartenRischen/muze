@@ -683,9 +683,9 @@ html, body {
 .ss-letter {
   display: inline-block;
   font-family: var(--font-ui);
-  font-size: clamp(56px, 14vw, 80px);
+  font-size: clamp(28px, 8vw, 48px);
   font-weight: 200;
-  letter-spacing: 0.3em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.92);
   opacity: 0;

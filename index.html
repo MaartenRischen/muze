@@ -369,9 +369,9 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     // Init UI
     setLoadingText('Preparing interface...');
     // Init all modules — guarded so a missing module doesn't kill the app
-    MUZE.DrumToggle.init();
-    MUZE.RiserBtn.init();
-    MUZE.ChordBar.init();
+    if (MUZE.DrumToggle) MUZE.DrumToggle.init();
+    if (MUZE.RiserBtn) MUZE.RiserBtn.init();
+    if (MUZE.ChordBar) MUZE.ChordBar.init();
     MUZE.SynthMenu.init();
     if (MUZE.MixerUI) MUZE.MixerUI.init();
     if (MUZE.SampleUI) MUZE.SampleUI.init();
