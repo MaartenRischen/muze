@@ -362,20 +362,21 @@ document.getElementById('start-btn').addEventListener('click', async () => {
 
     // Init UI
     setLoadingText('Preparing interface...');
+    // Init all modules — guarded so a missing module doesn't kill the app
     MUZE.Touch.init();
     MUZE.SynthMenu.init();
-    MUZE.MixerUI.init();
-    MUZE.SampleUI.init();
-    MUZE.Tutorial.init();
-    MUZE.PerfBar.init();
-    MUZE.Recorder.init();
-    MUZE.LoopRecorder.init();
-    MUZE.SceneManager.init();
-    MUZE.Gyroscope.init();
-    MUZE.BeatRepeat.init();
-    MUZE.ChordAdvance.init();
-    MUZE.MoodLight.init();
-    MUZE.Hints.init();
+    if (MUZE.MixerUI) MUZE.MixerUI.init();
+    if (MUZE.SampleUI) MUZE.SampleUI.init();
+    if (MUZE.Tutorial) MUZE.Tutorial.init();
+    if (MUZE.PerfBar) MUZE.PerfBar.init();
+    if (MUZE.Recorder) MUZE.Recorder.init();
+    if (MUZE.LoopRecorder) MUZE.LoopRecorder.init();
+    if (MUZE.SceneManager) MUZE.SceneManager.init();
+    if (MUZE.Gyroscope) MUZE.Gyroscope.init();
+    if (MUZE.BeatRepeat) MUZE.BeatRepeat.init();
+    if (MUZE.ChordAdvance) MUZE.ChordAdvance.init();
+    if (MUZE.MoodLight) MUZE.MoodLight.init();
+    if (MUZE.Hints) MUZE.Hints.init();
 
     // Restore saved settings
     MUZE.Storage.load();
