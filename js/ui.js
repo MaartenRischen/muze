@@ -1058,40 +1058,47 @@ MUZE.SampleUI = {
 MUZE.Tutorial = {
   _steps: [], _idx: 0, _active: false,
 
-  BASIC: [
-    { title: 'Smile', desc: 'Try smiling. The music shifts to a brighter, happier mode. Watch the mode name change and the colors shift.' },
-    { title: 'Frown', desc: 'Now frown or make a sad face. The music becomes darker and more tense. Notice the purple tones.' },
-    { title: 'Tilt Your Head', desc: 'Tilt your chin down \u2014 the sound gets muffled as the filter closes. Chin up = bright and open.' },
-    { title: 'Chords & Drums', desc: 'Bottom bar: 6 chord buttons. Above that: 3 drum zones (hi-hat top, snare middle, kick bottom). Tap them!' },
-    { title: 'Double Tap', desc: 'Double-tap anywhere in the drum zone to start an auto-rhythm. Double-tap again to stop.' },
-    { title: 'Show Your Hand', desc: 'Hold your hand up to the camera. A melody synth appears \u2014 move up and down to change pitch.' },
-    { title: 'Open vs Closed', desc: 'Open palm = legato. Closed fist = staccato. Toggle portamento in the gear menu for smooth glides.' },
-    { title: 'Eyes = Reverb', desc: 'Open your eyes wide for more reverb and delay. Squint to dry things out. The ring visualization responds too.' },
-    { title: 'Presets & BPM', desc: 'Top-left: tap PRESET to cycle through 8 sound presets. Tap BPM to set tempo, use TAP TEMPO for live timing. KEY and SCALE let you choose any key and mode.' },
-    { title: 'Loop Recorder', desc: 'Left side: the loop bar. Tap the circle to record a 4-bar loop. When playing, tap again or + to overdub new layers. The undo arrow removes the last layer.' },
-    { title: 'Scenes', desc: 'Bottom-left: 4 scene slots. Tap SAVE then a slot to snapshot your current settings. Tap any saved slot to crossfade smoothly to that vibe in 2 seconds.' },
-    { title: 'Chord Auto-Advance', desc: 'Tap CHORDS in the performance bar to auto-cycle through I-ii-iii-IV-V-vi every bar. An arrow shows the next chord. Great for building full progressions.' },
-    { title: 'You\'re Ready!', desc: 'Use the record button to capture performances. Tap ? again for the advanced tutorial.' },
+  FIRST_TOUCH: [
+    { title: 'Press Play', desc: 'Hit the play button (top right). Music starts immediately \u2014 a pad, arpeggio, and drums respond to your face.' },
+    { title: 'Smile & Frown', desc: 'Smile \u2014 the music gets brighter. Frown \u2014 it gets darker. Your expression chooses the musical mode in real-time. Watch the mode name change in the top-left corner.' },
+    { title: 'Move Your Hand', desc: 'Hold up your free hand to the camera. A melody synth follows your hand up and down. Open palm = smooth legato. Closed fist = short staccato.' },
+    { title: 'Tap Drums', desc: 'The lower half of the screen is three drum zones: hi-hat (top), snare (middle), kick (bottom). Tap to play. Double-tap to start auto-rhythm.' },
+    { title: 'Change Chords', desc: 'The bottom bar has 6 chord buttons (I ii iii IV V vi). Tap any chord and everything follows \u2014 pad, arpeggio, melody, all in key. You\'re performing!' },
   ],
 
-  ADVANCED: [
-    { title: 'Six Modes', desc: 'Smile controls the mode: Phrygian (dark) \u2192 Aeolian \u2192 Dorian \u2192 Mixolydian \u2192 Ionian \u2192 Lydian (bright). Each has its own color.' },
-    { title: 'Filter (Head Pitch)', desc: 'Chin down = lowpass closes. Chin up = opens. Volume-compensated. Affects pad, melody, and arpeggio.' },
-    { title: 'Reverb + Delay', desc: 'Eye openness scales reverb/delay. Wide = full wet, squint = dry. The reverb has subtle modulation for a lush tail.' },
-    { title: 'Chorus (Head Roll)', desc: 'Tilt sideways for chorus depth \u2014 shimmer and stereo widening.' },
-    { title: 'Octave (Brows)', desc: 'Raise eyebrows to shift melody and arpeggio up an octave.' },
-    { title: 'Riser (Hold + Release)', desc: 'Hold finger 400ms+: noise sweep builds, drums duck. Swipe up to drop (big kick + reverb wash). Release without swipe to cancel.' },
-    { title: 'Swipe Effects', desc: 'Swipe down: tape stop. Swipe up (no hold): reverb throw. Swipe left/right: cycle drum patterns.' },
-    { title: 'Synth Panel', desc: 'Gear icon: Arp, Melody, Pad, Binaural tabs. Full ADSR, FX controls. Presets crossfade smoothly over 2 seconds.' },
-    { title: 'Loop Recorder', desc: 'Record a 4-bar loop, then overdub layers on top. Undo removes the last layer. This is how you build a full arrangement live.' },
-    { title: 'Scenes (4 Slots)', desc: 'Save your entire instrument state (BPM, key, volumes, sends, synth params) to 4 slots. Recall any scene with a smooth 2-second crossfade between settings.' },
-    { title: 'Gyroscope', desc: 'Tap the rotation arrow button to enable phone tilt control. Left/right tilt pans the arp and melody. Forward/back tilt modulates reverb depth.' },
-    { title: 'Beat Repeat', desc: 'Triple-tap any drum zone for a 2-second stutter effect. It accelerates from 8th to 16th to 32nd notes. Amazing for build-ups right before a drop.' },
-    { title: 'Chord Auto-Advance', desc: 'Tap CHORDS to auto-cycle through the I-ii-iii-IV-V-vi progression every bar. Combine with loop recording to capture harmonic movement.' },
-    { title: 'Sidechain Pump', desc: 'Every kick hit subtly ducks the pad volume for that classic pumping groove feel. It creates space and movement automatically.' },
-    { title: 'Swing', desc: 'In the BPM popup, drag the swing slider to add shuffle feel. Works great with lo-fi and halftime presets.' },
-    { title: 'Key & Scale', desc: '12 keys (C through B) and 11 scales including pentatonic, harmonic minor, whole tone, and blues. MODAL mode lets your face choose the scale.' },
-    { title: 'Go Perform', desc: 'Layer face, hands, touch, loops, scenes, chord advance, and beat repeat. Switch between 4 vibes live. Every parameter stacks. There are no wrong moves.' },
+  EXPLORING: [
+    { title: 'Head Tilt = Filter', desc: 'Tilt your chin down \u2014 the sound gets muffled and warm as a lowpass filter closes. Chin up/forward = bright and open. This affects pad, arp, and melody.' },
+    { title: 'Eyes = Space', desc: 'Open your eyes wide \u2014 reverb and delay increase, creating a spacious wash. Squint \u2014 the sound becomes dry and intimate. This is how you control the room size.' },
+    { title: 'Head Roll = Shimmer', desc: 'Tilt your head sideways. Chorus depth increases, making the pad shimmer and widen in stereo. Great for dreamy moments.' },
+    { title: 'Eyebrows = Octave', desc: 'Raise your eyebrows to shift the melody and arpeggio up an octave. Lower them to come back down. Combine with hand position for a huge pitch range.' },
+    { title: 'Riser & Drop', desc: 'Hold your finger on a drum zone for 400ms \u2014 a riser noise builds while drums and pad duck. Swipe up to drop: massive kick hit + reverb wash. Release without swiping to cancel.' },
+    { title: 'Tape Stop', desc: 'Swipe down on the drum zone for a tape stop effect \u2014 pitch drops and tempo crawls, then snaps back. Dramatic for transitions.' },
+    { title: 'Reverb Throw', desc: 'Swipe up (without holding first) for a reverb throw \u2014 the current sound explodes into a massive reverb wash that fades naturally.' },
+    { title: 'Drum Patterns', desc: 'With auto-rhythm running (double-tap to start), swipe left or right to cycle through 6+ drum patterns including Euclidean rhythms.' },
+    { title: 'Beat Repeat', desc: 'Triple-tap any drum zone for a 2-second stutter effect that accelerates from 8th to 16th to 32nd notes. Perfect for build-ups before a drop.' },
+    { title: 'Visual Effects', desc: 'Notice the glowing face contour, iris lights, and hand trail? These react to the music in real-time. The ring visualization pulses with the beat. Everything is connected.' },
+  ],
+
+  SOUND_DESIGN: [
+    { title: 'Synth Panel', desc: 'Tap the gear icon (top right) to open the synth panel. Four tabs: Arp (arpeggio synthesis), Melody (hand synth), Pad (chord pad), and Binaural (binaural beats).' },
+    { title: 'Presets', desc: 'In the gear panel\'s Perform tab, tap the preset button to cycle through 8 presets: Default, Ambient Dream, Dark Techno, Lo-Fi Chill, Bright Pop, Deep Space, Minimal, Future Bass. Each transforms the entire instrument.' },
+    { title: 'Tempo & Swing', desc: 'In the Perform tab: drag the BPM slider (40-200), use TAP TEMPO for live tempo setting, and add swing for a shuffled groove feel. Swing is especially good with lo-fi presets.' },
+    { title: 'Key & Scale', desc: 'Choose from 12 keys (C through B) and 14+ scales including pentatonic, harmonic minor, whole tone, blues, phrygian dominant, hirajoshi, and melodic minor. "Modal (face)" lets your expression choose the scale.' },
+    { title: 'The Mixer', desc: 'Tap MIX (top right) to open the mixing desk. 8 channel strips (pad, arp, melody, kick, snare, hat, binaural, riser) + master. Each has volume fader, pan, 3-band EQ, reverb send, and delay send.' },
+    { title: 'Channel Detail', desc: 'In the mixer, tap any channel label to open its detail panel with large EQ knobs, send controls, and pan. Mute (M) and Solo (S) buttons on each strip. Master strip has a limiter.' },
+    { title: 'Pad Samples', desc: 'In the Perform tab, tap the pad/lead buttons to cycle through sample-based sounds alongside the FM synth. Any recorded sample can be used as a pad or lead.' },
+    { title: 'Binaural Beats', desc: 'In the Binaural tab: toggle on for a subtle low-frequency binaural beat. Choose "tonic" (fixed pitch) or "chord" (follows harmony). Adjust beat frequency (1-20 Hz) for different mental states.' },
+  ],
+
+  PERFORMANCE: [
+    { title: 'Loop Your Melody', desc: 'In the Perform tab, tap REC to start the melody loop recorder. A 1-bar count-in plays, then your hand melody is recorded for 4 bars. When done, it loops back. Tap OVR to overdub more layers. Undo removes the last layer.' },
+    { title: 'Loop Length', desc: 'Change the loop length before recording: cycle through 1, 2, 4, or 8 bars to match your musical idea. Shorter loops = tighter phrases. Longer = more freedom.' },
+    { title: 'Save Scenes', desc: 'In the Perform tab, tap SAVE then a slot (1-4) to snapshot your entire setup: BPM, key, synth params, mixer levels, everything. Tap a saved slot to crossfade to that scene over 2 seconds.' },
+    { title: 'Chord Auto-Advance', desc: 'In the Perform tab, toggle CHORDS to auto-cycle through I\u2192ii\u2192iii\u2192IV\u2192V\u2192vi every bar. An arrow on the chord bar shows what\'s coming next. Record a loop with auto-advance for instant chord progressions.' },
+    { title: 'Gyroscope', desc: 'Tap the gyro button to enable phone tilt control. Tilt left/right pans the arp and melody in opposite directions for stereo width. Tilt forward/back modulates reverb depth.' },
+    { title: 'Record Video', desc: 'Tap the record button (circle, top right) to capture your performance as video with audio. On iOS, you can share directly to camera roll. The recording includes all visual effects.' },
+    { title: 'Performance Flow', desc: 'A great live set: Start with a preset. Build a loop with your hand. Save it to Scene 1. Switch preset. Build another loop. Save to Scene 2. Now crossfade between scenes while playing drums and using effects.' },
+    { title: 'Master It', desc: 'Every parameter stacks and interacts. Face controls the mood. Hand plays the melody. Touch drives rhythm and effects. Tilt adds expression. Scenes give you structure. There are no wrong moves \u2014 only your unique performance.' },
   ],
 
   init() {
@@ -1102,8 +1109,10 @@ MUZE.Tutorial = {
     document.getElementById('tut-close-pick').addEventListener('click', () => {
       document.getElementById('tut-picker').classList.remove('open');
     });
-    document.getElementById('tut-basic').addEventListener('click', () => this._start(this.BASIC));
-    document.getElementById('tut-advanced').addEventListener('click', () => this._start(this.ADVANCED));
+    document.getElementById('tut-first').addEventListener('click', () => this._start(this.FIRST_TOUCH));
+    document.getElementById('tut-explore').addEventListener('click', () => this._start(this.EXPLORING));
+    document.getElementById('tut-design').addEventListener('click', () => this._start(this.SOUND_DESIGN));
+    document.getElementById('tut-perform').addEventListener('click', () => this._start(this.PERFORMANCE));
     document.getElementById('tut-next').addEventListener('click', () => this._go(1));
     document.getElementById('tut-prev').addEventListener('click', () => this._go(-1));
     document.getElementById('tut-exit').addEventListener('click', () => this._close());
