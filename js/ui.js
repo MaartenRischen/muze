@@ -9,21 +9,20 @@ MUZE.InstrumentToggles = {
   _melodyActive: false,
   _beatActive: false,
   _binActive: false,
-  _longPressTimer: null,
-  _longPressTriggered: false,
-
   // Map each button to its mixer channel(s)
   _channelMap: {
     pad: 'pad',
     arp: 'arp',
     melody: 'melody',
-    beat: 'kick',   // beat controls kick/snare/hat — show kick volume
+    beat: 'kick',
     bin: 'binaural',
   },
 
+  // Volume gesture state
+  _vol: { active: false, ch: null, inst: null, startY: 0, startDb: 0, btn: null },
+
   init() {
-    const ids = ['toggle-pad', 'toggle-arp', 'toggle-melody', 'toggle-beat', 'toggle-bin'];
-    const handlers = {
+    const toggles = {
       'toggle-pad': () => this._togglePad(),
       'toggle-arp': () => this._toggleArp(),
       'toggle-melody': () => this._toggleMelody(),
@@ -31,76 +30,111 @@ MUZE.InstrumentToggles = {
       'toggle-bin': () => this._toggleBin(),
     };
 
-    ids.forEach(id => {
+    Object.keys(toggles).forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
-      // Long-press detection (touch + mouse)
-      const startLongPress = (e) => {
-        this._longPressTriggered = false;
-        this._longPressTimer = setTimeout(() => {
-          this._longPressTriggered = true;
-          this._showVolumeSlider(el);
-        }, 400);
-      };
-      const cancelLongPress = () => {
-        if (this._longPressTimer) { clearTimeout(this._longPressTimer); this._longPressTimer = null; }
-      };
-      const endPress = (e) => {
-        cancelLongPress();
-        if (this._longPressTriggered) { e.preventDefault(); return; }
-        handlers[id]();
+
+      let timer = null;
+      let held = false;
+      let startY = 0;
+
+      const getY = (e) => e.touches ? e.touches[0].clientY : e.clientY;
+
+      const onDown = (e) => {
+        held = false;
+        startY = getY(e);
+        timer = setTimeout(() => {
+          held = true;
+          this._volStart(el, startY);
+        }, 350);
       };
 
-      el.addEventListener('touchstart', startLongPress, { passive: true });
-      el.addEventListener('touchend', endPress);
-      el.addEventListener('touchcancel', cancelLongPress);
-      el.addEventListener('mousedown', startLongPress);
-      el.addEventListener('mouseup', endPress);
-      el.addEventListener('mouseleave', cancelLongPress);
-    });
+      const onMove = (e) => {
+        if (held && this._vol.active) {
+          e.preventDefault();
+          this._volMove(getY(e));
+        } else if (timer && Math.abs(getY(e) - startY) > 10) {
+          // Finger moved too much before hold triggered — cancel
+          clearTimeout(timer); timer = null;
+        }
+      };
 
-    // Dismiss volume slider on outside tap
-    document.addEventListener('pointerdown', (e) => {
-      const popup = document.getElementById('vol-slider-popup');
-      if (popup.classList.contains('visible') && !popup.contains(e.target) && !e.target.closest('.inst-toggle')) {
-        popup.classList.remove('visible');
-      }
+      const onUp = (e) => {
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (held) {
+          this._volEnd();
+          held = false;
+          return;
+        }
+        held = false;
+        toggles[id]();
+      };
+
+      const onCancel = () => {
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (held) this._volEnd();
+        held = false;
+      };
+
+      el.addEventListener('touchstart', onDown, { passive: true });
+      el.addEventListener('touchmove', onMove, { passive: false });
+      el.addEventListener('touchend', onUp);
+      el.addEventListener('touchcancel', onCancel);
+      el.addEventListener('mousedown', onDown);
+      el.addEventListener('mousemove', onMove);
+      el.addEventListener('mouseup', onUp);
+      el.addEventListener('mouseleave', onCancel);
     });
   },
 
-  _showVolumeSlider(btn) {
+  _volStart(btn, y) {
     const inst = btn.dataset.inst;
     const ch = this._channelMap[inst];
     if (!ch || !MUZE.Mixer.channels[ch]) return;
 
     const popup = document.getElementById('vol-slider-popup');
-    const slider = document.getElementById('vol-slider-range');
+    const fill = document.getElementById('vol-slider-fill');
     const dbLabel = document.getElementById('vol-slider-db');
-    const nameLabel = document.getElementById('vol-slider-label');
 
-    nameLabel.textContent = inst.toUpperCase() + ' VOL';
-    slider.value = MUZE.Mixer.channels[ch].volume;
-    dbLabel.textContent = Math.round(MUZE.Mixer.channels[ch].volume) + ' dB';
+    const db = MUZE.Mixer.channels[ch].volume;
+    this._vol = { active: true, ch, inst, startY: y, startDb: db, btn };
 
     // Position to the left of the button
     const rect = btn.getBoundingClientRect();
-    popup.style.top = rect.top + rect.height / 2 + 'px';
+    popup.style.top = (rect.top + rect.height / 2) + 'px';
     popup.style.right = (window.innerWidth - rect.left + 8) + 'px';
     popup.style.transform = 'translateY(-50%)';
-    popup.style.left = '';
-    popup.classList.add('visible');
 
-    // Wire up slider
-    slider.oninput = () => {
-      const db = parseFloat(slider.value);
-      dbLabel.textContent = Math.round(db) + ' dB';
-      MUZE.Mixer.setChannelVolume(ch, db);
-      // For beat, also set snare + hat proportionally
-      if (inst === 'beat') {
-        MUZE.Mixer.setChannelVolume('snare', db - 4);
-        MUZE.Mixer.setChannelVolume('hat', db - 10);
-      }
-    };
+    dbLabel.textContent = Math.round(db) + ' dB';
+    const pct = ((db + 30) / 36) * 100; // -30..+6 range
+    fill.style.height = Math.max(0, Math.min(100, pct)) + '%';
+    popup.classList.add('visible');
+  },
+
+  _volMove(y) {
+    const v = this._vol;
+    if (!v.active) return;
+
+    // Drag up = louder, 200px travel = full range (-30 to +6 = 36dB)
+    const delta = (v.startY - y) * (36 / 200);
+    const db = Math.max(-30, Math.min(6, v.startDb + delta));
+
+    MUZE.Mixer.setChannelVolume(v.ch, db);
+    if (v.inst === 'beat') {
+      MUZE.Mixer.setChannelVolume('snare', db - 4);
+      MUZE.Mixer.setChannelVolume('hat', db - 10);
+    }
+
+    const fill = document.getElementById('vol-slider-fill');
+    const dbLabel = document.getElementById('vol-slider-db');
+    dbLabel.textContent = Math.round(db) + ' dB';
+    const pct = ((db + 30) / 36) * 100;
+    fill.style.height = Math.max(0, Math.min(100, pct)) + '%';
+  },
+
+  _volEnd() {
+    this._vol.active = false;
+    document.getElementById('vol-slider-popup').classList.remove('visible');
   },
 
   _togglePad() {

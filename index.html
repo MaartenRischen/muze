@@ -52,11 +52,10 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
   <button class="inst-toggle" id="toggle-beat" data-inst="beat"><span class="inst-icon">◉</span><span class="inst-label">BEAT</span></button>
   <button class="inst-toggle" id="toggle-bin" data-inst="bin"><span class="inst-icon">∿</span><span class="inst-label">BIN</span></button>
 </div>
-<!-- Volume slider popup (shown on long-press) -->
+<!-- Volume bar (shown on long-press drag) -->
 <div id="vol-slider-popup">
-  <div id="vol-slider-label">VOL</div>
-  <input type="range" id="vol-slider-range" min="-30" max="6" step="1" value="0">
   <div id="vol-slider-db">0 dB</div>
+  <div id="vol-slider-track"><div id="vol-slider-fill"></div></div>
 </div>
 
 <!-- Chord bar -->
