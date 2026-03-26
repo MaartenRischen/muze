@@ -6,6 +6,7 @@
 MUZE.InstrumentToggles = {
   _padActive: false,
   _arpActive: false,
+  _arp2Active: false,
   _melodyActive: false,
   _beatActive: false,
   _binActive: false,
@@ -13,6 +14,7 @@ MUZE.InstrumentToggles = {
   _channelMap: {
     pad: 'pad',
     arp: 'arp',
+    arp2: 'arp2',
     melody: 'melody',
     beat: 'kick',
     bin: 'binaural',
@@ -25,6 +27,7 @@ MUZE.InstrumentToggles = {
     const toggles = {
       'toggle-pad': () => this._togglePad(),
       'toggle-arp': () => this._toggleArp(),
+      'toggle-arp2': () => this._toggleArp2(),
       'toggle-melody': () => this._toggleMelody(),
       'toggle-beat': () => this._toggleBeat(),
       'toggle-bin': () => this._toggleBin(),
@@ -148,11 +151,26 @@ MUZE.InstrumentToggles = {
     if (this._arpActive) {
       if (!MUZE.Audio._arpNotes || MUZE.Audio._arpNotes.length === 0) {
         const root = MUZE.Music.getEffectiveRoot ? MUZE.Music.getEffectiveRoot() : 60;
-        MUZE.Audio.updateArpNotes(MUZE.State.currentScale || MUZE.Config.SCALE_DORIAN, root);
+        MUZE.Audio.updateArpNotes(MUZE.State.currentScale || MUZE.Config.SCALE_DORIAN, root, 1);
       }
-      if (!MUZE.Audio._arpSeq) MUZE.Audio.startArpeggio();
+      if (!MUZE.Audio._arpSeq) MUZE.Audio.startArpeggio(1);
     } else {
-      MUZE.Audio.stopArpeggio();
+      MUZE.Audio.stopArpeggio(1);
+    }
+  },
+
+  _toggleArp2() {
+    this._arp2Active = !this._arp2Active;
+    document.getElementById('toggle-arp2').classList.toggle('active', this._arp2Active);
+    MUZE.Mixer.toggleMute('arp2');
+    if (this._arp2Active) {
+      if (!MUZE.Audio._arp2Notes || MUZE.Audio._arp2Notes.length === 0) {
+        const root = MUZE.Music.getEffectiveRoot ? MUZE.Music.getEffectiveRoot() : 60;
+        MUZE.Audio.updateArpNotes(MUZE.State.currentScale || MUZE.Config.SCALE_DORIAN, root, 2);
+      }
+      if (!MUZE.Audio._arp2Seq) MUZE.Audio.startArpeggio(2);
+    } else {
+      MUZE.Audio.stopArpeggio(2);
     }
   },
 
@@ -277,12 +295,42 @@ MUZE.SynthMenu = {
     this._bind('arp-sus', (v) => MUZE.Audio.leadSynth.set({ envelope: { sustain: +v } }));
     this._bind('arp-rel', (v) => MUZE.Audio.leadSynth.set({ envelope: { release: +v } }));
 
-    // Arp pattern cycle button
+    // Arp 1 pattern + note value cycle buttons
     const arpPatBtn = document.getElementById('arp-pattern');
     if (arpPatBtn) {
       arpPatBtn.addEventListener('click', function() {
         MUZE.State.arpPatternIdx = (MUZE.State.arpPatternIdx + 1) % MUZE.Config.ARP_PATTERNS.length;
         this.textContent = MUZE.Config.ARP_PATTERNS[MUZE.State.arpPatternIdx];
+      });
+    }
+    const arpNoteBtn = document.getElementById('arp-note-value');
+    if (arpNoteBtn) {
+      arpNoteBtn.addEventListener('click', function() {
+        MUZE.State.arpNoteValueIdx = (MUZE.State.arpNoteValueIdx + 1) % MUZE.Config.ARP_NOTE_VALUES.length;
+        this.textContent = MUZE.Config.ARP_NOTE_VALUES[MUZE.State.arpNoteValueIdx];
+        MUZE.Audio.restartArpWithNewRate(1);
+      });
+    }
+
+    // Arp 2 synth controls
+    this._bind('arp2-osc', (v) => MUZE.Audio.leadSynth2.set({ oscillator: { type: v } }), true);
+    this._bind('arp2-atk', (v) => MUZE.Audio.leadSynth2.set({ envelope: { attack: +v } }));
+    this._bind('arp2-dec', (v) => MUZE.Audio.leadSynth2.set({ envelope: { decay: +v } }));
+    this._bind('arp2-sus', (v) => MUZE.Audio.leadSynth2.set({ envelope: { sustain: +v } }));
+    this._bind('arp2-rel', (v) => MUZE.Audio.leadSynth2.set({ envelope: { release: +v } }));
+    const arp2PatBtn = document.getElementById('arp2-pattern');
+    if (arp2PatBtn) {
+      arp2PatBtn.addEventListener('click', function() {
+        MUZE.State.arp2PatternIdx = (MUZE.State.arp2PatternIdx + 1) % MUZE.Config.ARP_PATTERNS.length;
+        this.textContent = MUZE.Config.ARP_PATTERNS[MUZE.State.arp2PatternIdx];
+      });
+    }
+    const arp2NoteBtn = document.getElementById('arp2-note-value');
+    if (arp2NoteBtn) {
+      arp2NoteBtn.addEventListener('click', function() {
+        MUZE.State.arp2NoteValueIdx = (MUZE.State.arp2NoteValueIdx + 1) % MUZE.Config.ARP_NOTE_VALUES.length;
+        this.textContent = MUZE.Config.ARP_NOTE_VALUES[MUZE.State.arp2NoteValueIdx];
+        MUZE.Audio.restartArpWithNewRate(2);
       });
     }
 

@@ -6,6 +6,7 @@ MUZE.Mixer = {
   channels: {
     pad:      { volume: -10, pan: 0,    eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.35, delaySend: 0.25, mute: false, solo: false, faceLinked: true,  color: '#60a5fa' },
     arp:      { volume: -12, pan: 0.3,  eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.35, delaySend: 0.25, mute: false, solo: false, faceLinked: true,  color: '#4ade80' },
+    arp2:     { volume: -14, pan: -0.3, eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.30, delaySend: 0.20, mute: false, solo: false, faceLinked: true,  color: '#34d399' },
     melody:   { volume: -8,  pan: -0.3, eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.30, delaySend: 0.20, mute: false, solo: false, faceLinked: true,  color: '#c084fc' },
     kick:     { volume: -6,  pan: 0,    eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0,    delaySend: 0,    mute: false, solo: false, faceLinked: false, color: '#f87171' },
     snare:    { volume: -10, pan: 0,    eqLow: 0, eqMid: 0, eqHigh: 0, reverbSend: 0.15, delaySend: 0,    mute: false, solo: false, faceLinked: false, color: '#fb923c' },
@@ -16,7 +17,7 @@ MUZE.Mixer = {
 
   master: { volume: 0, eqLow: 0, eqMid: 0, eqHigh: 0, limiterThreshold: -3 },
 
-  CHANNEL_ORDER: ['pad', 'arp', 'melody', 'kick', 'snare', 'hat', 'binaural', 'riser'],
+  CHANNEL_ORDER: ['pad', 'arp', 'arp2', 'melody', 'kick', 'snare', 'hat', 'binaural', 'riser'],
 
   // ---- Channel Methods ----
 

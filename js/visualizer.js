@@ -112,12 +112,9 @@ MUZE.Visualizer = {
   // ---- Explosion screen glow ----
   _explosionGlow: null,  // { x, y, life, startTime }
 
-  // ---- Arpeggio visualization ----
-  _arpPhase: 0,               // slow rotation offset
-  _arpLastIdx: -1,            // detect note changes
-  _arpFlash: 0,               // flash intensity on note hit
-  _arpTrails: [],             // fading trail motes [{angle, r, g, b, alpha, radius}]
-  _arpSparks: [],             // emitted sparks on note hit
+  // ---- Arpeggio visualization (vertical, dual) ----
+  _arp1LastIdx: -1, _arp1Flash: 0, _arp1Sparks: [],
+  _arp2LastIdx: -1, _arp2Flash: 0, _arp2Sparks: [],
 
   init() {
     this._canvas = document.getElementById('overlay');
@@ -460,12 +457,11 @@ MUZE.Visualizer = {
   },
 
   // ============================================================
-  // 1b. ARPEGGIO ORBITAL VISUALIZATION
-  //     Glowing motes orbit the waveform ring, one per arp note.
-  //     The active note blazes bright and emits sparks.
-  //     Trail motes fade behind the current position.
+  // 1b. ARPEGGIO VERTICAL VISUALIZATION (dual columns)
+  //     High notes = top, low notes = bottom.
+  //     Arp1 on the left, Arp2 on the right of the waveform ring.
+  //     Active note blazes with glow + sparks.
   // ============================================================
-  // Convert note name ("C4") to MIDI number (60)
   _noteNameToMidi(name) {
     if (typeof name === 'number') return name;
     const match = String(name).match(/^([A-Ga-g]#?)(-?\d+)$/);
@@ -475,114 +471,125 @@ MUZE.Visualizer = {
   },
 
   _updateAndDrawArpViz(ctx, cx, cy, ringRadius, energy, accentRgb) {
-    const notes = MUZE.Audio._arpNotes;
-    const idx = MUZE.Audio._arpIdx;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    const colOffset = ringRadius + 50;
+    const vH = Math.min(280, cy * 0.65);
+    const topY = cy - vH / 2;
+    const botY = cy + vH / 2;
+
+    // Draw arp1 (left) and arp2 (right)
+    this._drawArpColumn(ctx, cx - colOffset, topY, botY, vH,
+      MUZE.Audio._arpNotes, MUZE.Audio._arpIdx,
+      '_arp1LastIdx', '_arp1Flash', '_arp1Sparks',
+      energy, accentRgb, '#4ade80', '74,222,128');
+    this._drawArpColumn(ctx, cx + colOffset, topY, botY, vH,
+      MUZE.Audio._arp2Notes, MUZE.Audio._arp2Idx,
+      '_arp2LastIdx', '_arp2Flash', '_arp2Sparks',
+      energy, accentRgb, '#34d399', '52,211,153');
+
+    ctx.restore();
+  },
+
+  _drawArpColumn(ctx, colX, topY, botY, vH, notes, rawIdx, lastIdxKey, flashKey, sparksKey, energy, accentRgb, color, colorRgb) {
     if (!notes || notes.length === 0) return;
 
     const n = notes.length;
-    const orbitR = ringRadius + 28 + energy * 40;
+    const currentIdx = rawIdx % n;
 
-    // Slow rotation
-    this._arpPhase += 0.004;
+    // Convert to MIDI for pitch mapping
+    const midis = notes.map(n => this._noteNameToMidi(n));
+    const minM = Math.min(...midis);
+    const maxM = Math.max(...midis);
+    const range = Math.max(maxM - minM, 1);
 
-    // Detect note change → flash + emit sparks
-    const currentIdx = idx % n;
-    if (currentIdx !== this._arpLastIdx) {
-      this._arpFlash = 1.0;
-      this._arpLastIdx = currentIdx;
+    // Map MIDI → Y (high = top, low = bottom)
+    const midiToY = (m) => botY - ((m - minM) / range) * vH;
 
-      const angle = this._arpPhase + (currentIdx / n) * Math.PI * 2;
-      const sx = cx + Math.cos(angle) * orbitR;
-      const sy = cy + Math.sin(angle) * orbitR;
-      const midi = this._noteNameToMidi(notes[currentIdx]);
-      const { r, g, b } = this._noteToRgb(midi);
-      for (let s = 0; s < 6; s++) {
-        const a = angle + (Math.random() - 0.5) * 1.2;
-        const speed = 1.5 + Math.random() * 3;
-        this._arpSparks.push({
-          x: sx, y: sy,
-          vx: Math.cos(a) * speed,
-          vy: Math.sin(a) * speed,
-          life: 1.0,
-          decay: 0.02 + Math.random() * 0.02,
+    // Detect note change → flash + sparks
+    if (currentIdx !== this[lastIdxKey]) {
+      this[flashKey] = 1.0;
+      this[lastIdxKey] = currentIdx;
+
+      const sy = midiToY(midis[currentIdx]);
+      const { r, g, b } = this._noteToRgb(midis[currentIdx]);
+      for (let s = 0; s < 5; s++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1 + Math.random() * 2.5;
+        this[sparksKey].push({
+          x: colX, y: sy,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 1,
+          life: 1.0, decay: 0.025 + Math.random() * 0.02,
           r, g, b,
         });
       }
-
-      this._arpTrails.push({
-        angle, r, g, b,
-        alpha: 0.7,
-        radius: orbitR,
-      });
     }
+    this[flashKey] *= 0.88;
+    const flash = this[flashKey];
 
-    // Decay flash
-    this._arpFlash *= 0.88;
-
-    // --- Draw orbit ring (very faint guide) ---
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
+    // --- Faint vertical guide ---
     ctx.beginPath();
-    ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(${accentRgb}, 0.04)`;
+    ctx.moveTo(colX, topY);
+    ctx.lineTo(colX, botY);
+    ctx.strokeStyle = `rgba(${colorRgb}, 0.06)`;
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // --- Draw trail motes (fading ghosts) ---
-    for (let i = this._arpTrails.length - 1; i >= 0; i--) {
-      const t = this._arpTrails[i];
-      t.alpha *= 0.95;
-      if (t.alpha < 0.02) {
-        this._arpTrails[i] = this._arpTrails[this._arpTrails.length - 1];
-        this._arpTrails.pop();
-        continue;
-      }
-      const tx = cx + Math.cos(t.angle) * t.radius;
-      const ty = cy + Math.sin(t.angle) * t.radius;
-      ctx.beginPath();
-      ctx.arc(tx, ty, 3 + t.alpha * 2, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${t.r},${t.g},${t.b},${(t.alpha * 0.5).toFixed(2)})`;
-      ctx.fill();
-    }
-    if (this._arpTrails.length > 60) this._arpTrails.splice(0, this._arpTrails.length - 60);
-
-    // --- Draw note motes around orbit ---
+    // --- Draw sequence path (connect notes in pattern order) ---
+    ctx.beginPath();
     for (let i = 0; i < n; i++) {
-      const angle = this._arpPhase + (i / n) * Math.PI * 2;
-      const x = cx + Math.cos(angle) * orbitR;
-      const y = cy + Math.sin(angle) * orbitR;
-      const midi = this._noteNameToMidi(notes[i]);
-      const { r, g, b } = this._noteToRgb(midi);
+      const y = midiToY(midis[i]);
+      const x = colX + (i / (n - 1 || 1) - 0.5) * 16; // slight horizontal spread for pattern shape
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = `rgba(${colorRgb}, 0.08)`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // --- Draw note dots ---
+    for (let i = 0; i < n; i++) {
+      const y = midiToY(midis[i]);
+      const x = colX;
+      const { r, g, b } = this._noteToRgb(midis[i]);
       const isActive = (i === currentIdx);
 
       if (isActive) {
-        const flash = this._arpFlash;
-        const glowSize = 12 + flash * 20 + energy * 8;
+        const glowSize = 10 + flash * 16 + energy * 6;
 
         // Outer glow
         const grad = ctx.createRadialGradient(x, y, 0, x, y, glowSize);
         grad.addColorStop(0, `rgba(${r},${g},${b},${(0.8 + flash * 0.2).toFixed(2)})`);
-        grad.addColorStop(0.3, `rgba(${r},${g},${b},${(0.3 + flash * 0.3).toFixed(2)})`);
+        grad.addColorStop(0.35, `rgba(${r},${g},${b},${(0.25 + flash * 0.3).toFixed(2)})`);
         grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
         ctx.beginPath();
         ctx.arc(x, y, glowSize, 0, Math.PI * 2);
         ctx.fillStyle = grad;
         ctx.fill();
 
-        // Hot white core
+        // White-hot core
         ctx.beginPath();
-        ctx.arc(x, y, 3 + flash * 4, 0, Math.PI * 2);
+        ctx.arc(x, y, 3 + flash * 3, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(255,255,255,${(0.7 + flash * 0.3).toFixed(2)})`;
         ctx.fill();
+
+        // Horizontal bar pulse
+        ctx.beginPath();
+        ctx.moveTo(x - 12 - flash * 8, y);
+        ctx.lineTo(x + 12 + flash * 8, y);
+        ctx.strokeStyle = `rgba(${r},${g},${b},${(0.3 + flash * 0.4).toFixed(2)})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
       } else {
         const dist = Math.min(Math.abs(i - currentIdx), Math.abs(i - currentIdx + n), Math.abs(i - currentIdx - n));
-        const proximity = Math.max(0, 1 - dist / (n * 0.4));
-        const a = 0.15 + proximity * 0.25;
-        const sz = 2 + proximity * 2;
+        const prox = Math.max(0, 1 - dist / (n * 0.4));
+        const a = 0.12 + prox * 0.2;
+        const sz = 1.5 + prox * 1.5;
 
         ctx.beginPath();
-        ctx.arc(x, y, sz + 4, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${r},${g},${b},${(a * 0.3).toFixed(2)})`;
+        ctx.arc(x, y, sz + 3, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${r},${g},${b},${(a * 0.25).toFixed(2)})`;
         ctx.fill();
 
         ctx.beginPath();
@@ -592,28 +599,20 @@ MUZE.Visualizer = {
       }
     }
 
-    // --- Draw and update sparks ---
-    for (let i = this._arpSparks.length - 1; i >= 0; i--) {
-      const s = this._arpSparks[i];
-      s.x += s.vx;
-      s.y += s.vy;
-      s.vx *= 0.96;
-      s.vy *= 0.96;
+    // --- Update and draw sparks ---
+    const sparks = this[sparksKey];
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const s = sparks[i];
+      s.x += s.vx; s.y += s.vy;
+      s.vx *= 0.95; s.vy *= 0.95;
       s.life -= s.decay;
-      if (s.life <= 0) {
-        this._arpSparks[i] = this._arpSparks[this._arpSparks.length - 1];
-        this._arpSparks.pop();
-        continue;
-      }
-      const sa = s.life * s.life;
+      if (s.life <= 0) { sparks[i] = sparks[sparks.length - 1]; sparks.pop(); continue; }
       ctx.beginPath();
       ctx.arc(s.x, s.y, 1.5 * s.life, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${s.r},${s.g},${s.b},${sa.toFixed(2)})`;
+      ctx.fillStyle = `rgba(${s.r},${s.g},${s.b},${(s.life * s.life).toFixed(2)})`;
       ctx.fill();
     }
-    if (this._arpSparks.length > 80) this._arpSparks.length = 80;
-
-    ctx.restore();
+    if (sparks.length > 60) sparks.length = 60;
   },
 
   // ============================================================

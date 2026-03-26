@@ -404,6 +404,7 @@ html, body {
 
 #toggle-pad.active .inst-icon { color: #60a5fa; text-shadow: 0 0 12px rgba(96,165,250,0.5); }
 #toggle-arp.active .inst-icon { color: #4ade80; text-shadow: 0 0 12px rgba(74,222,128,0.5); }
+#toggle-arp2.active .inst-icon { color: #34d399; text-shadow: 0 0 12px rgba(52,211,153,0.5); }
 #toggle-melody.active .inst-icon { color: #c084fc; text-shadow: 0 0 12px rgba(192,132,252,0.5); }
 #toggle-beat.active .inst-icon { color: #f87171; text-shadow: 0 0 12px rgba(248,113,113,0.5); }
 #toggle-bin.active .inst-icon { color: #22d3ee; text-shadow: 0 0 12px rgba(34,211,238,0.5); }

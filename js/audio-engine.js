@@ -55,9 +55,9 @@ MUZE.Audio = {
   // Melody state
   _melodyPlaying: false,
 
-  // Arpeggio
+  // Arpeggio 1 + 2
   _arpSeq: null, _arpNotes: [], _arpIdx: 0,
-  _arpPatternType: 'up-down',
+  _arp2Seq: null, _arp2Notes: [], _arp2Idx: 0,
 
   async init() {
     // Force iOS audio route to Bluetooth
@@ -205,6 +205,19 @@ MUZE.Audio = {
     this.leadSynth.connect(this._arpFilter);
     this._arpFilter.connect(this._arpChorus);
     this._createChannelStrip('arp', this._arpChorus);
+
+    // ---- ARPEGGIO 2 SYNTH ----
+    this.leadSynth2 = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 6,
+      oscillator: { type: 'triangle', count: 2, spread: 15 },
+      envelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: 0.3 },
+    });
+    this._arp2Filter = new Tone.Filter({ frequency: 1800, type: 'lowpass', rolloff: -24, Q: 4 });
+    this._arp2Chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.3, wet: 0.35 });
+    this._arp2Chorus.start();
+    this.leadSynth2.connect(this._arp2Filter);
+    this._arp2Filter.connect(this._arp2Chorus);
+    this._createChannelStrip('arp2', this._arp2Chorus);
 
     // ---- MELODY SYNTH: Expressive filter envelope + vibrato ----
     this.melodySynth = new Tone.MonoSynth({
@@ -603,73 +616,80 @@ MUZE.Audio = {
   },
 
   // ============================================================
-  // ARPEGGIO (multiple pattern types)
+  // ARPEGGIO (dual arp, configurable note value + pattern)
   // ============================================================
-  startArpeggio() {
-    if (this._arpSeq) return;
-    this._arpIdx = 0;
-    this._arpSeq = new Tone.Loop((time) => {
-      if (!this._arpNotes.length || !this.leadSynth) return;
-      const note = this._arpNotes[this._arpIdx % this._arpNotes.length];
-      const accent = (this._arpIdx % 4 === 0) ? 0.75 : 0.4 + Math.random() * 0.15;
-      this.leadSynth.triggerAttackRelease(note, '8n', time, accent);
-
-      // Animate arp filter for each note (pluck effect)
-      if (this._arpFilter) {
-        this._arpFilter.frequency.setValueAtTime(6000, time);
-        this._arpFilter.frequency.exponentialRampToValueAtTime(1200, time + 0.15);
-      }
-
-      this._arpIdx++;
-    }, '8n');
-    this._arpSeq.start(0);
+  _arpProps(id) {
+    return id === 2
+      ? { seq: '_arp2Seq', notes: '_arp2Notes', idx: '_arp2Idx', synth: 'leadSynth2', filter: '_arp2Filter', patKey: 'arp2PatternIdx', noteKey: 'arp2NoteValueIdx' }
+      : { seq: '_arpSeq',  notes: '_arpNotes',  idx: '_arpIdx',  synth: 'leadSynth',  filter: '_arpFilter',  patKey: 'arpPatternIdx',  noteKey: 'arpNoteValueIdx' };
   },
 
-  updateArpNotes(scale, root) {
+  startArpeggio(arpId) {
+    const p = this._arpProps(arpId);
+    if (this[p.seq]) return;
+    this[p.idx] = 0;
+    const noteVal = MUZE.Config.ARP_NOTE_VALUES[MUZE.State[p.noteKey]] || '8n';
+    const synth = this[p.synth];
+    const filter = this[p.filter];
+    this[p.seq] = new Tone.Loop((time) => {
+      const notes = this[p.notes];
+      if (!notes.length || !synth) return;
+      const note = notes[this[p.idx] % notes.length];
+      const accent = (this[p.idx] % 4 === 0) ? 0.75 : 0.4 + Math.random() * 0.15;
+      synth.triggerAttackRelease(note, noteVal, time, accent);
+      if (filter) {
+        filter.frequency.setValueAtTime(6000, time);
+        filter.frequency.exponentialRampToValueAtTime(1200, time + 0.15);
+      }
+      this[p.idx]++;
+    }, noteVal);
+    this[p.seq].start(0);
+  },
+
+  updateArpNotes(scale, root, arpId) {
+    const p = this._arpProps(arpId);
     const baseNotes = scale.map(i => MUZE.Music.midiToNote(root + i));
-    const pattern = MUZE.Config.ARP_PATTERNS[MUZE.State.arpPatternIdx] || 'up-down';
+    const pattern = MUZE.Config.ARP_PATTERNS[MUZE.State[p.patKey]] || 'up-down';
 
     switch (pattern) {
       case 'up':
-        this._arpNotes = [...baseNotes];
-        break;
+        this[p.notes] = [...baseNotes]; break;
       case 'down':
-        this._arpNotes = [...baseNotes].reverse();
-        break;
+        this[p.notes] = [...baseNotes].reverse(); break;
       case 'random': {
-        // Fisher-Yates shuffle but keep stable within a cycle
         const shuffled = [...baseNotes];
         for (let i = shuffled.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
-        this._arpNotes = shuffled;
-        break;
+        this[p.notes] = shuffled; break;
       }
       case 'up-up-down': {
-        const up1 = [...baseNotes];
-        const up2 = [...baseNotes];
         const down = [...baseNotes].reverse().slice(1);
-        this._arpNotes = [...up1, ...up2, ...down];
-        break;
+        this[p.notes] = [...baseNotes, ...baseNotes, ...down]; break;
       }
       case 'played':
-        // Just play in scale order (like 'up' but wraps at chord tones)
-        this._arpNotes = [...baseNotes];
-        break;
-      case 'up-down':
-      default: {
-        const up = [...baseNotes];
+        this[p.notes] = [...baseNotes]; break;
+      case 'up-down': default: {
         const down = [...baseNotes].reverse().slice(1);
-        this._arpNotes = [...up, ...down];
-        break;
+        this[p.notes] = [...baseNotes, ...down]; break;
       }
     }
   },
 
-  stopArpeggio() {
-    if (this._arpSeq) { this._arpSeq.stop(); this._arpSeq.dispose(); this._arpSeq = null; }
-    this._arpNotes = [];
+  stopArpeggio(arpId) {
+    const p = this._arpProps(arpId);
+    if (this[p.seq]) { this[p.seq].stop(); this[p.seq].dispose(); this[p.seq] = null; }
+    this[p.notes] = [];
+  },
+
+  restartArpWithNewRate(arpId) {
+    const p = this._arpProps(arpId);
+    const wasRunning = !!this[p.seq];
+    const savedNotes = [...(this[p.notes] || [])];
+    if (wasRunning) { this[p.seq].stop(); this[p.seq].dispose(); this[p.seq] = null; }
+    this[p.notes] = savedNotes;
+    if (wasRunning) this.startArpeggio(arpId);
   },
 
   // ============================================================

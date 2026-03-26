@@ -116,8 +116,10 @@ MUZE.Loop = {
       const effectiveRoot = MUZE.Music.getEffectiveRoot();
       const root = effectiveRoot + octShift;
 
-      MUZE.Audio.updateArpNotes(scale, root);
-      if (!MUZE.Audio._arpSeq) MUZE.Audio.startArpeggio();
+      MUZE.Audio.updateArpNotes(scale, root, 1);
+      if (!MUZE.Audio._arpSeq) MUZE.Audio.startArpeggio(1);
+      MUZE.Audio.updateArpNotes(scale, root, 2);
+      if (!MUZE.Audio._arp2Seq) MUZE.Audio.startArpeggio(2);
 
       const degree = C.CHORD_DEGREES[S.chordIndex];
       const padNotes = MUZE.Music.getPadVoicing(effectiveRoot, scale, degree);

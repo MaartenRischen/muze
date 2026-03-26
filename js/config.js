@@ -52,8 +52,9 @@ MUZE.Config = Object.freeze({
     { name: 'Halftime', kick:[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], snare:[0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
   ],
 
-  // Arpeggio pattern types
+  // Arpeggio pattern types and note values
   ARP_PATTERNS: ['up-down', 'up', 'down', 'random', 'up-up-down', 'played'],
+  ARP_NOTE_VALUES: ['4n', '8n', '8n.', '16n', '16n.', '32n'],
 
   // Mode -> color mapping
   MODE_COLORS: {
@@ -213,6 +214,9 @@ MUZE.State = {
   bpm: 85,
   swing: 0,               // swing percentage 0-100
   arpPatternIdx: 0,       // index into ARP_PATTERNS
+  arpNoteValueIdx: 1,     // index into ARP_NOTE_VALUES (default '8n')
+  arp2PatternIdx: 2,      // arp2 defaults to 'down'
+  arp2NoteValueIdx: 3,    // arp2 defaults to '16n'
   presetIdx: 0,           // current preset index
   extraScaleMode: null,   // null = face-controlled modal, or string name of extra scale
 };
