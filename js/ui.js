@@ -2,18 +2,59 @@
    MUZE — UI (Touch, Synth Menu, Tutorial, Recorder, Samples)
    ============================================================ */
 
-// ---- Drum Toggle Button (replaces drum zones) ----
-MUZE.DrumToggle = {
+// ---- Instrument Toggle Buttons ----
+MUZE.InstrumentToggles = {
+  _padActive: true,
+  _arpActive: true,
+  _beatActive: false,
+  _binActive: false,
+
   init() {
-    document.getElementById('drum-toggle-btn').addEventListener('click', () => {
-      const active = MUZE.AutoRhythm.toggle();
-      MUZE.State.autoRhythm = active;
-      const btn = document.getElementById('drum-toggle-btn');
-      btn.classList.toggle('active-feature', active);
-      document.getElementById('rhythm-indicator').classList.toggle('visible', active);
-    });
+    const pad = document.getElementById('toggle-pad');
+    const arp = document.getElementById('toggle-arp');
+    const beat = document.getElementById('toggle-beat');
+    const bin = document.getElementById('toggle-bin');
+
+    // Pad and arp start ON
+    if (pad) { pad.classList.add('active'); pad.addEventListener('click', () => this._togglePad()); }
+    if (arp) { arp.classList.add('active'); arp.addEventListener('click', () => this._toggleArp()); }
+    if (beat) { beat.addEventListener('click', () => this._toggleBeat()); }
+    if (bin) { bin.addEventListener('click', () => this._toggleBin()); }
+  },
+
+  _togglePad() {
+    this._padActive = !this._padActive;
+    document.getElementById('toggle-pad').classList.toggle('active', this._padActive);
+    MUZE.Mixer.toggleMute('pad');
+  },
+
+  _toggleArp() {
+    this._arpActive = !this._arpActive;
+    document.getElementById('toggle-arp').classList.toggle('active', this._arpActive);
+    if (this._arpActive) {
+      if (!MUZE.Audio._arpSeq) MUZE.Audio.startArpeggio();
+    } else {
+      MUZE.Audio.stopArpeggio();
+    }
+  },
+
+  _toggleBeat() {
+    const active = MUZE.AutoRhythm.toggle();
+    this._beatActive = active;
+    MUZE.State.autoRhythm = active;
+    document.getElementById('toggle-beat').classList.toggle('active', active);
+    document.getElementById('rhythm-indicator').classList.toggle('visible', active);
+  },
+
+  _toggleBin() {
+    const on = MUZE.Audio.toggleBinaural();
+    this._binActive = on;
+    document.getElementById('toggle-bin').classList.toggle('active', on);
   }
 };
+
+// Keep DrumToggle as alias for backward compat
+MUZE.DrumToggle = { init() { /* handled by InstrumentToggles */ } };
 
 // ---- Riser Button (replaces hold+swipe gesture) ----
 MUZE.RiserBtn = {

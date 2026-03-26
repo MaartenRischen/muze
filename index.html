@@ -15,16 +15,11 @@
 <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
 </head>
 <body>
-<div id="error-log" style="position:fixed;bottom:0;left:0;right:0;max-height:30vh;overflow-y:auto;z-index:9999;background:rgba(0,0,0,0.9);color:#f44;font:11px/1.4 monospace;padding:8px;display:none;pointer-events:auto"></div>
+<!-- Error log hidden, only visible in console -->
 <script>
-(function(){
-  var el=document.getElementById('error-log');
-  var errs=[];
-  function show(msg){errs.push(msg);el.style.display='block';el.textContent=errs.join('\n');}
-  window.addEventListener('error',function(e){show('ERR: '+e.message+' @ '+e.filename+':'+e.lineno);});
-  window.addEventListener('unhandledrejection',function(e){show('PROMISE: '+(e.reason&&e.reason.message||e.reason));});
-  var origErr=console.error;console.error=function(){show('LOG: '+Array.from(arguments).join(' '));origErr.apply(console,arguments);};
-})();
+window._muzeErrors=[];
+window.addEventListener('error',function(e){window._muzeErrors.push(e.message);});
+window.addEventListener('unhandledrejection',function(e){window._muzeErrors.push(e.reason?.message||String(e.reason));});
 </script>
 
 <video id="cam" autoplay playsinline muted></video>
@@ -41,7 +36,13 @@
 <!-- Audio-reactive beat flash -->
 <div id="beat-flash-overlay"></div>
 
-<!-- Drum touch zones removed — single drum toggle button in toolbar -->
+<!-- Instrument toggles — spaced around the camera view -->
+<div id="instrument-toggles">
+  <button class="inst-toggle" id="toggle-pad" data-inst="pad"><span class="inst-icon">◈</span><span class="inst-label">PAD</span></button>
+  <button class="inst-toggle" id="toggle-arp" data-inst="arp"><span class="inst-icon">♪</span><span class="inst-label">ARP</span></button>
+  <button class="inst-toggle" id="toggle-beat" data-inst="beat"><span class="inst-icon">◉</span><span class="inst-label">BEAT</span></button>
+  <button class="inst-toggle" id="toggle-bin" data-inst="bin"><span class="inst-icon">∿</span><span class="inst-label">BIN</span></button>
+</div>
 
 <!-- Chord bar -->
 <div id="chord-zone">
@@ -71,7 +72,6 @@
 <!-- Toolbar -->
 <div class="toolbar">
   <button class="toolbar-btn" id="pause-btn" aria-label="Pause">&#9208;</button>
-  <button class="toolbar-btn" id="drum-toggle-btn" aria-label="Drums">&#9835;</button>
   <button class="toolbar-btn" id="riser-btn" aria-label="Riser">&uarr;</button>
   <button class="toolbar-btn" id="rec-btn" aria-label="Record">&#9679;</button>
   <button class="toolbar-btn" id="toolbar-mixer-btn" aria-label="Mixer" style="font-size:10px;font-weight:600;letter-spacing:0.5px;font-family:var(--font-ui)">MIX</button>
@@ -381,7 +381,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     // Init UI
     setLoadingText('Preparing interface...');
     // Init all modules — guarded so a missing module doesn't kill the app
-    if (MUZE.DrumToggle) MUZE.DrumToggle.init();
+    if (MUZE.InstrumentToggles) MUZE.InstrumentToggles.init();
     if (MUZE.RiserBtn) MUZE.RiserBtn.init();
     if (MUZE.ChordBar) MUZE.ChordBar.init();
     MUZE.SynthMenu.init();

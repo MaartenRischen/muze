@@ -358,6 +358,55 @@ html, body {
   z-index: 0;
 }
 
+/* ============================================================
+   INSTRUMENT TOGGLES — 4 buttons spaced around the view
+   ============================================================ */
+#instrument-toggles {
+  position: fixed;
+  bottom: 70px; left: 0; right: 0;
+  z-index: 4;
+  display: flex;
+  justify-content: space-evenly;
+  padding: 0 12px;
+  pointer-events: none;
+}
+.inst-toggle {
+  pointer-events: auto;
+  appearance: none; border: none;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 3px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 10px 14px 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 52px;
+}
+.inst-toggle .inst-icon {
+  font-size: 20px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.4);
+  transition: color 0.2s, text-shadow 0.2s;
+}
+.inst-toggle .inst-label {
+  font: 600 8px/1 var(--font-ui, sans-serif);
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+/* Active states — each instrument gets its own color */
+.inst-toggle.active { border-color: rgba(255,255,255,0.25); background: rgba(0,0,0,0.55); }
+.inst-toggle.active .inst-label { color: rgba(255, 255, 255, 0.7); }
+
+#toggle-pad.active .inst-icon { color: #60a5fa; text-shadow: 0 0 12px rgba(96,165,250,0.5); }
+#toggle-arp.active .inst-icon { color: #4ade80; text-shadow: 0 0 12px rgba(74,222,128,0.5); }
+#toggle-beat.active .inst-icon { color: #f87171; text-shadow: 0 0 12px rgba(248,113,113,0.5); }
+#toggle-bin.active .inst-icon { color: #22d3ee; text-shadow: 0 0 12px rgba(34,211,238,0.5); }
+
+.inst-toggle:active { transform: scale(0.93); }
+
 /* --- Base chord button --- */
 .chord-btn {
   flex: 1; display: flex; align-items: center; justify-content: center;
