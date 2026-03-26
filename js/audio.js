@@ -132,7 +132,7 @@ MUZE.Audio = {
     // (Removed: reverb modulation chorus — unnecessary CPU for barely audible effect)
 
     // Reverb HF damping: single lowpass filter (replaces EQ3, saves ~4 BiquadFilter nodes)
-    this._reverbDamping = new Tone.Filter({ frequency: 6000, type: 'lowpass', rolloff: -6 }).connect(this._masterSaturation);
+    this._reverbDamping = new Tone.Filter({ frequency: 6000, type: 'lowpass', rolloff: -12 }).connect(this._masterSaturation);
 
     this._reverbBus = new Tone.Reverb({ decay: 3.2, preDelay: 0.035 }).connect(this._reverbDamping);
     await this._reverbBus.ready;
