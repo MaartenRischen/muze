@@ -40,7 +40,7 @@ MUZE.Config = Object.freeze({
   BPM_MIN: 40, BPM_MAX: 200,
   CHORD_DEGREES: [0, 1, 2, 3, 4, 5],
   BROW_SPIKE_THRESHOLD: 0.25, BROW_SPIKE_COOLDOWN: 600,
-  DETECT_INTERVAL: 33,
+  DETECT_INTERVAL: 50,  // 20fps detection (was 30fps) — saves ~30% ML CPU
   SWIPE_THRESHOLD: 50, SWIPE_MAX_TIME: 300, DOUBLE_TAP_TIME: 300, HOLD_TIME: 400,
 
   RHYTHM_PATTERNS: [
@@ -219,6 +219,7 @@ MUZE.State = {
   arp2NoteValueIdx: 3,    // arp2 defaults to '16n'
   presetIdx: 0,           // current preset index
   extraScaleMode: null,   // null = face-controlled modal, or string name of extra scale
+  latencyMode: 'balanced', // 'low' (fast phone), 'balanced' (default), 'safe' (slow phone)
 };
 
 // ---- Smoothing Filter (legacy, kept for reference) ----

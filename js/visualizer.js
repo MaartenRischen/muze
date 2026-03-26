@@ -14,7 +14,7 @@ MUZE.Visualizer = {
 
   // ---- Particles ----
   _particles: [],
-  _maxParticles: 40,
+  _maxParticles: 25,
 
   // ---- Color cache (updated on mode change only) ----
   _cachedAccent: '#e8a948',
@@ -52,7 +52,7 @@ MUZE.Visualizer = {
 
   // ---- Face effect: expression particles ----
   _faceParticles: [],
-  _maxFaceParticles: 80,
+  _maxFaceParticles: 40,
 
   // ---- Face effect: head rotation ghost trails ----
   _contourSnapshots: [],  // [{points: Float32Array, time: number, opacity: number}]
@@ -74,7 +74,7 @@ MUZE.Visualizer = {
 
   // ---- Note burst particles ----
   _burstParticles: [],
-  _maxBurstParticles: 100,
+  _maxBurstParticles: 50,
   _lastBurstNote: null,
   _burstRings: [],
 

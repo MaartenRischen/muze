@@ -67,6 +67,10 @@ MUZE.Audio = {
       await sa.play();
     } catch (e) { /* OK */ }
 
+    // Apply latency mode before starting audio
+    const latencyMode = MUZE.State.latencyMode || 'balanced';
+    const latencyHint = latencyMode === 'low' ? 'interactive' : latencyMode === 'safe' ? 'playback' : 'balanced';
+    Tone.context.lookAhead = latencyMode === 'safe' ? 0.2 : latencyMode === 'low' ? 0.05 : 0.1;
     await Tone.start();
     // Ensure stereo output (iOS can sometimes collapse to mono)
     Tone.Destination.channelCount = 2;
@@ -110,21 +114,9 @@ MUZE.Audio = {
     // PERF: Removed _masterMeter (Tone.Meter does FFT every frame). Use gain.value as proxy.
     this._masterEQ = new Tone.EQ3(0, 0, 0).connect(this._masterGain);
 
-    // Tape saturation — WaveShaper with tanh curve for analog warmth
-    this._masterSatDry = new Tone.Gain(0.8);  // 80% dry
-    this._masterSatWet = new Tone.Gain(0.2);  // 20% wet
-    this._masterSatShaper = new Tone.WaveShaper((x) => {
-      const a = 0.8;
-      return Math.tanh(a * x) / Math.tanh(a);
-    }, 2048);
-    this._masterSatMerge = new Tone.Gain(1).connect(this._masterEQ);
-    this._masterSatDry.connect(this._masterSatMerge);
-    this._masterSatShaper.connect(this._masterSatWet);
-    this._masterSatWet.connect(this._masterSatMerge);
-    // _masterSaturation acts as the input node for the saturation stage
-    this._masterSaturation = new Tone.Gain(1);
-    this._masterSaturation.connect(this._masterSatDry);
-    this._masterSaturation.connect(this._masterSatShaper);
+    // Simplified saturation: single gain stage (saves 4 nodes + WaveShaper CPU)
+    // The WaveShaper parallel chain was costing stereo processing per sample
+    this._masterSaturation = new Tone.Gain(0.95).connect(this._masterEQ);
 
     this._masterFilterGain = new Tone.Gain(1).connect(this._masterSaturation);
     this._masterFilter = new Tone.Filter({ frequency: 2000, type: 'lowpass', rolloff: -24, Q: 1.2 }).connect(this._masterFilterGain);
@@ -137,7 +129,7 @@ MUZE.Audio = {
     // Reverb HF damping: single lowpass filter (replaces EQ3, saves ~4 BiquadFilter nodes)
     this._reverbDamping = new Tone.Filter({ frequency: 6000, type: 'lowpass', rolloff: -12 }).connect(this._masterSaturation);
 
-    this._reverbBus = new Tone.Reverb({ decay: 3.2, preDelay: 0.035 }).connect(this._reverbDamping);
+    this._reverbBus = new Tone.Reverb({ decay: 2.0, preDelay: 0.03 }).connect(this._reverbDamping);
     await this._reverbBus.ready;
     this._reverbBus.wet.value = 1; // fully wet — send level controls amount
 
@@ -150,7 +142,7 @@ MUZE.Audio = {
     // ---- PAD SYNTH: FM + sub oscillator ----
     // PERF: maxPolyphony 3 (plays 3-note chords), removed _padDetune2 entirely
     this.padSynth = new Tone.PolySynth(Tone.FMSynth, {
-      maxPolyphony: 8,
+      maxPolyphony: 4,
       voice: {
         harmonicity: 1.5, modulationIndex: 2.5,
         oscillator: { type: 'fatsine', count: 3, spread: 18 },
@@ -164,7 +156,7 @@ MUZE.Audio = {
 
     // Sub oscillator: one octave down, sine, subtle
     this._padSub = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 8,
+      maxPolyphony: 4,
       oscillator: { type: 'sine' },
       envelope: { attack: 1.2, decay: 0.5, sustain: 0.9, release: 3.0 },
     });
@@ -172,7 +164,7 @@ MUZE.Audio = {
 
     // Chorus insert for pad (enhanced: slightly higher rate for shimmer)
     this._padChorus = new Tone.Chorus({ frequency: 1.2, delayTime: 4.0, depth: 0.35, wet: 0.5 });
-    this._padChorus.start();
+    // Chorus starts lazily when channel is unmuted (saves ~5% CPU per idle chorus)
 
     // (Removed: _padDetune2 — single pad layer + sub is enough, saves 3 FMSynth voices)
 
@@ -183,7 +175,7 @@ MUZE.Audio = {
 
     // ---- ARPEGGIO SYNTH: Filter envelope + stereo ping-pong ----
     this.leadSynth = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 8,
+      maxPolyphony: 4,
       oscillator: { type: 'fatsawtooth', count: 2, spread: 20 },
       envelope: { attack: 0.005, decay: 0.25, sustain: 0.15, release: 0.25 },
     });
@@ -200,7 +192,6 @@ MUZE.Audio = {
 
     // Chorus insert for arp (shimmer, controlled by head roll like pad)
     this._arpChorus = new Tone.Chorus({ frequency: 1.2, delayTime: 4.0, depth: 0.35, wet: 0.4 });
-    this._arpChorus.start();
 
     this.leadSynth.connect(this._arpFilter);
     this._arpFilter.connect(this._arpChorus);
@@ -208,13 +199,12 @@ MUZE.Audio = {
 
     // ---- ARPEGGIO 2 SYNTH ----
     this.leadSynth2 = new Tone.PolySynth(Tone.Synth, {
-      maxPolyphony: 6,
+      maxPolyphony: 3,
       oscillator: { type: 'triangle', count: 2, spread: 15 },
       envelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: 0.3 },
     });
     this._arp2Filter = new Tone.Filter({ frequency: 1800, type: 'lowpass', rolloff: -24, Q: 4 });
     this._arp2Chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.3, wet: 0.35 });
-    this._arp2Chorus.start();
     this.leadSynth2.connect(this._arp2Filter);
     this._arp2Filter.connect(this._arp2Chorus);
     this._createChannelStrip('arp2', this._arp2Chorus);
@@ -522,23 +512,22 @@ MUZE.Audio = {
   _sidechainDuck() {
     const now = Tone.now();
     // Duck pad to 10% with 5ms attack, 30ms hold, 300ms exponential release
+    // Simplified sidechain: single ramp per channel (was 3+ events each)
     const padNode = this._nodes.pad;
     if (padNode) {
-      const padGain = padNode.gain.gain.value;
-      padNode.gain.gain.cancelScheduledValues(now);
-      padNode.gain.gain.setValueAtTime(padGain, now);
-      padNode.gain.gain.linearRampToValueAtTime(padGain * 0.1, now + 0.005);   // 5ms attack
-      padNode.gain.gain.setValueAtTime(padGain * 0.1, now + 0.005 + 0.03);      // 30ms hold
-      padNode.gain.gain.exponentialRampToValueAtTime(padGain, now + 0.005 + 0.03 + 0.3); // 300ms exp release
+      const g = padNode.gain.gain;
+      const restore = g.value || Tone.dbToGain(MUZE.Mixer.channels.pad.volume);
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(restore * 0.15, now);
+      g.exponentialRampToValueAtTime(restore, now + 0.25);
     }
-    // Duck arp to 50% with 5ms attack, 250ms exponential release
     const arpNode = this._nodes.arp;
     if (arpNode) {
-      const arpGain = arpNode.gain.gain.value;
-      arpNode.gain.gain.cancelScheduledValues(now);
-      arpNode.gain.gain.setValueAtTime(arpGain, now);
-      arpNode.gain.gain.linearRampToValueAtTime(arpGain * 0.5, now + 0.005);   // 5ms attack
-      arpNode.gain.gain.exponentialRampToValueAtTime(arpGain, now + 0.005 + 0.25); // 250ms exp release
+      const g = arpNode.gain.gain;
+      const restore = g.value || Tone.dbToGain(MUZE.Mixer.channels.arp.volume);
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(restore * 0.5, now);
+      g.exponentialRampToValueAtTime(restore, now + 0.2);
     }
   },
 
@@ -631,15 +620,17 @@ MUZE.Audio = {
     const noteVal = MUZE.Config.ARP_NOTE_VALUES[MUZE.State[p.noteKey]] || '8n';
     const synth = this[p.synth];
     const filter = this[p.filter];
+    // Throttle filter envelope: only every 2nd note to halve automation overhead
+    let filterTick = 0;
     this[p.seq] = new Tone.Loop((time) => {
       const notes = this[p.notes];
       if (!notes.length || !synth) return;
       const note = notes[this[p.idx] % notes.length];
-      const accent = (this[p.idx] % 4 === 0) ? 0.75 : 0.4 + Math.random() * 0.15;
+      const accent = (this[p.idx] % 4 === 0) ? 0.7 : 0.4 + Math.random() * 0.1;
       synth.triggerAttackRelease(note, noteVal, time, accent);
-      if (filter) {
-        filter.frequency.setValueAtTime(6000, time);
-        filter.frequency.exponentialRampToValueAtTime(1200, time + 0.15);
+      if (filter && (filterTick++ & 1) === 0) {
+        filter.frequency.setValueAtTime(5000, time);
+        filter.frequency.exponentialRampToValueAtTime(1400, time + 0.12);
       }
       this[p.idx]++;
     }, noteVal);

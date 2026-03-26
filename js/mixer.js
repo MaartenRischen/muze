@@ -58,6 +58,9 @@ MUZE.Mixer = {
     }
   },
 
+  // Chorus map for lazy start/stop (saves ~5% CPU per idle chorus)
+  _chorusMap: { pad: '_padChorus', arp: '_arpChorus', arp2: '_arp2Chorus' },
+
   toggleMute(ch) {
     const data = this.channels[ch];
     data.mute = !data.mute;
@@ -69,6 +72,14 @@ MUZE.Mixer = {
       } else {
         node.gain.gain.rampTo(node._preMuteGain || Tone.dbToGain(data.volume), 0.02);
       }
+    }
+    // Lazy chorus: start only when audible, stop when muted
+    const chorusKey = this._chorusMap[ch];
+    if (chorusKey && MUZE.Audio[chorusKey]) {
+      try {
+        if (!data.mute) MUZE.Audio[chorusKey].start();
+        else MUZE.Audio[chorusKey].stop();
+      } catch (e) { /* already started/stopped */ }
     }
     this._updateSoloState();
     return data.mute;

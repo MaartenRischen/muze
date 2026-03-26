@@ -537,6 +537,22 @@ MUZE.PerformTab = {
       });
     }
 
+    // ---- Latency mode ----
+    const latencyBtn = document.getElementById('perf-latency-btn');
+    if (latencyBtn) {
+      const modes = ['low', 'balanced', 'safe'];
+      latencyBtn.addEventListener('click', () => {
+        const cur = modes.indexOf(MUZE.State.latencyMode || 'balanced');
+        const next = modes[(cur + 1) % modes.length];
+        MUZE.State.latencyMode = next;
+        latencyBtn.textContent = next;
+        // Apply immediately where possible
+        if (Tone.context) {
+          Tone.context.lookAhead = next === 'safe' ? 0.2 : next === 'low' ? 0.05 : 0.1;
+        }
+      });
+    }
+
     // ---- Scene slots in Perform tab ----
     document.querySelectorAll('.scene-slot-panel').forEach(btn => {
       btn.addEventListener('click', () => {

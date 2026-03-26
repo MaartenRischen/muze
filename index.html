@@ -10,8 +10,8 @@
 <meta name="description" content="Your body is the instrument. Create music with gestures.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
 <title>Jammerman</title>
-<link rel="stylesheet" href="css/style.css?v=1774519606">
-<link rel="stylesheet" href="css/mixer.css?v=1774519606">
+<link rel="stylesheet" href="css/style.css?v=1774521208">
+<link rel="stylesheet" href="css/mixer.css?v=1774521208">
 <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
 </head>
 <body>
@@ -215,6 +215,8 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
     <div class="synth-row"><label>scale</label><button class="synth-select" id="perf-scale-btn" style="text-align:center">Modal (face)</button></div>
     <h3>Chords</h3>
     <div class="synth-row"><label>auto</label><button class="synth-select" id="perf-chords-btn" style="text-align:center">OFF</button></div>
+    <h3>Audio</h3>
+    <div class="synth-row"><label>latency</label><button class="synth-select" id="perf-latency-btn" style="text-align:center">balanced</button></div>
     <h3>Scenes</h3>
     <div style="display:flex;gap:6px;margin:8px 0">
       <button class="synth-select scene-slot-panel" data-scene="0" style="flex:1;text-align:center">1</button>
@@ -357,19 +359,19 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
 </script>
 
 <!-- JS Modules -->
-<script src="js/config.js?v=1774519606"></script>
-<script src="js/tracking.js?v=1774519606"></script>
-<script src="js/bgblur.js?v=1774519606"></script><!-- DO NOT REMOVE -->
-<script src="js/music.js?v=1774519606"></script>
-<script src="js/mixer.js?v=1774519606"></script>
-<script src="js/audio-engine.js?v=1774519606"></script>
-<script src="js/visualizer.js?v=1774519606"></script>
-<script src="js/moodlight.js?v=1774519606"></script>
-<script src="js/drumfx.js?v=1774519606"></script>
-<script src="js/storage.js?v=1774519606"></script>
-<script src="js/ui.js?v=1774519606"></script>
-<script src="js/features.js?v=1774519606"></script>
-<script src="js/app.js?v=1774519606"></script>
+<script src="js/config.js?v=1774521208"></script>
+<script src="js/tracking.js?v=1774521208"></script>
+<script src="js/bgblur.js?v=1774521208"></script><!-- DO NOT REMOVE -->
+<script src="js/music.js?v=1774521208"></script>
+<script src="js/mixer.js?v=1774521208"></script>
+<script src="js/audio-engine.js?v=1774521208"></script>
+<script src="js/visualizer.js?v=1774521208"></script>
+<script src="js/moodlight.js?v=1774521208"></script>
+<script src="js/drumfx.js?v=1774521208"></script>
+<script src="js/storage.js?v=1774521208"></script>
+<script src="js/ui.js?v=1774521208"></script>
+<script src="js/features.js?v=1774521208"></script>
+<script src="js/app.js?v=1774521208"></script>
 
 <!-- Bootstrap (ES module for MediaPipe import) -->
 <script type="module">
