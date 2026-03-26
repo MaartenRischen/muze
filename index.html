@@ -309,11 +309,12 @@
 <!-- Start screen letter animation JS (minimal, GPU-composited) -->
 <script>
 (function() {
-  // Activate shimmer gradient after staggered letter entrance completes (~1.9s)
+  // Activate shimmer gradient after ALL letters land
+  // 9 letters × 0.3s stagger + 0.3s base + 0.7s animation = ~4s total
   setTimeout(function() {
     var title = document.getElementById('ss-title');
     if (title) title.classList.add('shimmer-active');
-  }, 1900);
+  }, 4200);
   // Activate button glow ring after button entrance (~3.2s)
   setTimeout(function() {
     var btn = document.getElementById('start-btn');
@@ -328,7 +329,7 @@
 <script src="js/bgblur.js?v=1774498190"></script><!-- DO NOT REMOVE -->
 <script src="js/music.js?v=1774498190"></script>
 <script src="js/mixer.js?v=1774498190"></script>
-<script src="js/audio.js?v=1774498190"></script>
+<script src="js/audio-engine.js"></script>
 <script src="js/visualizer.js?v=1774498190"></script>
 <script src="js/moodlight.js?v=1774498190"></script>
 <script src="js/drumfx.js?v=1774498190"></script>
