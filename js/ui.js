@@ -26,12 +26,25 @@ MUZE.InstrumentToggles = {
     this._padActive = !this._padActive;
     document.getElementById('toggle-pad').classList.toggle('active', this._padActive);
     MUZE.Mixer.toggleMute('pad');
+    // Trigger default chord so pad sounds even without face detection
+    if (this._padActive && MUZE.Audio.triggerPad) {
+      const root = MUZE.Music.getEffectiveRoot ? MUZE.Music.getEffectiveRoot() : 60;
+      const scale = MUZE.State.currentScale || MUZE.Config.SCALE_DORIAN;
+      const degree = MUZE.Config.CHORD_DEGREES[MUZE.State.chordIndex || 0];
+      const notes = MUZE.Music.getPadVoicing(root, scale, degree);
+      MUZE.Audio.triggerPad(notes);
+    }
   },
 
   _toggleArp() {
     this._arpActive = !this._arpActive;
     document.getElementById('toggle-arp').classList.toggle('active', this._arpActive);
     if (this._arpActive) {
+      // Seed with default notes so arp plays even without face detection
+      if (!MUZE.Audio._arpNotes || MUZE.Audio._arpNotes.length === 0) {
+        const root = MUZE.Music.getEffectiveRoot ? MUZE.Music.getEffectiveRoot() : 60;
+        MUZE.Audio.updateArpNotes(MUZE.State.currentScale || MUZE.Config.SCALE_DORIAN, root);
+      }
       if (!MUZE.Audio._arpSeq) MUZE.Audio.startArpeggio();
     } else {
       MUZE.Audio.stopArpeggio();
