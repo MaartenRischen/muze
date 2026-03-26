@@ -39,6 +39,7 @@ MUZE.InstrumentToggles = {
   _toggleArp() {
     this._arpActive = !this._arpActive;
     document.getElementById('toggle-arp').classList.toggle('active', this._arpActive);
+    MUZE.Mixer.toggleMute('arp');
     if (this._arpActive) {
       // Seed with default notes so arp plays even without face detection
       if (!MUZE.Audio._arpNotes || MUZE.Audio._arpNotes.length === 0) {

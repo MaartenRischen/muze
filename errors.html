@@ -1,15 +1,21 @@
 <!DOCTYPE html>
-<html><head><title>Jammerman Error Log</title>
+<html><head><title>Muze Error Log</title>
 <style>
 body{background:#0a0a0a;color:#f44;font:12px/1.6 monospace;padding:16px;margin:0}
 h1{color:#fff;font-size:16px;margin:0 0 12px}
 .entry{border-bottom:1px solid #222;padding:4px 0}
 .time{color:#888}
-.clear{color:#666;cursor:pointer;float:right}
+.btn{color:#666;cursor:pointer;margin-left:12px}
+.btn:hover{color:#fff}
 #log{white-space:pre-wrap}
+#copied{color:#4ade80;display:none;margin-left:8px;font-size:12px}
 </style></head>
 <body>
-<h1>Jammerman Error Log <span class="clear" onclick="localStorage.removeItem('_muzeErrors');location.reload()">[clear]</span></h1>
+<h1>Muze Error Log
+  <span class="btn" onclick="copyAll()">[copy all]</span>
+  <span class="btn" onclick="localStorage.removeItem('_muzeErrors');location.reload()">[clear]</span>
+  <span id="copied">Copied!</span>
+</h1>
 <div id="log">Loading...</div>
 <script>
 function load(){
@@ -21,6 +27,19 @@ function load(){
       return '<div class="entry"><span class="time">'+d.toLocaleTimeString()+'</span> '+e.m+'</div>';
     }).join('');
   }catch(ex){document.getElementById('log').textContent='Could not parse: '+ex.message;}
+}
+function copyAll(){
+  try{
+    var errs=JSON.parse(localStorage.getItem('_muzeErrors')||'[]');
+    var txt=errs.map(function(e){
+      return new Date(e.t).toISOString()+' '+e.m;
+    }).join('\n');
+    navigator.clipboard.writeText(txt||'No errors.').then(function(){
+      var el=document.getElementById('copied');
+      el.style.display='inline';
+      setTimeout(function(){el.style.display='none';},1500);
+    });
+  }catch(ex){alert('Copy failed: '+ex.message);}
 }
 load();
 setInterval(load,2000);
