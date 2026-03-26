@@ -380,6 +380,120 @@ MUZE.SynthMenu = {
     this._bind('pad-rel', (v) => {
       MUZE.Audio.padSynth.set({ envelope: { release: +v } });
     });
+
+    // ---- Drum Step Sequencer ----
+    this._initDrumGrid();
+  },
+
+  _initDrumGrid() {
+    const grid = document.getElementById('drum-grid');
+    if (!grid) return;
+
+    // Generate 16 step cells per row
+    grid.querySelectorAll('.drum-row').forEach(row => {
+      const inst = row.dataset.inst;
+      const container = row.querySelector('.drum-steps');
+      for (let s = 0; s < 16; s++) {
+        const cell = document.createElement('div');
+        cell.className = 'drum-step';
+        cell.dataset.step = s;
+        cell.dataset.inst = inst;
+
+        // Tap to toggle (cycles off → loud → soft → off)
+        cell.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          // Switch to custom mode on first edit
+          if (!MUZE.AutoRhythm._useCustom) {
+            MUZE.AutoRhythm._useCustom = true;
+            const srcBtn = document.getElementById('drum-source-btn');
+            if (srcBtn) srcBtn.textContent = 'custom';
+          }
+          MUZE.AutoRhythm.toggleStep(inst, s);
+          this._updateDrumGridUI();
+          // Preview the hit
+          const vel = MUZE.AutoRhythm._userPattern[inst][s];
+          if (vel > 0) MUZE.Audio.triggerDrum(inst, vel, inst === 'hat' && s % 8 === 6);
+        });
+
+        container.appendChild(cell);
+      }
+    });
+
+    // Source toggle: preset / custom
+    const sourceBtn = document.getElementById('drum-source-btn');
+    if (sourceBtn) {
+      sourceBtn.addEventListener('click', () => {
+        MUZE.AutoRhythm._useCustom = !MUZE.AutoRhythm._useCustom;
+        sourceBtn.textContent = MUZE.AutoRhythm._useCustom ? 'custom' : 'preset';
+        MUZE.AutoRhythm._restart();
+      });
+    }
+
+    // Preset cycle button
+    const presetBtn = document.getElementById('drum-preset-btn');
+    if (presetBtn) {
+      presetBtn.addEventListener('click', () => {
+        MUZE.AutoRhythm.nextPattern();
+        presetBtn.textContent = MUZE.AutoRhythm.getPatternName();
+      });
+    }
+
+    // Clear button
+    const clearBtn = document.getElementById('drum-clear-btn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        MUZE.AutoRhythm.clearPattern();
+        this._updateDrumGridUI();
+      });
+    }
+
+    // Copy preset to custom
+    const copyBtn = document.getElementById('drum-copy-preset-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        MUZE.AutoRhythm.loadPresetToCustom();
+        MUZE.AutoRhythm._useCustom = true;
+        const srcBtn = document.getElementById('drum-source-btn');
+        if (srcBtn) srcBtn.textContent = 'custom';
+        this._updateDrumGridUI();
+        MUZE.AutoRhythm._restart();
+      });
+    }
+
+    // Update grid highlight on animation frame
+    this._drumGridRAF();
+  },
+
+  _updateDrumGridUI() {
+    const grid = document.getElementById('drum-grid');
+    if (!grid) return;
+    grid.querySelectorAll('.drum-step').forEach(cell => {
+      const inst = cell.dataset.inst;
+      const step = parseInt(cell.dataset.step);
+      const vel = MUZE.AutoRhythm._userPattern[inst][step];
+      cell.classList.toggle('on', vel > 0);
+      cell.classList.toggle('vel-hi', vel >= 0.6);
+      cell.classList.toggle('vel-lo', vel > 0 && vel < 0.6);
+    });
+  },
+
+  _drumGridRAF() {
+    let lastStep = -1;
+    const update = () => {
+      const step = MUZE.AutoRhythm._currentStep;
+      if (step !== lastStep) {
+        const grid = document.getElementById('drum-grid');
+        if (grid) {
+          grid.querySelectorAll('.drum-step.playing').forEach(el => el.classList.remove('playing'));
+          if (step >= 0 && MUZE.AutoRhythm._active) {
+            grid.querySelectorAll(`.drum-step[data-step="${step}"]`).forEach(el => el.classList.add('playing'));
+          }
+        }
+        lastStep = step;
+      }
+      requestAnimationFrame(update);
+    };
+    requestAnimationFrame(update);
   },
 
   _bind(id, fn, isSelect) {

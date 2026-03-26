@@ -1420,6 +1420,58 @@ html, body {
   animation: tab-fade-in 0.2s ease-out;
 }
 .synth-tab-content.active { display: block; }
+
+/* Drum step sequencer grid */
+#drum-grid {
+  margin: 10px 0 4px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.drum-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 3px;
+}
+.drum-label {
+  font: 700 8px/1 var(--font-ui, sans-serif);
+  color: rgba(255,255,255,0.4);
+  width: 22px;
+  text-align: right;
+  margin-right: 4px;
+  letter-spacing: 1px;
+}
+.drum-steps {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+}
+.drum-step {
+  flex: 1;
+  aspect-ratio: 1;
+  max-width: 18px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+  position: relative;
+}
+.drum-step.on {
+  border-color: rgba(255,255,255,0.2);
+}
+.drum-step.on.vel-hi { background: rgba(248,113,113,0.7); }
+.drum-step.on.vel-lo { background: rgba(248,113,113,0.35); }
+.drum-step.playing {
+  box-shadow: 0 0 6px rgba(255,255,255,0.4);
+  border-color: rgba(255,255,255,0.5);
+}
+.drum-step:nth-child(4n+1) {
+  margin-left: 3px;
+}
+.drum-step:first-child {
+  margin-left: 0;
+}
 @keyframes tab-fade-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }

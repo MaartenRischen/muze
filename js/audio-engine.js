@@ -944,25 +944,78 @@ MUZE.MicRecorder = {
 // ============================================================
 MUZE.AutoRhythm = {
   _seq: null, _active: false, _patIdx: 0,
+  _currentStep: -1,  // for UI highlight
+
+  // User-editable step sequencer pattern (velocity per step, 0 = off)
+  _userPattern: {
+    kick:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    snare: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    hat:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+  },
+  _useCustom: false,  // false = preset patterns, true = user sequencer
+
   start() {
     if (this._seq) this._seq.dispose();
     this._active = true;
     this._seq = new Tone.Sequence((t, s) => {
-      const p = MUZE.Config.RHYTHM_PATTERNS[this._patIdx];
-      if (p.kick[s]) MUZE.Audio.triggerDrum('kick', 0.7);
-      if (p.snare[s]) MUZE.Audio.triggerDrum('snare', 0.6);
-      if (p.hat[s]) {
-        // Every 4th hat hit has a chance to be open hat (adds variation)
-        const isOpen = (s % 8 === 6);
-        MUZE.Audio.triggerDrum('hat', 0.4, isOpen);
+      this._currentStep = s;
+      if (this._useCustom) {
+        const u = this._userPattern;
+        if (u.kick[s] > 0) MUZE.Audio.triggerDrum('kick', u.kick[s]);
+        if (u.snare[s] > 0) MUZE.Audio.triggerDrum('snare', u.snare[s]);
+        if (u.hat[s] > 0) MUZE.Audio.triggerDrum('hat', u.hat[s], s % 8 === 6);
+      } else {
+        const p = MUZE.Config.RHYTHM_PATTERNS[this._patIdx];
+        if (p.kick[s]) MUZE.Audio.triggerDrum('kick', 0.7);
+        if (p.snare[s]) MUZE.Audio.triggerDrum('snare', 0.6);
+        if (p.hat[s]) MUZE.Audio.triggerDrum('hat', 0.4, s % 8 === 6);
       }
     }, [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15], '16n');
     this._seq.start(0);
   },
-  stop() { this._active = false; if (this._seq) { this._seq.stop(); this._seq.dispose(); this._seq = null; } },
+
+  stop() {
+    this._active = false;
+    this._currentStep = -1;
+    if (this._seq) { this._seq.stop(); this._seq.dispose(); this._seq = null; }
+  },
+
   toggle() { if (this._active) this.stop(); else this.start(); return this._active; },
-  nextPattern() { this._patIdx = (this._patIdx + 1) % MUZE.Config.RHYTHM_PATTERNS.length; },
-  prevPattern() { this._patIdx = (this._patIdx - 1 + MUZE.Config.RHYTHM_PATTERNS.length) % MUZE.Config.RHYTHM_PATTERNS.length; },
+
+  // Restart if running (to pick up pattern changes)
+  _restart() { if (this._active) { this.stop(); this.start(); } },
+
+  nextPattern() { this._patIdx = (this._patIdx + 1) % MUZE.Config.RHYTHM_PATTERNS.length; this._restart(); },
+  prevPattern() { this._patIdx = (this._patIdx - 1 + MUZE.Config.RHYTHM_PATTERNS.length) % MUZE.Config.RHYTHM_PATTERNS.length; this._restart(); },
   isActive() { return this._active; },
-  getPatternName() { return MUZE.Config.RHYTHM_PATTERNS[this._patIdx].name; }
+  getPatternName() { return this._useCustom ? 'Custom' : MUZE.Config.RHYTHM_PATTERNS[this._patIdx].name; },
+
+  // Load a preset into the user pattern for editing
+  loadPresetToCustom(idx) {
+    const p = MUZE.Config.RHYTHM_PATTERNS[idx || this._patIdx];
+    this._userPattern.kick  = p.kick.map(v => v ? 0.7 : 0);
+    this._userPattern.snare = p.snare.map(v => v ? 0.6 : 0);
+    this._userPattern.hat   = p.hat.map(v => v ? 0.4 : 0);
+  },
+
+  // Toggle a step (cycles: off → 0.7 → 0.4 → off for velocity control)
+  toggleStep(inst, step) {
+    const arr = this._userPattern[inst];
+    if (!arr) return;
+    if (arr[step] === 0) arr[step] = 0.7;
+    else if (arr[step] >= 0.6) arr[step] = 0.4;
+    else arr[step] = 0;
+  },
+
+  // Set velocity directly
+  setStepVelocity(inst, step, vel) {
+    if (this._userPattern[inst]) this._userPattern[inst][step] = vel;
+  },
+
+  // Clear all steps
+  clearPattern() {
+    for (const inst of ['kick', 'snare', 'hat']) {
+      this._userPattern[inst] = [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0];
+    }
+  }
 };
