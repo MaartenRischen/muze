@@ -170,7 +170,9 @@ MUZE.DrumFX = (() => {
       const t = elapsed / RIPPLE_DURATION;
 
       if (t >= 1) {
-        _ripples.splice(i, 1);
+        // PERF: swap-and-pop O(1) removal
+        _ripples[i] = _ripples[_ripples.length - 1];
+        _ripples.pop();
         continue;
       }
 
@@ -237,7 +239,9 @@ MUZE.DrumFX = (() => {
       const t = elapsed / PARTICLE_LIFE;
 
       if (t >= 1) {
-        _particles.splice(i, 1);
+        // PERF: swap-and-pop O(1) removal
+        _particles[i] = _particles[_particles.length - 1];
+        _particles.pop();
         continue;
       }
 

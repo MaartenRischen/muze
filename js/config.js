@@ -11,7 +11,7 @@ MUZE.Config = Object.freeze({
   SMOOTH_FAST: 0.35, SMOOTH_SLOW: 0.15, SMOOTH_HAND: 0.30,
 
   MOUTH_OPEN_MIN: 0.015, MOUTH_OPEN_MAX: 0.09,
-  LIP_SMILE_MIN: -0.025, LIP_SMILE_MAX: 0.025,
+  LIP_SMILE_MIN: -0.045, LIP_SMILE_MAX: 0.045,
   BROW_MIN: 0.100, BROW_MAX: 0.143,
   EYE_OPEN_MIN: 0.012, EYE_OPEN_MAX: 0.055,
   MOUTH_WIDTH_MIN: 0.28, MOUTH_WIDTH_MAX: 0.38,
@@ -217,7 +217,7 @@ MUZE.State = {
   extraScaleMode: null,   // null = face-controlled modal, or string name of extra scale
 };
 
-// ---- Smoothing Filter ----
+// ---- Smoothing Filter (legacy, kept for reference) ----
 MUZE.Smooth = {
   _prev: {},
   update(key, raw, alpha) {
@@ -226,4 +226,32 @@ MUZE.Smooth = {
     this._prev[key] = s; return s;
   },
   reset() { this._prev = {}; }
+};
+
+// ---- 1-Euro Filter (adaptive smoothing: low jitter when still, low lag when fast) ----
+MUZE.OneEuroFilter = function(freq, minCutoff, beta, dCutoff) {
+  this.freq = freq || 60;
+  this.minCutoff = minCutoff || 1.0;
+  this.beta = beta || 0.0;
+  this.dCutoff = dCutoff || 1.0;
+  this.x = null;
+  this.dx = 0;
+  this.lastTime = null;
+};
+MUZE.OneEuroFilter.prototype.filter = function(x, timestamp) {
+  if (this.x === null) { this.x = x; this.lastTime = timestamp; return x; }
+  var dt = (timestamp - this.lastTime) / 1000;
+  if (dt <= 0) dt = 1 / this.freq;
+  this.lastTime = timestamp;
+  var dx = (x - this.x) / dt;
+  var edx = this._alpha(dt, this.dCutoff) * dx + (1 - this._alpha(dt, this.dCutoff)) * this.dx;
+  this.dx = edx;
+  var cutoff = this.minCutoff + this.beta * Math.abs(edx);
+  var ex = this._alpha(dt, cutoff) * x + (1 - this._alpha(dt, cutoff)) * this.x;
+  this.x = ex;
+  return ex;
+};
+MUZE.OneEuroFilter.prototype._alpha = function(dt, cutoff) {
+  var tau = 1.0 / (2 * Math.PI * cutoff);
+  return 1.0 / (1.0 + tau / dt);
 };

@@ -131,8 +131,8 @@ MUZE.Audio = {
     // ============================================================
     // (Removed: reverb modulation chorus — unnecessary CPU for barely audible effect)
 
-    // Reverb HF damping: cut harsh high frequencies from reverb tail
-    this._reverbDamping = new Tone.EQ3({ low: 0, mid: 0, high: -6 }).connect(this._masterSaturation);
+    // Reverb HF damping: single lowpass filter (replaces EQ3, saves ~4 BiquadFilter nodes)
+    this._reverbDamping = new Tone.Filter({ frequency: 6000, type: 'lowpass', rolloff: -6 }).connect(this._masterSaturation);
 
     this._reverbBus = new Tone.Reverb({ decay: 3.2, preDelay: 0.035 }).connect(this._reverbDamping);
     await this._reverbBus.ready;
@@ -343,34 +343,67 @@ MUZE.Audio = {
 
   // ============================================================
   // REAL-TIME PARAMETER UPDATES (face-driven)
+  // Dead-zone: only schedule rampTo when value changes by >0.5%
   // ============================================================
+  _lastFilterFreq: 2000,
+  _lastFilterGain: 1,
+  _lastChorusDepth: 0,
+  _lastArpFilterFreq: 800,
+  _lastSendValues: {},
+
   updateParams(state) {
     const C = MUZE.Config;
 
     // Master filter: head pitch
     const pitchN = 1 - Math.max(0, Math.min(1, (state.headPitch + 0.4) / 0.8));
     const filterFreq = C.FILTER_FREQ_MIN * Math.pow(C.FILTER_FREQ_MAX / C.FILTER_FREQ_MIN, pitchN);
-    this._masterFilter.frequency.rampTo(filterFreq, 0.08);
-    this._masterFilterGain.gain.rampTo(1 + (1 - pitchN) * 0.35, 0.08);
+    if (Math.abs(filterFreq - this._lastFilterFreq) / this._lastFilterFreq > 0.005) {
+      this._masterFilter.frequency.rampTo(filterFreq, 0.08);
+      this._lastFilterFreq = filterFreq;
+    }
+    const filterGainVal = 1 + (1 - pitchN) * 0.35;
+    if (Math.abs(filterGainVal - this._lastFilterGain) / this._lastFilterGain > 0.005) {
+      this._masterFilterGain.gain.rampTo(filterGainVal, 0.08);
+      this._lastFilterGain = filterGainVal;
+    }
 
     // Reverb/delay sends: eye openness scales face-linked channels
     for (const ch of MUZE.Mixer.CHANNEL_ORDER) {
       const data = MUZE.Mixer.channels[ch];
       const node = this._nodes[ch];
       if (!node || !data.faceLinked) continue;
-      node.reverbSend.gain.rampTo(state.eyeOpenness * data.reverbSend, 0.1);
-      node.delaySend.gain.rampTo(state.eyeOpenness * data.delaySend, 0.1);
+      const reverbTarget = state.eyeOpenness * data.reverbSend;
+      const delayTarget = state.eyeOpenness * data.delaySend;
+      const key = ch;
+      if (!this._lastSendValues[key]) this._lastSendValues[key] = { reverb: 0, delay: 0 };
+      const lastReverb = this._lastSendValues[key].reverb;
+      const lastDelay = this._lastSendValues[key].delay;
+      if (lastReverb === 0 || Math.abs(reverbTarget - lastReverb) / (lastReverb || 0.001) > 0.005) {
+        node.reverbSend.gain.rampTo(reverbTarget, 0.1);
+        this._lastSendValues[key].reverb = reverbTarget;
+      }
+      if (lastDelay === 0 || Math.abs(delayTarget - lastDelay) / (lastDelay || 0.001) > 0.005) {
+        node.delaySend.gain.rampTo(delayTarget, 0.1);
+        this._lastSendValues[key].delay = delayTarget;
+      }
     }
 
     // Chorus: head roll (pad insert only)
     const rollN = Math.min(1, Math.abs(state.headRoll) / 0.35);
-    this._padChorus.depth = C.CHORUS_DEPTH_MIN + rollN * (C.CHORUS_DEPTH_MAX - C.CHORUS_DEPTH_MIN);
+    const chorusDepth = C.CHORUS_DEPTH_MIN + rollN * (C.CHORUS_DEPTH_MAX - C.CHORUS_DEPTH_MIN);
+    if (Math.abs(chorusDepth - this._lastChorusDepth) / (this._lastChorusDepth || 0.001) > 0.005) {
+      this._padChorus.depth = chorusDepth;
+      this._lastChorusDepth = chorusDepth;
+    }
 
     // Arp filter envelope simulation: mouth openness opens the filter
     if (this._arpFilter) {
       const mouthN = Math.max(0, Math.min(1, state.mouthOpenness));
       const arpFilterFreq = 800 + mouthN * 6000;
-      this._arpFilter.frequency.rampTo(arpFilterFreq, 0.08);
+      if (Math.abs(arpFilterFreq - this._lastArpFilterFreq) / this._lastArpFilterFreq > 0.005) {
+        this._arpFilter.frequency.rampTo(arpFilterFreq, 0.08);
+        this._lastArpFilterFreq = arpFilterFreq;
+      }
     }
 
     // Mode color update
@@ -489,6 +522,9 @@ MUZE.Audio = {
 
   // ============================================================
   // RISER (hold -> build -> drop)
+  // NOTE: The pause handler in index.html MUST call cancelRiser() when pausing
+  // during an active riser, otherwise ducked volumes stay ducked forever.
+  // Add to pause handler: if (MUZE.State.riserActive) { MUZE.Audio.cancelRiser(); ... }
   // ============================================================
   _preRiserGains: {},
 
@@ -509,7 +545,8 @@ MUZE.Audio = {
   dropRiser() {
     this._riserGain.gain.rampTo(0, 0.05);
     this._riserFilter.frequency.rampTo(200, 0.1);
-    setTimeout(() => { try { this.riserSynth.stop(); } catch(e) {} }, 200);
+    // Transport-scheduled stop prevents timing drift in background tabs
+    Tone.Transport.scheduleOnce(() => { try { this.riserSynth.stop(); } catch(e) {} }, '+0.2');
     // Big kick hit
     this.kickSynth.triggerAttackRelease('C1', '4n', Tone.now(), 1);
     this._kickClick.triggerAttackRelease('32n', Tone.now(), 0.8);
@@ -520,13 +557,14 @@ MUZE.Audio = {
       node._reverbSendPre = node.reverbSend.gain.value;
       node.reverbSend.gain.rampTo(0.9, 0.05);
     }
-    setTimeout(() => {
+    // Transport-scheduled reverb wash recovery
+    Tone.Transport.scheduleOnce(() => {
       for (const ch of MUZE.Mixer.CHANNEL_ORDER) {
         const node = this._nodes[ch];
         if (!node || node._reverbSendPre === undefined) continue;
         node.reverbSend.gain.rampTo(node._reverbSendPre, 2);
       }
-    }, 300);
+    }, '+0.3');
     // Restore ducked volumes (fallback to mixer defaults if _preRiserGains is empty)
     for (const ch of ['pad', 'kick', 'snare', 'hat']) {
       const node = this._nodes[ch];
@@ -542,7 +580,8 @@ MUZE.Audio = {
   cancelRiser() {
     this._riserGain.gain.rampTo(0, 0.3);
     this._riserFilter.frequency.rampTo(200, 0.3);
-    setTimeout(() => { try { this.riserSynth.stop(); } catch(e) {} }, 400);
+    // Transport-scheduled stop prevents timing drift in background tabs
+    Tone.Transport.scheduleOnce(() => { try { this.riserSynth.stop(); } catch(e) {} }, '+0.5');
     for (const ch of ['pad', 'kick', 'snare', 'hat']) {
       const node = this._nodes[ch];
       if (!node) continue;
@@ -666,13 +705,14 @@ MUZE.Audio = {
       node._reverbSendPre = node.reverbSend.gain.value;
       node.reverbSend.gain.rampTo(0.9, 0.05);
     }
-    setTimeout(() => {
+    // Transport-scheduled recovery prevents timing drift in background tabs
+    Tone.Transport.scheduleOnce(() => {
       for (const ch of MUZE.Mixer.CHANNEL_ORDER) {
         const node = this._nodes[ch];
         if (!node || node._reverbSendPre === undefined) continue;
         node.reverbSend.gain.rampTo(node._reverbSendPre, 1.5);
       }
-    }, 200);
+    }, '+0.2');
   },
 
   tapeStop() {
@@ -681,7 +721,8 @@ MUZE.Audio = {
     [this.padSynth, this._padSub, this.leadSynth, this.melodySynth].forEach(s => {
       if (s) { s.set({ detune: 0 }); s.set({ detune: -2400 }); }
     });
-    setTimeout(() => {
+    // Transport-scheduled recovery prevents timing drift in background tabs
+    Tone.Transport.scheduleOnce(() => {
       Tone.Transport.bpm.rampTo(orig, 0.15);
       [this.padSynth, this._padSub, this.leadSynth, this.melodySynth].forEach(s => {
         if (s) s.set({ detune: 0 });
@@ -689,7 +730,7 @@ MUZE.Audio = {
       // Restore pad detuning
       this.padSynth.set({ detune: 5 });
       this._padSub.set({ detune: 0 });
-    }, 500);
+    }, '+0.5');
   },
 
   // ============================================================
@@ -830,7 +871,8 @@ MUZE.Audio = {
     this.padSynth.volume.rampTo(-14, 0.3);
     this._padSub.volume.rampTo(-14, 0.3);
     this._padGrain.volume.rampTo(-60, 0.3);
-    setTimeout(() => { try { this._padGrain.stop(); } catch(e) {} }, 400);
+    // Transport-scheduled stop prevents timing drift in background tabs
+    Tone.Transport.scheduleOnce(() => { try { this._padGrain.stop(); } catch(e) {} }, '+0.4');
   },
 
   // ============================================================

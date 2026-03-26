@@ -62,10 +62,11 @@
   <div id="mode-hud"></div>
 </div>
 
-<!-- Toolbar (minimal: 4 buttons) -->
+<!-- Toolbar (minimal: 5 buttons) -->
 <div class="toolbar">
   <button class="toolbar-btn" id="pause-btn" aria-label="Pause">&#9208;</button>
   <button class="toolbar-btn" id="rec-btn" aria-label="Record">&#9679;</button>
+  <button class="toolbar-btn" id="toolbar-mixer-btn" aria-label="Mixer" style="font-size:10px;font-weight:600;letter-spacing:0.5px;font-family:var(--font-ui)">MIX</button>
   <button class="toolbar-btn" id="help-btn" aria-label="Help" style="font-weight:bold">?</button>
   <button class="toolbar-btn" id="synth-menu-btn" aria-label="Settings">&#9881;</button>
 </div>
@@ -374,6 +375,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     MUZE.BeatRepeat.init();
     MUZE.ChordAdvance.init();
     MUZE.MoodLight.init();
+    MUZE.Hints.init();
 
     // Restore saved settings
     MUZE.Storage.load();
@@ -389,6 +391,11 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     // Pause button
     const pauseBtn = document.getElementById('pause-btn');
     pauseBtn.addEventListener('click', () => {
+      if (MUZE.State.riserActive) {
+        MUZE.Audio.cancelRiser();
+        MUZE.State.riserActive = false;
+        document.getElementById('riser-overlay')?.classList.remove('active');
+      }
       if (MUZE.Loop._running) {
         MUZE.Loop._running = false;
         MUZE.Audio.releasePad();

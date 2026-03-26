@@ -5,7 +5,7 @@
 # ============================================================
 
 DESKTOP="$HOME/Desktop"
-WORKING="$DESKTOP/Muze-working"
+WORKING="$DESKTOP/Muze-sprint"
 SOURCE="$HOME/code/Muze"
 MISSION="$SOURCE/muze-mission.md"
 LOGFILE="$DESKTOP/muze-session-log.txt"

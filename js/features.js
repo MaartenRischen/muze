@@ -18,6 +18,8 @@ MUZE.LoopRecorder = {
   _progressRAF: null,
   _currentNote: null,
   _noteStartTime: 0,
+  _barCount: 4,     // variable loop length: 1, 2, 4, or 8 bars
+  _barOptions: [1, 2, 4, 8],
 
   init() {
     const ids = ['loop-rec-panel-btn', 'loop-overdub-panel-btn', 'loop-undo-panel-btn', 'loop-clear-panel-btn',
@@ -29,10 +31,40 @@ MUZE.LoopRecorder = {
       if (el1) el1.addEventListener('click', fns[i]);
       if (el2) el2.addEventListener('click', fns[i]);
     }
+
+    // Wire up bar-count cycle button if present
+    const barBtn = document.getElementById('loop-bar-count-btn') || document.getElementById('loop-bar-count');
+    if (barBtn) {
+      barBtn.addEventListener('click', () => this.cycleBarCount());
+      barBtn.textContent = this._barCount + ' BAR' + (this._barCount > 1 ? 'S' : '');
+    }
   },
 
   _getLoopMs() {
-    return (60000 / Tone.Transport.bpm.value) * 4 * 4; // 4 bars
+    return (60000 / Tone.Transport.bpm.value) * 4 * this._barCount; // beats-per-bar * barCount
+  },
+
+  // Cycle loop length through 1, 2, 4, 8 bars
+  cycleBarCount() {
+    if (this._state !== 'empty') return this._barCount; // only change when idle
+    const idx = this._barOptions.indexOf(this._barCount);
+    this._barCount = this._barOptions[(idx + 1) % this._barOptions.length];
+    // Update UI if a display element exists
+    const el = document.getElementById('loop-bar-count');
+    if (el) el.textContent = this._barCount + ' BAR' + (this._barCount > 1 ? 'S' : '');
+    return this._barCount;
+  },
+
+  getBarCount() {
+    return this._barCount;
+  },
+
+  setBarCount(bars) {
+    if (!this._barOptions.includes(bars)) return;
+    if (this._state !== 'empty') return; // only change when idle
+    this._barCount = bars;
+    const el = document.getElementById('loop-bar-count');
+    if (el) el.textContent = this._barCount + ' BAR' + (this._barCount > 1 ? 'S' : '');
   },
 
   // Called from app.js main loop when hand melody note changes during recording
@@ -295,6 +327,11 @@ MUZE.SceneManager = {
       melOsc: document.getElementById('mel-osc')?.value || 'triangle',
       // Master
       masterVolume: M.master.volume,
+      // Extended preset parameters
+      arpRate: MUZE.State.arpRate || '8n',
+      padChorusDepth: MUZE.State.padChorusDepth !== undefined ? MUZE.State.padChorusDepth : 0.3,
+      delayTime: MUZE.State.delayTime || '8n.',
+      reverbDecay: MUZE.State.reverbDecay !== undefined ? MUZE.State.reverbDecay : 2.5,
     };
   },
 
@@ -412,6 +449,33 @@ MUZE.SceneManager = {
         if (acBtn) acBtn.classList.remove('active');
         const acVal = document.getElementById('auto-chord-val');
         if (acVal) acVal.textContent = 'OFF';
+      }
+    }
+
+    // Extended preset parameters
+    if (scene.arpRate) {
+      MUZE.State.arpRate = scene.arpRate;
+      if (MUZE.Audio._arpSeq) MUZE.Audio._arpSeq.interval = scene.arpRate;
+    }
+    if (scene.padChorusDepth !== undefined) {
+      MUZE.State.padChorusDepth = scene.padChorusDepth;
+      if (MUZE.Audio._chorusBus) MUZE.Audio._chorusBus.depth = scene.padChorusDepth;
+      else if (MUZE.Audio._chorus) MUZE.Audio._chorus.depth = scene.padChorusDepth;
+    }
+    if (scene.delayTime) {
+      MUZE.State.delayTime = scene.delayTime;
+      if (MUZE.Audio._delayBus) {
+        try {
+          const dt = scene.delayTime;
+          MUZE.Audio._delayBus.delayTime.rampTo(
+            dt === '16n' ? 0.125 : dt === '8n.' ? 0.375 : dt === '4n.' ? 0.75 : 0.25, FADE_TIME);
+        } catch(e) {}
+      }
+    }
+    if (scene.reverbDecay !== undefined) {
+      MUZE.State.reverbDecay = scene.reverbDecay;
+      if (MUZE.Audio._reverbBus) {
+        try { MUZE.Audio._reverbBus.decay = scene.reverbDecay; } catch(e) {}
       }
     }
 

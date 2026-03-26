@@ -30,6 +30,17 @@ MUZE.Storage = {
     // Save chord auto-advance state
     data['chordAutoAdvance'] = MUZE.ChordAdvance ? MUZE.ChordAdvance._active : false;
 
+    // Save extended preset parameters (arpRate, padChorusDepth, delayTime, reverbDecay)
+    if (MUZE.State.arpRate) data['arpRate'] = MUZE.State.arpRate;
+    if (MUZE.State.padChorusDepth !== undefined) data['padChorusDepth'] = MUZE.State.padChorusDepth;
+    if (MUZE.State.delayTime) data['delayTime'] = MUZE.State.delayTime;
+    if (MUZE.State.reverbDecay !== undefined) data['reverbDecay'] = MUZE.State.reverbDecay;
+
+    // Save loop recorder bar count
+    if (MUZE.LoopRecorder) {
+      data['loopBarCount'] = MUZE.LoopRecorder._barCount;
+    }
+
     // Save scene data
     if (MUZE.SceneManager) {
       data['scenes'] = MUZE.SceneManager._scenes;
@@ -104,6 +115,29 @@ MUZE.Storage = {
           MUZE.State.currentScale = scaleData;
           const scaleVal = document.getElementById('scale-val');
           if (scaleVal) scaleVal.textContent = data['extraScaleMode'];
+        }
+      }
+
+      // Restore extended preset parameters
+      if (data['arpRate']) MUZE.State.arpRate = data['arpRate'];
+      if (data['padChorusDepth'] !== undefined) MUZE.State.padChorusDepth = +data['padChorusDepth'];
+      if (data['delayTime']) MUZE.State.delayTime = data['delayTime'];
+      if (data['reverbDecay'] !== undefined) MUZE.State.reverbDecay = +data['reverbDecay'];
+      // Apply extended params to audio engine once audio is ready
+      if (MUZE.PresetExtensions && (data['arpRate'] || data['padChorusDepth'] !== undefined)) {
+        // Defer to allow audio init to complete
+        setTimeout(() => {
+          if (MUZE.PresetExtensions.restoreFromState) MUZE.PresetExtensions.restoreFromState();
+        }, 500);
+      }
+
+      // Restore loop recorder bar count
+      if (data['loopBarCount'] && MUZE.LoopRecorder) {
+        const bars = +data['loopBarCount'];
+        if ([1, 2, 4, 8].includes(bars)) {
+          MUZE.LoopRecorder._barCount = bars;
+          const barEl = document.getElementById('loop-bar-count-btn') || document.getElementById('loop-bar-count');
+          if (barEl) barEl.textContent = bars + ' BAR' + (bars > 1 ? 'S' : '');
         }
       }
 

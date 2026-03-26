@@ -69,6 +69,11 @@ MUZE.Touch = {
 
   _onEnd(e) {
     e.preventDefault();
+    if (!e.changedTouches || !e.changedTouches.length) {
+      clearTimeout(this._holdTimer);
+      this._touchStart = null;
+      return;
+    }
     if (!this._touchStart) return;
     const t = e.changedTouches[0];
     const dx = t.clientX - this._touchStart.x;
@@ -411,13 +416,24 @@ MUZE.MixerUI = {
     const strips = document.getElementById('mixer-strips');
     const detail = document.getElementById('mixer-detail');
 
-    // Toggle mixer panel
+    // Toggle mixer panel (from synth panel button)
     document.getElementById('mixer-btn').addEventListener('click', () => {
       const opening = !panel.classList.contains('open');
       panel.classList.toggle('open');
       if (opening) this._startMeters();
       else this._stopMeters();
     });
+
+    // Toggle mixer panel (from toolbar MIX button)
+    const toolbarMixBtn = document.getElementById('toolbar-mixer-btn');
+    if (toolbarMixBtn) {
+      toolbarMixBtn.addEventListener('click', () => {
+        const opening = !panel.classList.contains('open');
+        panel.classList.toggle('open');
+        if (opening) this._startMeters();
+        else this._stopMeters();
+      });
+    }
 
     document.getElementById('mixer-close').addEventListener('click', () => {
       panel.classList.remove('open');
@@ -1186,7 +1202,7 @@ MUZE.Recorder = {
       MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm';
 
     this._chunks = [];
-    this._mediaRec = new MediaRecorder(canvasStream, { mimeType: this._mimeType, videoBitsPerSecond: 4000000 });
+    this._mediaRec = new MediaRecorder(canvasStream, { mimeType: this._mimeType, videoBitsPerSecond: 6000000, audioBitsPerSecond: 256000 });
     this._mediaRec.ondataavailable = (e) => { if (e.data.size > 0) this._chunks.push(e.data); };
     this._mediaRec.onstop = () => this._save();
     this._mediaRec.start(500);
@@ -1324,5 +1340,27 @@ MUZE.Recorder = {
       const a = document.createElement('a'); a.href = url; a.download = `muze-${name}-${ts}.${ext}`; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     }
+  }
+};
+
+// ---- First-run Gesture Hints ----
+MUZE.Hints = {
+  init() {
+    if (localStorage.getItem('muze-seen-hints')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'gesture-hints';
+    overlay.innerHTML = `
+      <div class="hint hint-top">TAP for drums</div>
+      <div class="hint hint-mid">DOUBLE-TAP for auto-rhythm</div>
+      <div class="hint hint-bot">HOLD + RELEASE for drop</div>
+    `;
+    document.body.appendChild(overlay);
+    setTimeout(() => { overlay.classList.add('fade'); }, 5000);
+    setTimeout(() => { overlay.remove(); }, 6000);
+    document.addEventListener('touchstart', () => {
+      overlay.classList.add('fade');
+      setTimeout(() => overlay.remove(), 1000);
+      localStorage.setItem('muze-seen-hints', '1');
+    }, { once: true });
   }
 };

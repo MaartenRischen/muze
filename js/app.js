@@ -15,6 +15,21 @@ MUZE.Loop = {
     this._debugEl = document.getElementById('debug');
     this._modeHudEl = document.getElementById('mode-hud');
 
+    // 1-Euro filters — one per tracked parameter
+    this._filters = {
+      mouth:  new MUZE.OneEuroFilter(30, 1.0, 0.007, 1.0),
+      lip:    new MUZE.OneEuroFilter(30, 0.5, 0.004, 1.0), // slower for lip corner to reduce mode flickering
+      brow:   new MUZE.OneEuroFilter(30, 1.0, 0.007, 1.0),
+      eye:    new MUZE.OneEuroFilter(30, 1.0, 0.005, 1.0),
+      mouthW: new MUZE.OneEuroFilter(30, 1.0, 0.005, 1.0),
+      pitch:  new MUZE.OneEuroFilter(30, 1.0, 0.007, 1.0),
+      yaw:    new MUZE.OneEuroFilter(30, 1.0, 0.005, 1.0),
+      roll:   new MUZE.OneEuroFilter(30, 1.0, 0.005, 1.0),
+      handX:  new MUZE.OneEuroFilter(30, 1.0, 0.007, 1.0),
+      handY:  new MUZE.OneEuroFilter(30, 1.0, 0.007, 1.0),
+    };
+    this._faceLostTime = null; // face-loss grace period tracker
+
     // Debug toggle (tap top-left corner)
     document.getElementById('debug-toggle').addEventListener('click', () => {
       MUZE.State.debugVisible = !MUZE.State.debugVisible;
@@ -52,28 +67,33 @@ MUZE.Loop = {
         // Even cycle: face detection
         const fr = MUZE.FaceTracker.detect(video, ts);
         if (fr && fr.faceLandmarks && fr.faceLandmarks.length > 0) {
+          this._faceLostTime = null; // face found — reset grace timer
           S._rawLandmarks = fr.faceLandmarks[0];
           const r = MUZE.FaceFeatures.extract(fr.faceLandmarks[0]);
           if (r) {
-            S.mouthOpenness = MUZE.Smooth.update('mouth', r.mouthOpenness, C.SMOOTH_FAST);
-            S.lipCorner = MUZE.Smooth.update('lip', r.lipCorner, C.SMOOTH_FAST);
-            S.browHeight = MUZE.Smooth.update('brow', r.browHeight, C.SMOOTH_FAST);
-            S.eyeOpenness = MUZE.Smooth.update('eye', r.eyeOpenness, C.SMOOTH_FAST);
-            S.mouthWidth = MUZE.Smooth.update('mouthW', r.mouthWidth, C.SMOOTH_SLOW);
-            S.headPitch = MUZE.Smooth.update('pitch', r.headPitch, C.SMOOTH_FAST);
-            S.headYaw = MUZE.Smooth.update('yaw', r.headYaw, C.SMOOTH_SLOW);
-            S.headRoll = MUZE.Smooth.update('roll', r.headRoll, C.SMOOTH_SLOW);
+            S.mouthOpenness = this._filters.mouth.filter(r.mouthOpenness, now);
+            S.lipCorner     = this._filters.lip.filter(r.lipCorner, now);
+            S.browHeight    = this._filters.brow.filter(r.browHeight, now);
+            S.eyeOpenness   = this._filters.eye.filter(r.eyeOpenness, now);
+            S.mouthWidth    = this._filters.mouthW.filter(r.mouthWidth, now);
+            S.headPitch     = this._filters.pitch.filter(r.headPitch, now);
+            S.headYaw       = this._filters.yaw.filter(r.headYaw, now);
+            S.headRoll      = this._filters.roll.filter(r.headRoll, now);
             S.faceDetected = true;
           }
-        } else { S.faceDetected = false; }
+        } else {
+          // Face-loss grace period: wait 400ms before reporting face lost
+          if (!this._faceLostTime) this._faceLostTime = now;
+          if (now - this._faceLostTime > 400) S.faceDetected = false;
+        }
       } else {
         // Odd cycle: hand detection
         const hr = MUZE.HandTracker.detect(video, ts + 1);
         if (hr && hr.landmarks && hr.landmarks.length > 0) {
           const r = MUZE.HandFeatures.extract(hr.landmarks);
           S.handPresent = r.handPresent;
-          S.handX = MUZE.Smooth.update('handX', r.handX, C.SMOOTH_HAND);
-          S.handY = MUZE.Smooth.update('handY', r.handY, C.SMOOTH_HAND);
+          S.handX = this._filters.handX.filter(r.handX, now);
+          S.handY = this._filters.handY.filter(r.handY, now);
           S.handOpen = r.handOpen;
         } else { S.handPresent = false; }
       }

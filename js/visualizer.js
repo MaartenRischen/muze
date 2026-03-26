@@ -106,6 +106,9 @@ MUZE.Visualizer = {
   // ---- Mode color grading ----
   _cachedGradeMode: '',
 
+  // ---- Vignette throttle ----
+  _lastVignetteOpacity: 0,
+
   // ---- Explosion screen glow ----
   _explosionGlow: null,  // { x, y, life, startTime }
 
@@ -229,9 +232,11 @@ MUZE.Visualizer = {
           const bgCanvas = document.getElementById('bg-canvas');
           if (bgCanvas) {
             bgCanvas.classList.remove('bass-warping');
-            void bgCanvas.offsetWidth;
-            bgCanvas.classList.add('bass-warping');
-            setTimeout(() => bgCanvas.classList.remove('bass-warping'), 250);
+            // Use rAF to re-trigger animation without forced reflow
+            requestAnimationFrame(() => {
+              bgCanvas.classList.add('bass-warping');
+              setTimeout(() => bgCanvas.classList.remove('bass-warping'), 250);
+            });
           }
         }
       }
@@ -259,8 +264,13 @@ MUZE.Visualizer = {
     }
 
     // ---- Edge vignette energy pulse (subtle — camera must stay visible) ----
+    // Only update CSS custom property when value changes meaningfully (avoid per-frame style writes)
     const vignetteOpacity = 0.08 + energy * 0.12;
-    document.body.style.setProperty('--vignette-opacity', vignetteOpacity);
+    const vigRounded = Math.round(vignetteOpacity * 200) / 200; // quantize to 0.005 steps
+    if (vigRounded !== this._lastVignetteOpacity) {
+      this._lastVignetteOpacity = vigRounded;
+      document.body.style.setProperty('--vignette-opacity', vigRounded);
+    }
 
     // ---- Advance geometry phase ----
     this._geoPhase += 0.003;
@@ -393,7 +403,9 @@ MUZE.Visualizer = {
       sw2.alpha *= 0.94;
       sw2.speed *= 0.98;
       if (sw2.alpha < 0.005) {
-        this._shockwaves.splice(i, 1);
+        // PERF: swap-and-pop O(1) removal
+        this._shockwaves[i] = this._shockwaves[this._shockwaves.length - 1];
+        this._shockwaves.pop();
         continue;
       }
       const shockR = radius + sw2.radius;
@@ -853,7 +865,9 @@ MUZE.Visualizer = {
       n.life -= n.decay;
       n.brightness *= 0.997; // slow brightness fade
       if (n.life <= 0) {
-        this._constellationNotes.splice(i, 1);
+        // PERF: swap-and-pop O(1) removal
+        this._constellationNotes[i] = this._constellationNotes[this._constellationNotes.length - 1];
+        this._constellationNotes.pop();
       }
     }
   },
@@ -994,10 +1008,11 @@ MUZE.Visualizer = {
     ctx.lineJoin = 'round';
 
     // 3-pass neon glow: wide dim -> medium -> thin bright core
+    // Subtle enhancement — not overwhelming (max alpha: 0.06 / 0.12 / 0.3)
     const passes = [
-      { width: 8,   alpha: 0.08 },
-      { width: 4,   alpha: 0.15 },
-      { width: 1.5, alpha: 0.4 },
+      { width: 8,   alpha: 0.06 },
+      { width: 4,   alpha: 0.12 },
+      { width: 1.5, alpha: 0.3 },
     ];
 
     for (const pass of passes) {
@@ -1259,7 +1274,9 @@ MUZE.Visualizer = {
     for (let i = this._contourSnapshots.length - 1; i >= 0; i--) {
       this._contourSnapshots[i].opacity *= 0.88;
       if (this._contourSnapshots[i].opacity < 0.01) {
-        this._contourSnapshots.splice(i, 1);
+        // PERF: swap-and-pop O(1) removal
+        this._contourSnapshots[i] = this._contourSnapshots[this._contourSnapshots.length - 1];
+        this._contourSnapshots.pop();
       }
     }
   },
@@ -1526,7 +1543,9 @@ MUZE.Visualizer = {
 
     for (let i = 0; i < count; i++) {
       if (this._burstParticles.length >= this._maxBurstParticles) {
-        this._burstParticles.shift();
+        // PERF: swap oldest (index 0) with last, then pop — avoids O(n) shift
+        this._burstParticles[0] = this._burstParticles[this._burstParticles.length - 1];
+        this._burstParticles.pop();
       }
       const angle = (i / count) * Math.PI * 2 + Math.random() * 0.4;
       const speed = burstSpeed * (0.6 + Math.random() * 0.8);
@@ -1567,7 +1586,9 @@ MUZE.Visualizer = {
       ring.radius += ring.speed;
       ring.alpha *= 0.94;
       if (ring.alpha < 0.01 || ring.radius > ring.maxRadius) {
-        this._burstRings.splice(i, 1);
+        // PERF: swap-and-pop O(1) removal
+        this._burstRings[i] = this._burstRings[this._burstRings.length - 1];
+        this._burstRings.pop();
       }
     }
   },

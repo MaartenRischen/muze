@@ -59,8 +59,8 @@ MUZE.HandTracker = {
         delegate: 'GPU'
       },
       runningMode: 'VIDEO', numHands: 1,
-      minHandDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
+      minHandDetectionConfidence: 0.35,
+      minTrackingConfidence: 0.3
     });
   },
   detect(video, ts) {
@@ -159,11 +159,16 @@ MUZE.HandFeatures = {
       this._dist3d(lm[8], lm[0]) + this._dist3d(lm[12], lm[0]) +
       this._dist3d(lm[16], lm[0]) + this._dist3d(lm[20], lm[0])
     ) / 4;
+    const ratio = avgFingerDist / palmSize;
+    // Hysteresis: need to cross 1.85 to open, 1.55 to close
+    if (this._lastOpen === undefined) this._lastOpen = ratio > 1.7;
+    const open = this._lastOpen ? (ratio > 1.55) : (ratio > 1.85);
+    this._lastOpen = open;
     return {
       handPresent: true,
       handX: 1 - handX,
       handY: handY,
-      handOpen: (avgFingerDist / palmSize) > 1.7
+      handOpen: open
     };
   },
   _dist3d(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + ((a.z||0)-(b.z||0))**2); }
