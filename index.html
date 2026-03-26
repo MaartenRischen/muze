@@ -409,9 +409,9 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       document.getElementById('mode-hud').classList.toggle('frozen', MUZE.State.modeFrozen);
     });
 
-    // Pause button
+    // Pause button (may not exist if removed from toolbar)
     const pauseBtn = document.getElementById('pause-btn');
-    pauseBtn.addEventListener('click', () => {
+    if (pauseBtn) pauseBtn.addEventListener('click', () => {
       if (MUZE.State.riserActive) {
         MUZE.Audio.cancelRiser();
         MUZE.State.riserActive = false;
