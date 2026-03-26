@@ -296,7 +296,7 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
     <div class="ss-orb ss-orb--amber"></div>
     <div class="ss-orb ss-orb--orange"></div>
   </div>
-  <!-- Staggered title -->
+  <!-- Staggered title: "JAMMER MAN" → closes gap → "JAMMERMAN" -->
   <h1 id="ss-title" aria-label="Jammerman">
     <span class="ss-letter" style="--i:0">J</span>
     <span class="ss-letter" style="--i:1">A</span>
@@ -304,6 +304,7 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
     <span class="ss-letter" style="--i:3">M</span>
     <span class="ss-letter" style="--i:4">E</span>
     <span class="ss-letter" style="--i:5">R</span>
+    <span class="ss-letter ss-gap" style="--i:5" id="ss-space">&nbsp;</span>
     <span class="ss-letter" style="--i:6">M</span>
     <span class="ss-letter" style="--i:7">A</span>
     <span class="ss-letter" style="--i:8">N</span>
@@ -322,12 +323,16 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
 <!-- Start screen letter animation JS (minimal, GPU-composited) -->
 <script>
 (function() {
-  // Activate shimmer gradient after ALL letters land
-  // 9 letters × 0.3s stagger + 0.3s base + 0.7s animation = ~4s total
+  // Close the gap: "JAMMER MAN" → "JAMMERMAN" right before shimmer
+  setTimeout(function() {
+    var space = document.getElementById('ss-space');
+    if (space) space.classList.add('ss-gap-close');
+  }, 3800);
+  // Activate shimmer gradient after gap closes
   setTimeout(function() {
     var title = document.getElementById('ss-title');
     if (title) title.classList.add('shimmer-active');
-  }, 4200);
+  }, 4400);
   // Activate button glow ring after button entrance (~3.2s)
   setTimeout(function() {
     var btn = document.getElementById('start-btn');

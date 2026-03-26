@@ -817,6 +817,18 @@ html, body {
     text-shadow: 0 0 0px rgba(232, 169, 72, 0);
   }
 }
+/* Gap space between "JAMMER" and "MAN" — closes before shimmer */
+.ss-gap {
+  display: inline-block;
+  width: 0.35em;
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.3s ease;
+}
+.ss-gap.ss-gap-close {
+  width: 0;
+  opacity: 0;
+}
+
 /* After all letters land, shimmer class activates gradient text */
 #ss-title.shimmer-active .ss-letter {
   opacity: 1 !important;

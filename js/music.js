@@ -60,17 +60,15 @@ MUZE.Music = {
   getScaleName(scale) {
     const C = MUZE.Config;
     if (!scale) return '-';
-    if (scale === C.SCALE_LYDIAN) return 'lydian';
-    if (scale === C.SCALE_IONIAN) return 'ionian';
-    if (scale === C.SCALE_MIXOLYDIAN) return 'mixolydian';
-    if (scale === C.SCALE_DORIAN) return 'dorian';
-    if (scale === C.SCALE_AEOLIAN) return 'aeolian';
-    if (scale === C.SCALE_PHRYGIAN) return 'phrygian';
-    // Check extra scales by comparing interval arrays
+    const eq = (a, b) => a === b || (a.length === b.length && a.every((v, i) => v === b[i]));
+    if (eq(scale, C.SCALE_LYDIAN)) return 'lydian';
+    if (eq(scale, C.SCALE_IONIAN)) return 'ionian';
+    if (eq(scale, C.SCALE_MIXOLYDIAN)) return 'mixolydian';
+    if (eq(scale, C.SCALE_DORIAN)) return 'dorian';
+    if (eq(scale, C.SCALE_AEOLIAN)) return 'aeolian';
+    if (eq(scale, C.SCALE_PHRYGIAN)) return 'phrygian';
     for (const [name, intervals] of Object.entries(this.EXTRA_SCALES)) {
-      if (scale.length === intervals.length && scale.every((v, i) => v === intervals[i])) {
-        return name;
-      }
+      if (eq(scale, intervals)) return name;
     }
     return '?';
   },

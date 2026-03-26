@@ -465,6 +465,15 @@ MUZE.Visualizer = {
   //     The active note blazes bright and emits sparks.
   //     Trail motes fade behind the current position.
   // ============================================================
+  // Convert note name ("C4") to MIDI number (60)
+  _noteNameToMidi(name) {
+    if (typeof name === 'number') return name;
+    const match = String(name).match(/^([A-Ga-g]#?)(-?\d+)$/);
+    if (!match) return 60;
+    const noteMap = { C:0,'C#':1,D:2,'D#':3,E:4,F:5,'F#':6,G:7,'G#':8,A:9,'A#':10,B:11 };
+    return (noteMap[match[1].toUpperCase()] || 0) + (parseInt(match[2]) + 1) * 12;
+  },
+
   _updateAndDrawArpViz(ctx, cx, cy, ringRadius, energy, accentRgb) {
     const notes = MUZE.Audio._arpNotes;
     const idx = MUZE.Audio._arpIdx;
@@ -482,11 +491,11 @@ MUZE.Visualizer = {
       this._arpFlash = 1.0;
       this._arpLastIdx = currentIdx;
 
-      // Emit sparks from current note position
       const angle = this._arpPhase + (currentIdx / n) * Math.PI * 2;
       const sx = cx + Math.cos(angle) * orbitR;
       const sy = cy + Math.sin(angle) * orbitR;
-      const { r, g, b } = this._noteToRgb(notes[currentIdx]);
+      const midi = this._noteNameToMidi(notes[currentIdx]);
+      const { r, g, b } = this._noteToRgb(midi);
       for (let s = 0; s < 6; s++) {
         const a = angle + (Math.random() - 0.5) * 1.2;
         const speed = 1.5 + Math.random() * 3;
@@ -500,7 +509,6 @@ MUZE.Visualizer = {
         });
       }
 
-      // Add trail mote at current position
       this._arpTrails.push({
         angle, r, g, b,
         alpha: 0.7,
@@ -533,10 +541,9 @@ MUZE.Visualizer = {
       const ty = cy + Math.sin(t.angle) * t.radius;
       ctx.beginPath();
       ctx.arc(tx, ty, 3 + t.alpha * 2, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${t.r},${t.g},${t.b},${t.alpha * 0.5})`;
+      ctx.fillStyle = `rgba(${t.r},${t.g},${t.b},${(t.alpha * 0.5).toFixed(2)})`;
       ctx.fill();
     }
-    // Cap trail count
     if (this._arpTrails.length > 60) this._arpTrails.splice(0, this._arpTrails.length - 60);
 
     // --- Draw note motes around orbit ---
@@ -544,18 +551,18 @@ MUZE.Visualizer = {
       const angle = this._arpPhase + (i / n) * Math.PI * 2;
       const x = cx + Math.cos(angle) * orbitR;
       const y = cy + Math.sin(angle) * orbitR;
-      const { r, g, b } = this._noteToRgb(notes[i]);
+      const midi = this._noteNameToMidi(notes[i]);
+      const { r, g, b } = this._noteToRgb(midi);
       const isActive = (i === currentIdx);
 
       if (isActive) {
-        // Active note: big blazing glow
         const flash = this._arpFlash;
         const glowSize = 12 + flash * 20 + energy * 8;
 
         // Outer glow
         const grad = ctx.createRadialGradient(x, y, 0, x, y, glowSize);
-        grad.addColorStop(0, `rgba(${r},${g},${b},${0.8 + flash * 0.2})`);
-        grad.addColorStop(0.3, `rgba(${r},${g},${b},${0.3 + flash * 0.3})`);
+        grad.addColorStop(0, `rgba(${r},${g},${b},${(0.8 + flash * 0.2).toFixed(2)})`);
+        grad.addColorStop(0.3, `rgba(${r},${g},${b},${(0.3 + flash * 0.3).toFixed(2)})`);
         grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
         ctx.beginPath();
         ctx.arc(x, y, glowSize, 0, Math.PI * 2);
@@ -565,25 +572,22 @@ MUZE.Visualizer = {
         // Hot white core
         ctx.beginPath();
         ctx.arc(x, y, 3 + flash * 4, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,255,255,${0.7 + flash * 0.3})`;
+        ctx.fillStyle = `rgba(255,255,255,${(0.7 + flash * 0.3).toFixed(2)})`;
         ctx.fill();
       } else {
-        // Inactive notes: small dim motes
         const dist = Math.min(Math.abs(i - currentIdx), Math.abs(i - currentIdx + n), Math.abs(i - currentIdx - n));
         const proximity = Math.max(0, 1 - dist / (n * 0.4));
         const a = 0.15 + proximity * 0.25;
         const sz = 2 + proximity * 2;
 
-        // Subtle glow
         ctx.beginPath();
         ctx.arc(x, y, sz + 4, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${r},${g},${b},${a * 0.3})`;
+        ctx.fillStyle = `rgba(${r},${g},${b},${(a * 0.3).toFixed(2)})`;
         ctx.fill();
 
-        // Core dot
         ctx.beginPath();
         ctx.arc(x, y, sz, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+        ctx.fillStyle = `rgba(${r},${g},${b},${a.toFixed(2)})`;
         ctx.fill();
       }
     }
@@ -604,10 +608,9 @@ MUZE.Visualizer = {
       const sa = s.life * s.life;
       ctx.beginPath();
       ctx.arc(s.x, s.y, 1.5 * s.life, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${s.r},${s.g},${s.b},${sa})`;
+      ctx.fillStyle = `rgba(${s.r},${s.g},${s.b},${sa.toFixed(2)})`;
       ctx.fill();
     }
-    // Cap sparks
     if (this._arpSparks.length > 80) this._arpSparks.length = 80;
 
     ctx.restore();
