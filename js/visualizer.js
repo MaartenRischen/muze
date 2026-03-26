@@ -112,6 +112,13 @@ MUZE.Visualizer = {
   // ---- Explosion screen glow ----
   _explosionGlow: null,  // { x, y, life, startTime }
 
+  // ---- Arpeggio visualization ----
+  _arpPhase: 0,               // slow rotation offset
+  _arpLastIdx: -1,            // detect note changes
+  _arpFlash: 0,               // flash intensity on note hit
+  _arpTrails: [],             // fading trail motes [{angle, r, g, b, alpha, radius}]
+  _arpSparks: [],             // emitted sparks on note hit
+
   init() {
     this._canvas = document.getElementById('overlay');
     this._ctx = this._canvas.getContext('2d');
@@ -280,6 +287,9 @@ MUZE.Visualizer = {
     this._updateParticles(particleEnergy, accentRgb, cx, cy, radius);
     this._drawParticles(ctx, accentRgb, high);
 
+    // 4b. Arpeggio orbital visualization
+    this._updateAndDrawArpViz(ctx, cx, cy, radius, energy, accentRgb);
+
     // 5. Frequency arc (elegant bottom arc)
     this._drawFrequencyArc(ctx, fft, w, h, accentRgb, energy);
 
@@ -447,6 +457,160 @@ MUZE.Visualizer = {
     ctx.strokeStyle = `rgba(${accentRgb}, 0.04)`;
     ctx.lineWidth = 0.5;
     ctx.stroke();
+  },
+
+  // ============================================================
+  // 1b. ARPEGGIO ORBITAL VISUALIZATION
+  //     Glowing motes orbit the waveform ring, one per arp note.
+  //     The active note blazes bright and emits sparks.
+  //     Trail motes fade behind the current position.
+  // ============================================================
+  _updateAndDrawArpViz(ctx, cx, cy, ringRadius, energy, accentRgb) {
+    const notes = MUZE.Audio._arpNotes;
+    const idx = MUZE.Audio._arpIdx;
+    if (!notes || notes.length === 0) return;
+
+    const n = notes.length;
+    const orbitR = ringRadius + 28 + energy * 40;
+
+    // Slow rotation
+    this._arpPhase += 0.004;
+
+    // Detect note change → flash + emit sparks
+    const currentIdx = idx % n;
+    if (currentIdx !== this._arpLastIdx) {
+      this._arpFlash = 1.0;
+      this._arpLastIdx = currentIdx;
+
+      // Emit sparks from current note position
+      const angle = this._arpPhase + (currentIdx / n) * Math.PI * 2;
+      const sx = cx + Math.cos(angle) * orbitR;
+      const sy = cy + Math.sin(angle) * orbitR;
+      const { r, g, b } = this._noteToRgb(notes[currentIdx]);
+      for (let s = 0; s < 6; s++) {
+        const a = angle + (Math.random() - 0.5) * 1.2;
+        const speed = 1.5 + Math.random() * 3;
+        this._arpSparks.push({
+          x: sx, y: sy,
+          vx: Math.cos(a) * speed,
+          vy: Math.sin(a) * speed,
+          life: 1.0,
+          decay: 0.02 + Math.random() * 0.02,
+          r, g, b,
+        });
+      }
+
+      // Add trail mote at current position
+      this._arpTrails.push({
+        angle, r, g, b,
+        alpha: 0.7,
+        radius: orbitR,
+      });
+    }
+
+    // Decay flash
+    this._arpFlash *= 0.88;
+
+    // --- Draw orbit ring (very faint guide) ---
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.beginPath();
+    ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${accentRgb}, 0.04)`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // --- Draw trail motes (fading ghosts) ---
+    for (let i = this._arpTrails.length - 1; i >= 0; i--) {
+      const t = this._arpTrails[i];
+      t.alpha *= 0.95;
+      if (t.alpha < 0.02) {
+        this._arpTrails[i] = this._arpTrails[this._arpTrails.length - 1];
+        this._arpTrails.pop();
+        continue;
+      }
+      const tx = cx + Math.cos(t.angle) * t.radius;
+      const ty = cy + Math.sin(t.angle) * t.radius;
+      ctx.beginPath();
+      ctx.arc(tx, ty, 3 + t.alpha * 2, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${t.r},${t.g},${t.b},${t.alpha * 0.5})`;
+      ctx.fill();
+    }
+    // Cap trail count
+    if (this._arpTrails.length > 60) this._arpTrails.splice(0, this._arpTrails.length - 60);
+
+    // --- Draw note motes around orbit ---
+    for (let i = 0; i < n; i++) {
+      const angle = this._arpPhase + (i / n) * Math.PI * 2;
+      const x = cx + Math.cos(angle) * orbitR;
+      const y = cy + Math.sin(angle) * orbitR;
+      const { r, g, b } = this._noteToRgb(notes[i]);
+      const isActive = (i === currentIdx);
+
+      if (isActive) {
+        // Active note: big blazing glow
+        const flash = this._arpFlash;
+        const glowSize = 12 + flash * 20 + energy * 8;
+
+        // Outer glow
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, glowSize);
+        grad.addColorStop(0, `rgba(${r},${g},${b},${0.8 + flash * 0.2})`);
+        grad.addColorStop(0.3, `rgba(${r},${g},${b},${0.3 + flash * 0.3})`);
+        grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+        ctx.beginPath();
+        ctx.arc(x, y, glowSize, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Hot white core
+        ctx.beginPath();
+        ctx.arc(x, y, 3 + flash * 4, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${0.7 + flash * 0.3})`;
+        ctx.fill();
+      } else {
+        // Inactive notes: small dim motes
+        const dist = Math.min(Math.abs(i - currentIdx), Math.abs(i - currentIdx + n), Math.abs(i - currentIdx - n));
+        const proximity = Math.max(0, 1 - dist / (n * 0.4));
+        const a = 0.15 + proximity * 0.25;
+        const sz = 2 + proximity * 2;
+
+        // Subtle glow
+        ctx.beginPath();
+        ctx.arc(x, y, sz + 4, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${r},${g},${b},${a * 0.3})`;
+        ctx.fill();
+
+        // Core dot
+        ctx.beginPath();
+        ctx.arc(x, y, sz, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+        ctx.fill();
+      }
+    }
+
+    // --- Draw and update sparks ---
+    for (let i = this._arpSparks.length - 1; i >= 0; i--) {
+      const s = this._arpSparks[i];
+      s.x += s.vx;
+      s.y += s.vy;
+      s.vx *= 0.96;
+      s.vy *= 0.96;
+      s.life -= s.decay;
+      if (s.life <= 0) {
+        this._arpSparks[i] = this._arpSparks[this._arpSparks.length - 1];
+        this._arpSparks.pop();
+        continue;
+      }
+      const sa = s.life * s.life;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 1.5 * s.life, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${s.r},${s.g},${s.b},${sa})`;
+      ctx.fill();
+    }
+    // Cap sparks
+    if (this._arpSparks.length > 80) this._arpSparks.length = 80;
+
+    ctx.restore();
   },
 
   // ============================================================
