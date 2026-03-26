@@ -1504,7 +1504,7 @@ MUZE.Recorder = {
     const blob = new Blob(this._chunks, { type: this._mimeType });
     const fileName = `muze-${Date.now()}.${ext}`;
     if (navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: this._mimeType })] })) {
-      try { await navigator.share({ files: [new File([blob], fileName, { type: this._mimeType })], title: 'Muze Session' }); return; } catch (e) {}
+      try { await navigator.share({ files: [new File([blob], fileName, { type: this._mimeType })], title: 'Jammerman Session' }); return; } catch (e) {}
     }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
