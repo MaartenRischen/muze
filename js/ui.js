@@ -4,8 +4,8 @@
 
 // ---- Instrument Toggle Buttons ----
 MUZE.InstrumentToggles = {
-  _padActive: true,
-  _arpActive: true,
+  _padActive: false,
+  _arpActive: false,
   _beatActive: false,
   _binActive: false,
 
@@ -15,9 +15,9 @@ MUZE.InstrumentToggles = {
     const beat = document.getElementById('toggle-beat');
     const bin = document.getElementById('toggle-bin');
 
-    // Pad and arp start ON
-    if (pad) { pad.classList.add('active'); pad.addEventListener('click', () => this._togglePad()); }
-    if (arp) { arp.classList.add('active'); arp.addEventListener('click', () => this._toggleArp()); }
+    // All start OFF — user toggles them on
+    if (pad) { pad.addEventListener('click', () => this._togglePad()); }
+    if (arp) { arp.addEventListener('click', () => this._toggleArp()); }
     if (beat) { beat.addEventListener('click', () => this._toggleBeat()); }
     if (bin) { bin.addEventListener('click', () => this._toggleBin()); }
   },

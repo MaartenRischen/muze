@@ -71,7 +71,6 @@ window.addEventListener('unhandledrejection',function(e){window._muzeErrors.push
 
 <!-- Toolbar -->
 <div class="toolbar">
-  <button class="toolbar-btn" id="pause-btn" aria-label="Pause">&#9208;</button>
   <button class="toolbar-btn" id="riser-btn" aria-label="Riser">&uarr;</button>
   <button class="toolbar-btn" id="rec-btn" aria-label="Record">&#9679;</button>
   <button class="toolbar-btn" id="toolbar-mixer-btn" aria-label="Mixer" style="font-size:10px;font-weight:600;letter-spacing:0.5px;font-family:var(--font-ui)">MIX</button>
@@ -443,6 +442,14 @@ document.getElementById('start-btn').addEventListener('click', async () => {
       .catch(e => console.warn('BgBlur: could not load', e));
 
     MUZE.Loop.init();
+    MUZE.Loop.start();
+
+    // Start with all instruments muted — user toggles them on
+    if (MUZE.Mixer) {
+      MUZE.Mixer.toggleMute('pad');
+      MUZE.Mixer.toggleMute('arp');
+    }
+    // Beat and binaural already start off (InstrumentToggles defaults)
 
     // Cinematic dissolve: title lifts, background blurs, screen dissolves
     setLoadingText('Ready');
