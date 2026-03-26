@@ -1376,10 +1376,12 @@ MUZE.Visualizer = {
     const w = this._width, h = this._height;
     const S = MUZE.State;
 
-    // Fade previous content (alpha 0.015 => ~3s fade at 60fps)
-    tctx.globalCompositeOperation = 'source-over';
-    tctx.fillStyle = 'rgba(0, 0, 0, 0.015)';
+    // Fade previous content by erasing (not painting black!)
+    // Using destination-out so the trail canvas stays transparent, not dark
+    tctx.globalCompositeOperation = 'destination-out';
+    tctx.fillStyle = 'rgba(0, 0, 0, 0.02)';
     tctx.fillRect(0, 0, w, h);
+    tctx.globalCompositeOperation = 'source-over';
 
     // Finger spread: lerp glow sizes (~100ms)
     if (S.handPresent) {
