@@ -17,8 +17,15 @@ class FaceTracker {
         faceRequest.revision = VNDetectFaceLandmarksRequestRevision3
     }
 
-    /// Detect face landmarks from a camera frame. Returns FaceFeatures or nil.
-    func detect(sampleBuffer: CMSampleBuffer) -> FaceFeatures? {
+    /// Result of face detection: features + raw data for visualizer
+    struct DetectionResult {
+        let features: FaceFeatures
+        let landmarks: VNFaceLandmarks2D
+        let boundingBox: CGRect
+    }
+
+    /// Detect face landmarks from a camera frame. Returns DetectionResult or nil.
+    func detect(sampleBuffer: CMSampleBuffer) -> DetectionResult? {
         frameCount += 1
         guard frameCount % 2 == 0 else { return nil } // stagger: every other frame
 
@@ -39,7 +46,11 @@ class FaceTracker {
 
         guard allLandmarks.count > 0 else { return nil }
 
-        return extractFeatures(landmarks: landmarks, boundingBox: boundingBox)
+        guard let features = extractFeatures(landmarks: landmarks, boundingBox: boundingBox) else {
+            return nil
+        }
+
+        return DetectionResult(features: features, landmarks: landmarks, boundingBox: boundingBox)
     }
 
     // MARK: - Feature Extraction (adapted for Apple Vision landmark model)

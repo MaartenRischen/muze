@@ -114,9 +114,9 @@ class TrackingCoordinator: ObservableObject {
         let timestamp = now.timeIntervalSince1970 * 1000
 
         // Face detection (runs every other frame via internal stagger)
-        if let face = faceTracker.detect(sampleBuffer: sampleBuffer) {
+        if let result = faceTracker.detect(sampleBuffer: sampleBuffer) {
             faceLostTime = nil
-            let s = state
+            let face = result.features
 
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
@@ -131,6 +131,9 @@ class TrackingCoordinator: ObservableObject {
                 self.state.faceCenterX = face.faceCenterX
                 self.state.faceCenterY = face.faceCenterY
                 self.state.faceDetected = true
+                // Store raw landmarks for visualizer face mesh drawing
+                self.state.rawLandmarks = result.landmarks
+                self.state.faceBoundingBox = result.boundingBox
                 self.updateAudio()
             }
         } else {

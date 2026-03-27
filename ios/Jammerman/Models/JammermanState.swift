@@ -2,6 +2,7 @@
 // Mirrors web's MUZE.State per shared/SPEC.md
 
 import SwiftUI
+import Vision
 
 @Observable
 class JammermanState {
@@ -19,6 +20,11 @@ class JammermanState {
     // Face position (normalized 0..1, for visualizer)
     var faceCenterX: Float = 0.5
     var faceCenterY: Float = 0.35
+
+    // Raw Vision landmarks for visualizer face mesh drawing
+    // Stores the VNFaceLandmarks2D and bounding box from the latest detection
+    var rawLandmarks: VNFaceLandmarks2D?
+    var faceBoundingBox: CGRect = .zero
 
     // Hand features
     var handPresent: Bool = false
