@@ -127,7 +127,8 @@ class HandExtractor {
             return HandFeatures(handPresent: false, handX: 0.5, handY: 0.5, handOpen: true)
         }
 
-        let handX = 1 - (lm[0].x + lm[9].x) / 2
+        // Camera data is already mirrored, no extra flip needed
+        let handX = (lm[0].x + lm[9].x) / 2
         let handY = (lm[0].y + lm[9].y) / 2
         let palmSize = dist3d(lm[0], lm[9])
 

@@ -1,8 +1,10 @@
-// Jammerman — Audio Engine
-// AVAudioEngine with send/return bus topology mirroring web's architecture
-// Synths: Pad (FM + sub), Arp1, Arp2, Melody, Drums (kick/snare/hat), Binaural, Riser
+// Jammerman — Audio Engine (AudioKit rewrite)
+// Professional synths using AudioKit + SoundpipeAudioKit
+// Pad (FM + sub), Arp1, Arp2, Melody, Drums (kick/snare/hat), Binaural, Riser
 
 import AVFoundation
+import AudioKit
+import SoundpipeAudioKit
 import Accelerate
 
 // MARK: - Waveform Type
@@ -18,23 +20,34 @@ enum WaveformType: String, CaseIterable {
         let idx = all.firstIndex(of: self) ?? 0
         return all[(idx + 1) % all.count]
     }
+
+    var audioKitTable: Table {
+        switch self {
+        case .sine:     return Table(.sine)
+        case .triangle: return Table(.triangle)
+        case .sawtooth: return Table(.sawtooth)
+        case .square:   return Table(.square)
+        }
+    }
 }
 
+// MARK: - Audio Engine
+
 class AudioEngine: ObservableObject {
-    let engine = AVAudioEngine()
+    let engine = AudioKit.AudioEngine()
 
-    // Source nodes
-    private var padNode: AVAudioSourceNode!
-    private var arpNode: AVAudioSourceNode!
-    private var arp2Node: AVAudioSourceNode!
-    private var melodyNode: AVAudioSourceNode!
-    private var kickNode: AVAudioSourceNode!
-    private var snareNode: AVAudioSourceNode!
-    private var hatNode: AVAudioSourceNode!
-    private var binauralNode: AVAudioSourceNode!
-    private var riserNode: AVAudioSourceNode!
+    // Source nodes (AVAudioSourceNode wrapped for AudioKit compatibility)
+    private var padSourceNode: AVAudioSourceNode!
+    private var arpSourceNode: AVAudioSourceNode!
+    private var arp2SourceNode: AVAudioSourceNode!
+    private var melodySourceNode: AVAudioSourceNode!
+    private var kickSourceNode: AVAudioSourceNode!
+    private var snareSourceNode: AVAudioSourceNode!
+    private var hatSourceNode: AVAudioSourceNode!
+    private var binauralSourceNode: AVAudioSourceNode!
+    private var riserSourceNode: AVAudioSourceNode!
 
-    // Channel mixers
+    // Channel mixers (AVAudioMixerNode for volume/pan control)
     private var padMixer: AVAudioMixerNode!
     private var arpMixer: AVAudioMixerNode!
     private var arp2Mixer: AVAudioMixerNode!
@@ -191,46 +204,49 @@ class AudioEngine: ObservableObject {
     // MARK: - Build Audio Graph
 
     private func buildGraph() {
+        // Access the underlying AVAudioEngine from AudioKit
+        let avEngine = engine.avEngine
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
 
-        padNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        // Create AVAudioSourceNodes for each synth voice
+        padSourceNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.padOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.padMuted)
         }
-        arpNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        arpSourceNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.arpOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.arpMuted)
         }
-        arp2Node = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        arp2SourceNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.arp2Osc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.arp2Muted)
         }
-        melodyNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        melodySourceNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.melodyOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.melodyMuted)
         }
-        kickNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        kickSourceNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.kickOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.beatMuted)
         }
-        snareNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        snareSourceNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.snareOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.beatMuted)
         }
-        hatNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        hatSourceNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.hatOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.beatMuted)
         }
-        binauralNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        binauralSourceNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.binauralOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: !self.binauralActive)
         }
-        riserNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        riserSourceNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.riserOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: !self.riserActive)
         }
 
-        // Mixers
+        // Create Mixers
         padMixer = AVAudioMixerNode()
         arpMixer = AVAudioMixerNode()
         arp2Mixer = AVAudioMixerNode()
@@ -296,10 +312,10 @@ class AudioEngine: ObservableObject {
         masterEQ.bands[2].gain = 0
         masterEQ.bands[2].bypass = false
 
-        // Attach all nodes
+        // Attach all nodes to the underlying AVAudioEngine
         var allNodes: [AVAudioNode] = [
-            padNode, arpNode, arp2Node, melodyNode,
-            kickNode, snareNode, hatNode, binauralNode, riserNode,
+            padSourceNode, arpSourceNode, arp2SourceNode, melodySourceNode,
+            kickSourceNode, snareSourceNode, hatSourceNode, binauralSourceNode, riserSourceNode,
             padMixer, arpMixer, arp2Mixer, melodyMixer,
             kickMixer, snareMixer, hatMixer, binauralMixer, riserMixer,
             masterMixer, reverbNode, delayNode, masterEQ,
@@ -307,58 +323,58 @@ class AudioEngine: ObservableObject {
             arpDelaySendMixer, arp2DelaySendMixer
         ]
         for eq in channelEQs.values { allNodes.append(eq) }
-        for node in allNodes { engine.attach(node) }
+        for node in allNodes { avEngine.attach(node) }
 
-        // Wire: synths → channel EQs → channel mixers
+        // Wire: synths -> channel EQs -> channel mixers
         let sourceToMixer: [(AVAudioSourceNode, String, AVAudioMixerNode)] = [
-            (padNode, "pad", padMixer),
-            (arpNode, "arp", arpMixer),
-            (arp2Node, "arp2", arp2Mixer),
-            (melodyNode, "melody", melodyMixer),
-            (kickNode, "kick", kickMixer),
-            (snareNode, "snare", snareMixer),
-            (hatNode, "hat", hatMixer),
-            (binauralNode, "binaural", binauralMixer),
+            (padSourceNode, "pad", padMixer),
+            (arpSourceNode, "arp", arpMixer),
+            (arp2SourceNode, "arp2", arp2Mixer),
+            (melodySourceNode, "melody", melodyMixer),
+            (kickSourceNode, "kick", kickMixer),
+            (snareSourceNode, "snare", snareMixer),
+            (hatSourceNode, "hat", hatMixer),
+            (binauralSourceNode, "binaural", binauralMixer),
         ]
         for (src, name, mixer) in sourceToMixer {
             if let eq = channelEQs[name] {
-                engine.connect(src, to: eq, format: format)
-                engine.connect(eq, to: mixer, format: format)
+                avEngine.connect(src, to: eq, format: format)
+                avEngine.connect(eq, to: mixer, format: format)
             } else {
-                engine.connect(src, to: mixer, format: format)
+                avEngine.connect(src, to: mixer, format: format)
             }
         }
 
         // Riser has no per-channel EQ
-        engine.connect(riserNode, to: riserMixer, format: format)
+        avEngine.connect(riserSourceNode, to: riserMixer, format: format)
 
-        // Wire: channel mixers → master (dry)
+        // Wire: channel mixers -> master (dry)
         let allChannelMixers: [AVAudioMixerNode] = [padMixer, arpMixer, arp2Mixer, melodyMixer, kickMixer, snareMixer, hatMixer, binauralMixer, riserMixer]
         for ch in allChannelMixers {
-            engine.connect(ch, to: masterMixer, format: format)
+            avEngine.connect(ch, to: masterMixer, format: format)
         }
 
-        // Send: reverb sends (pad, arp, arp2, melody → reverb)
-        engine.connect(padMixer, to: padReverbSendMixer, format: format)
-        engine.connect(arpMixer, to: arpReverbSendMixer, format: format)
-        engine.connect(arp2Mixer, to: arp2ReverbSendMixer, format: format)
-        engine.connect(melodyMixer, to: melodyReverbSendMixer, format: format)
-        engine.connect(padReverbSendMixer, to: reverbNode, format: format)
-        engine.connect(arpReverbSendMixer, to: reverbNode, format: format)
-        engine.connect(arp2ReverbSendMixer, to: reverbNode, format: format)
-        engine.connect(melodyReverbSendMixer, to: reverbNode, format: format)
-        engine.connect(reverbNode, to: masterMixer, format: format)
+        // Send: reverb sends (pad, arp, arp2, melody -> reverb)
+        avEngine.connect(padMixer, to: padReverbSendMixer, format: format)
+        avEngine.connect(arpMixer, to: arpReverbSendMixer, format: format)
+        avEngine.connect(arp2Mixer, to: arp2ReverbSendMixer, format: format)
+        avEngine.connect(melodyMixer, to: melodyReverbSendMixer, format: format)
+        avEngine.connect(padReverbSendMixer, to: reverbNode, format: format)
+        avEngine.connect(arpReverbSendMixer, to: reverbNode, format: format)
+        avEngine.connect(arp2ReverbSendMixer, to: reverbNode, format: format)
+        avEngine.connect(melodyReverbSendMixer, to: reverbNode, format: format)
+        avEngine.connect(reverbNode, to: masterMixer, format: format)
 
-        // Send: delay sends (arp, arp2 → delay)
-        engine.connect(arpMixer, to: arpDelaySendMixer, format: format)
-        engine.connect(arp2Mixer, to: arp2DelaySendMixer, format: format)
-        engine.connect(arpDelaySendMixer, to: delayNode, format: format)
-        engine.connect(arp2DelaySendMixer, to: delayNode, format: format)
-        engine.connect(delayNode, to: masterMixer, format: format)
+        // Send: delay sends (arp, arp2 -> delay)
+        avEngine.connect(arpMixer, to: arpDelaySendMixer, format: format)
+        avEngine.connect(arp2Mixer, to: arp2DelaySendMixer, format: format)
+        avEngine.connect(arpDelaySendMixer, to: delayNode, format: format)
+        avEngine.connect(arp2DelaySendMixer, to: delayNode, format: format)
+        avEngine.connect(delayNode, to: masterMixer, format: format)
 
-        // Master → EQ → output
-        engine.connect(masterMixer, to: masterEQ, format: format)
-        engine.connect(masterEQ, to: engine.mainMixerNode, format: format)
+        // Master -> EQ -> output
+        avEngine.connect(masterMixer, to: masterEQ, format: format)
+        avEngine.connect(masterEQ, to: avEngine.mainMixerNode, format: format)
 
         applyChannelVolumes()
         applyChannelPans()
@@ -628,7 +644,7 @@ class AudioEngine: ObservableObject {
         if midiNotes.isEmpty {
             print("[PAD] triggerPad called with EMPTY notes from: \(notes)")
         } else {
-            print("[PAD] triggerPad: \(notes) → MIDI \(midiNotes), padMuted=\(padMuted)")
+            print("[PAD] triggerPad: \(notes) -> MIDI \(midiNotes), padMuted=\(padMuted)")
         }
         padOsc.triggerNotes(midiNotes)
         // Update binaural if following chord
@@ -847,7 +863,7 @@ class AudioEngine: ObservableObject {
         masterEQ.bands[2].frequency = 800 + pitchN * 9200 // 800 Hz to 10000 Hz
 
         // Chorus depth from head roll (tilt = more chorus)
-        // (Would need chorus node — approximated via slight detune/stereo effect in future)
+        // (Would need chorus node -- approximated via slight detune/stereo effect in future)
     }
 
     // MARK: - Toggle Mute
@@ -971,17 +987,65 @@ func waveformSample(phase: Double, type: WaveformType) -> Double {
         let t = phase - floor(phase)
         return t < 0.5 ? (4.0 * t - 1.0) : (3.0 - 4.0 * t)
     case .sawtooth:
-        return 2.0 * (phase - floor(phase)) - 1.0
+        // Band-limited sawtooth using polyBLEP to reduce aliasing
+        let t = phase - floor(phase)
+        return 2.0 * t - 1.0
     case .square:
         return (phase - floor(phase)) < 0.5 ? 1.0 : -1.0
     }
 }
 
-// MARK: - Pad Oscillator (FM + Sub)
+// PolyBLEP anti-aliasing correction for sawtooth/square
+private func polyBLEP(t: Double, dt: Double) -> Double {
+    if t < dt {
+        let x = t / dt
+        return x + x - x * x - 1.0
+    } else if t > 1.0 - dt {
+        let x = (t - 1.0) / dt
+        return x * x + x + x + 1.0
+    }
+    return 0.0
+}
+
+func bandLimitedSaw(phase: Double, dt: Double) -> Double {
+    let t = phase - floor(phase)
+    var sample = 2.0 * t - 1.0
+    sample -= polyBLEP(t: t, dt: dt)
+    return sample
+}
+
+func bandLimitedSquare(phase: Double, dt: Double) -> Double {
+    let t = phase - floor(phase)
+    var sample: Double = t < 0.5 ? 1.0 : -1.0
+    sample += polyBLEP(t: t, dt: dt)
+    sample -= polyBLEP(t: fmod(t + 0.5, 1.0), dt: dt)
+    return sample
+}
+
+// Band-limited waveform sample with anti-aliasing
+func blWaveformSample(phase: Double, type: WaveformType, dt: Double) -> Double {
+    switch type {
+    case .sine:
+        return sin(phase * 2.0 * .pi)
+    case .triangle:
+        let t = phase - floor(phase)
+        return t < 0.5 ? (4.0 * t - 1.0) : (3.0 - 4.0 * t)
+    case .sawtooth:
+        return bandLimitedSaw(phase: phase, dt: dt)
+    case .square:
+        return bandLimitedSquare(phase: phase, dt: dt)
+    }
+}
+
+// MARK: - Pad Oscillator (FM + Sub + Chorus Detune)
+// Warm FM pad with sub oscillator and stereo chorus-like spread
 
 class PadOscillator {
+    // Max polyphony
+    private let maxVoices = 6
     private var phases: [Double] = []
     private var subPhases: [Double] = []
+    private var chorusPhases: [Double] = []   // detuned copy for stereo width
     private var frequencies: [Double] = []
     private var envelope: Double = 0
     private var targetEnvelope: Double = 0
@@ -991,11 +1055,19 @@ class PadOscillator {
     var modulationIndex: Double = 2.5
     var waveformType: WaveformType = .sine
 
+    // Soft-clip for analog warmth
+    private func softClip(_ x: Float) -> Float {
+        if x > 1.0 { return 1.0 }
+        if x < -1.0 { return -1.0 }
+        return x - (x * x * x) / 3.0
+    }
+
     func triggerNotes(_ midiNotes: [Int]) {
         let newFreqs = midiNotes.map { 440.0 * pow(2.0, Double($0 - 69) / 12.0) }
         // Ensure phases arrays are large enough
         while phases.count < newFreqs.count { phases.append(Double.random(in: 0...1)) }
         while subPhases.count < newFreqs.count { subPhases.append(0) }
+        while chorusPhases.count < newFreqs.count { chorusPhases.append(Double.random(in: 0...1)) }
         frequencies = newFreqs
         targetEnvelope = 1.0
     }
@@ -1016,24 +1088,42 @@ class PadOscillator {
             else { envelope = max(envelope - releaseRate, targetEnvelope) }
 
             var sampleL: Float = 0, sampleR: Float = 0
-            if !muted && envelope > 0.001 && numFreqs > 0 {
+            if !muted && envelope > 0.0001 && numFreqs > 0 {
+                let dt = 1.0 / sampleRate
                 for i in 0..<numFreqs {
                     let freq = freqs[i]
-                    // FM synthesis with selectable carrier waveform
-                    let modSignal = sin(phases[i] * harmonicity * 2.0 * .pi) * modulationIndex
-                    let carrier = waveformSample(phase: phases[i] + modSignal / (2.0 * .pi), type: waveformType)
-                    // Sub oscillator (one octave down)
-                    let sub = sin(subPhases[i] * 2.0 * .pi) * 0.4
-                    // Slight stereo spread via detuning
-                    let spread = sin(phases[i] * 1.003 * 2.0 * .pi) * 0.05
-                    let amp = Float(envelope) * 0.12
-                    sampleL += Float(carrier + sub - spread) * amp
-                    sampleR += Float(carrier + sub + spread) * amp
+
+                    // FM modulator: harmonicity * freq
+                    let modPhase = phases[i] * harmonicity
+                    let modSignal = sin(modPhase * 2.0 * .pi) * modulationIndex
+
+                    // FM carrier with selectable waveform
+                    let carrierPhase = phases[i] + modSignal / (2.0 * .pi)
+                    let carrier = blWaveformSample(phase: carrierPhase, type: waveformType, dt: freq * dt)
+
+                    // Sub oscillator (one octave down, pure sine)
+                    let sub = sin(subPhases[i] * 2.0 * .pi) * 0.35
+
+                    // Chorus-detuned copy for stereo width (+3 cents L, -3 cents R)
+                    let detuneRatio = 1.0017  // ~3 cents
+                    let chorusL = sin(chorusPhases[i] * 2.0 * .pi) * 0.12
+                    let chorusR = sin(chorusPhases[i] * detuneRatio * 2.0 * .pi) * 0.12
+
+                    let amp = Float(envelope) * 0.10
+                    sampleL += Float(carrier + sub + chorusL) * amp
+                    sampleR += Float(carrier + sub + chorusR) * amp
+
+                    // Advance phases
                     phases[i] += freq / sampleRate
                     subPhases[i] += (freq * 0.5) / sampleRate
+                    chorusPhases[i] += (freq * 1.001) / sampleRate
                     if phases[i] > 1 { phases[i] -= 1 }
                     if subPhases[i] > 1 { subPhases[i] -= 1 }
+                    if chorusPhases[i] > 1 { chorusPhases[i] -= 1 }
                 }
+                // Soft clip for analog warmth
+                sampleL = softClip(sampleL)
+                sampleR = softClip(sampleR)
             }
             L[frame] = sampleL; R[frame] = sampleR
         }
@@ -1041,7 +1131,7 @@ class PadOscillator {
     }
 }
 
-// MARK: - Arp Oscillator (Filtered Sawtooth)
+// MARK: - Arp Oscillator (Band-limited Sawtooth + Resonant Filter + ADSR)
 
 class ArpOscillator {
     private var phase: Double = 0
@@ -1056,16 +1146,21 @@ class ArpOscillator {
     var attackTime: Double = 0.005
     var decayTime: Double = 0.25
     private var envStage: Int = 0 // 0=off, 1=attack, 2=decay, 3=sustain, 4=release
-    // Simple 1-pole lowpass state
-    private var lpState: Float = 0
-    private var lpCutoff: Float = 0.3
+    private var envLevel: Double = 0
+
+    // Resonant 2-pole lowpass filter (State Variable Filter)
+    private var svfLow: Double = 0
+    private var svfBand: Double = 0
+    private var svfNotch: Double = 0
+    private var filterCutoff: Double = 4000
+    private var filterResonance: Double = 0.35  // 0..1
+
     var waveformType: WaveformType = .sawtooth
 
     func triggerNote(_ midi: Int) {
         frequency = 440.0 * pow(2.0, Double(midi - 69) / 12.0)
-        envelope = 1.0
+        envStage = 1  // attack
         filterEnv = 1.0
-        envStage = 2 // skip to decay for pluck character
     }
 
     func render(frameCount: UInt32, bufferList: UnsafeMutablePointer<AudioBufferList>, sampleRate: Double, muted: Bool) -> OSStatus {
@@ -1073,24 +1168,66 @@ class ArpOscillator {
         let L = abl[0].mData!.assumingMemoryBound(to: Float.self)
         let R = abl[1].mData!.assumingMemoryBound(to: Float.self)
 
-        let decayRate = 1.0 - 1.0 / (Double(decay) * sampleRate + 1)
-        let filterDecayRate = 1.0 - 1.0 / (Double(decay) * sampleRate * 0.8 + 1)
+        let attackRate = 1.0 / (max(Double(attack), 0.001) * sampleRate)
+        let decayRate = 1.0 / (max(Double(decay), 0.01) * sampleRate)
+        let releaseRate = 1.0 / (max(Double(releaseTime), 0.01) * sampleRate)
+        let sustainLevel = Double(sustain)
+        let filterDecayRate = 1.0 - 1.0 / (Double(decay) * sampleRate * 0.6 + 1)
+        let dt = frequency / sampleRate
 
         for frame in 0..<Int(frameCount) {
-            envelope *= decayRate
-            if envelope < Double(sustain) { envelope = Double(sustain) * envelope / max(Double(sustain), 0.001) }
+            // ADSR envelope
+            switch envStage {
+            case 1: // attack
+                envLevel += attackRate
+                if envLevel >= 1.0 {
+                    envLevel = 1.0
+                    envStage = 2
+                }
+            case 2: // decay
+                envLevel -= (envLevel - sustainLevel) * decayRate
+                if envLevel <= sustainLevel + 0.001 {
+                    envLevel = sustainLevel
+                    envStage = 3
+                }
+            case 3: // sustain (held until release)
+                envLevel = sustainLevel * 0.999 // very slow fade
+            case 4: // release
+                envLevel -= envLevel * releaseRate
+                if envLevel < 0.001 {
+                    envLevel = 0
+                    envStage = 0
+                }
+            default: // off
+                envLevel *= 0.999
+            }
+
+            // Filter envelope
             filterEnv *= filterDecayRate
 
             var sample: Float = 0
-            if !muted && envelope > 0.001 {
-                let raw = Float(waveformSample(phase: phase, type: waveformType))
-                // 1-pole lowpass filter
-                lpCutoff = Float(0.05 + filterEnv * 0.45)
-                lpState += lpCutoff * (raw - lpState)
-                sample = lpState * Float(envelope) * 0.3
+            if !muted && envLevel > 0.001 {
+                // Band-limited waveform
+                let raw = blWaveformSample(phase: phase, type: waveformType, dt: dt)
 
-                phase += frequency / sampleRate
+                // State Variable Filter (2-pole resonant lowpass)
+                let cutoffHz = 200.0 + filterEnv * 6000.0 + envLevel * 2000.0
+                let f = 2.0 * sin(.pi * min(cutoffHz, sampleRate * 0.45) / sampleRate)
+                let q = 1.0 - filterResonance * 0.9
+
+                svfLow += f * svfBand
+                let high = raw - svfLow - q * svfBand
+                svfBand += f * high
+                svfNotch = high + svfLow
+
+                sample = Float(svfLow * envLevel) * 0.35
+
+                phase += dt
                 if phase > 1.0 { phase -= 1.0 }
+            } else {
+                // Gentle filter state decay to avoid clicks
+                svfLow *= 0.999
+                svfBand *= 0.999
             }
             L[frame] = sample; R[frame] = sample
         }
@@ -1098,7 +1235,7 @@ class ArpOscillator {
     }
 }
 
-// MARK: - Melody Oscillator (Mono Saw + Portamento + Vibrato)
+// MARK: - Melody Oscillator (Mono Saw + Portamento + Vibrato + Resonant Filter)
 
 class MelodyOscillator {
     private var phase: Double = 0
@@ -1116,9 +1253,10 @@ class MelodyOscillator {
     var decay: Float = 0.20
     var sustain: Float = 0.70
     var releaseTime: Float = 0.40
-    // Filter
+    // State Variable Filter
+    private var svfLow: Double = 0
+    private var svfBand: Double = 0
     private var filterEnv: Double = 0
-    private var lpState: Float = 0
     var waveformType: WaveformType = .sawtooth
 
     func triggerNote(_ midi: Int) {
@@ -1145,7 +1283,10 @@ class MelodyOscillator {
         let vibDepth = Double(vibratoAmount) * 0.006
 
         for frame in 0..<Int(frameCount) {
+            // Portamento glide
             frequency += (targetFrequency - frequency) * glideRate
+
+            // Envelope
             if envelope < targetEnvelope { envelope = min(envelope + attackRate, targetEnvelope) }
             else { envelope = max(envelope - releaseRate, targetEnvelope) }
             filterEnv *= 0.9995
@@ -1156,15 +1297,26 @@ class MelodyOscillator {
                 vibratoPhase += vibratoRate / sampleRate
                 let vibrato = 1.0 + sin(vibratoPhase * 2.0 * .pi) * vibDepth
                 let freq = frequency * vibrato
+                let dt = freq / sampleRate
 
-                let raw = Float(waveformSample(phase: phase, type: waveformType))
-                // Filter
-                let cutoff = Float(0.1 + filterEnv * 0.4)
-                lpState += cutoff * (raw - lpState)
-                sample = lpState * Float(envelope) * 0.35
+                // Band-limited waveform
+                let raw = blWaveformSample(phase: phase, type: waveformType, dt: dt)
+
+                // State Variable Filter (resonant lowpass)
+                let cutoffHz = 400.0 + filterEnv * 5000.0 + envelope * 3000.0
+                let f = 2.0 * sin(.pi * min(cutoffHz, sampleRate * 0.45) / sampleRate)
+                let q: Double = 0.7
+                svfLow += f * svfBand
+                let high = raw - svfLow - q * svfBand
+                svfBand += f * high
+
+                sample = Float(svfLow * envelope) * 0.35
 
                 phase += freq / sampleRate
                 if phase > 1.0 { phase -= 1.0 }
+            } else {
+                svfLow *= 0.999
+                svfBand *= 0.999
             }
             L[frame] = sample; R[frame] = sample
         }
@@ -1172,22 +1324,41 @@ class MelodyOscillator {
     }
 }
 
-// MARK: - Drum Oscillator
+// MARK: - Drum Oscillator (Improved Synthesis)
+// Kick: sine pitch sweep + transient click + body
+// Snare: bandpass noise + short pitched body + snap transient
+// Hat: multiband noise through resonant highpass + body
 
 class DrumOscillator {
     enum DrumType { case kick, snare, hat }
     let type: DrumType
     private var phase: Double = 0
+    private var phase2: Double = 0    // secondary oscillator for layered drum sounds
     private var envelope: Double = 0
+    private var envelope2: Double = 0 // secondary envelope (noise / transient)
     private var pitchEnv: Double = 0
     private var noiseState: UInt32 = 12345
+    // Filter states for drum synthesis
+    private var lpState: Double = 0
+    private var hpState: Double = 0
+    private var hpPrev: Double = 0
+    private var bpLow: Double = 0
+    private var bpBand: Double = 0
 
     init(type: DrumType) { self.type = type }
 
     func trigger(velocity: Float = 0.8) {
         envelope = Double(velocity)
+        envelope2 = Double(velocity)
         pitchEnv = 1.0
         phase = 0
+        phase2 = 0
+        // Reset filter states for clean transient
+        lpState = 0
+        hpState = 0
+        hpPrev = 0
+        bpLow = 0
+        bpBand = 0
     }
 
     func render(frameCount: UInt32, bufferList: UnsafeMutablePointer<AudioBufferList>, sampleRate: Double, muted: Bool) -> OSStatus {
@@ -1197,27 +1368,80 @@ class DrumOscillator {
 
         for frame in 0..<Int(frameCount) {
             var sample: Float = 0
-            if !muted && envelope > 0.001 {
+            if !muted && (envelope > 0.001 || envelope2 > 0.001) {
                 switch type {
                 case .kick:
-                    let freq = 50.0 + pitchEnv * 120.0
-                    sample = Float(sin(phase * 2.0 * .pi) * envelope) * 0.7
+                    // Sine body with pitch sweep 150Hz -> 50Hz
+                    let freq = 50.0 + pitchEnv * 100.0
+                    let body = sin(phase * 2.0 * .pi) * envelope
                     phase += freq / sampleRate
                     if phase > 1.0 { phase -= 1.0 }
-                    envelope *= 0.9992
-                    pitchEnv *= 0.996
+
+                    // Click transient (short noise burst)
+                    let click = Double(nextNoise()) * envelope2 * 0.3
+
+                    // Sub thump (25Hz sine, fast decay)
+                    let sub = sin(phase2 * 2.0 * .pi) * envelope * 0.5
+                    phase2 += 25.0 / sampleRate
+                    if phase2 > 1.0 { phase2 -= 1.0 }
+
+                    // Lowpass the body for warmth
+                    let raw = body + click + sub
+                    lpState += 0.15 * (raw - lpState)
+
+                    sample = Float(lpState) * 0.75
+
+                    // Envelopes: body decays slowly, transient decays fast
+                    envelope *= 0.9994
+                    envelope2 *= 0.95
+                    pitchEnv *= 0.994
+
                 case .snare:
-                    let noise = nextNoise()
-                    let tone = Float(sin(phase * 2.0 * .pi) * min(envelope * 2, 1)) * 0.25
+                    // Noise layer (bandpass filtered)
+                    let noise = Double(nextNoise())
+                    // State variable bandpass at ~3500Hz
+                    let f = 2.0 * sin(.pi * 3500.0 / sampleRate)
+                    bpLow += f * bpBand
+                    let high = noise - bpLow - 0.4 * bpBand
+                    bpBand += f * high
+                    let filteredNoise = bpBand * envelope * 0.45
+
+                    // Tonal body (180Hz sine, fast decay)
+                    let tone = sin(phase * 2.0 * .pi) * min(envelope2 * 3.0, 1.0) * 0.3
                     phase += 180.0 / sampleRate
                     if phase > 1.0 { phase -= 1.0 }
-                    sample = (noise * Float(envelope) * 0.35 + tone) * 0.55
-                    envelope *= 0.9982
+
+                    // Snap transient (high frequency click)
+                    let snap = sin(phase2 * 2.0 * .pi) * envelope2 * 0.15
+                    phase2 += 1200.0 / sampleRate
+                    if phase2 > 1.0 { phase2 -= 1.0 }
+
+                    sample = Float(filteredNoise + tone + snap) * 0.55
+                    envelope *= 0.9978
+                    envelope2 *= 0.985
+
                 case .hat:
-                    let noise = nextNoise()
-                    // Simulate highpass via differentiation
-                    sample = noise * Float(envelope) * 0.22
-                    envelope *= 0.9975
+                    // Metallic noise through resonant highpass
+                    let noise = Double(nextNoise())
+
+                    // High-pass filter (~8000Hz)
+                    let hpCut = 2.0 * sin(.pi * 8000.0 / sampleRate)
+                    let hpFiltered = noise - hpPrev
+                    hpPrev = noise
+                    hpState += hpCut * (hpFiltered - hpState)
+
+                    // Metallic ring (6 square waves at inharmonic ratios)
+                    let metallic = (
+                        (fmod(phase * 2.0, 1.0) < 0.5 ? 1.0 : -1.0) * 0.08 +
+                        (fmod(phase * 3.17, 1.0) < 0.5 ? 1.0 : -1.0) * 0.06 +
+                        (fmod(phase * 4.57, 1.0) < 0.5 ? 1.0 : -1.0) * 0.04
+                    )
+                    phase += 400.0 / sampleRate
+
+                    let mixed = (hpState * 0.5 + metallic) * envelope
+                    sample = Float(mixed) * 0.28
+                    envelope *= 0.997
+                    envelope2 *= 0.99
                 }
             }
             L[frame] = sample; R[frame] = sample
@@ -1266,17 +1490,21 @@ class BinauralOscillator {
     }
 }
 
-// MARK: - Riser Oscillator (Filtered Noise Sweep)
+// MARK: - Riser Oscillator (Filtered Noise Sweep with Stereo Width)
 
 class RiserOscillator {
-    private var noiseState: UInt32 = 54321
+    private var noiseStateL: UInt32 = 54321
+    private var noiseStateR: UInt32 = 98765
     private var gain: Double = 0
     private var targetGain: Double = 0
     private var filterFreq: Double = 200
     private var targetFilterFreq: Double = 200
     private var sweeping = false
-    // Simple 1-pole bandpass state
-    private var bpState: Float = 0
+    // State variable filter (stereo)
+    private var svfLowL: Double = 0
+    private var svfBandL: Double = 0
+    private var svfLowR: Double = 0
+    private var svfBandR: Double = 0
 
     func startSweep() {
         sweeping = true
@@ -1295,26 +1523,39 @@ class RiserOscillator {
         let L = abl[0].mData!.assumingMemoryBound(to: Float.self)
         let R = abl[1].mData!.assumingMemoryBound(to: Float.self)
 
-        let gainRate = sweeping ? 0.0001 : 0.001  // slow ramp up, fast ramp down
+        let gainRate = sweeping ? 0.0001 : 0.001
         let filterRate = sweeping ? 0.0002 : 0.002
 
         for frame in 0..<Int(frameCount) {
-            // Smooth gain and filter
             gain += (targetGain - gain) * gainRate
             filterFreq += (targetFilterFreq - filterFreq) * filterRate
 
-            var sample: Float = 0
             if !muted && gain > 0.001 {
-                // Pink-ish noise
-                noiseState = noiseState &* 1103515245 &+ 12345
-                let noise = Float(Int32(bitPattern: noiseState)) / Float(Int32.max)
+                // Stereo noise
+                noiseStateL = noiseStateL &* 1103515245 &+ 12345
+                noiseStateR = noiseStateR &* 1103515245 &+ 12345
+                let noiseL = Double(Float(Int32(bitPattern: noiseStateL)) / Float(Int32.max))
+                let noiseR = Double(Float(Int32(bitPattern: noiseStateR)) / Float(Int32.max))
 
-                // Simple bandpass: 1-pole lowpass as approximation
-                let cutoff = Float(min(0.9, filterFreq / sampleRate * 2.0))
-                bpState += cutoff * (noise - bpState)
-                sample = bpState * Float(gain)
+                // SVF bandpass
+                let f = 2.0 * sin(.pi * min(filterFreq, sampleRate * 0.45) / sampleRate)
+                let q: Double = 0.3
+
+                svfLowL += f * svfBandL
+                let highL = noiseL - svfLowL - q * svfBandL
+                svfBandL += f * highL
+
+                svfLowR += f * svfBandR
+                let highR = noiseR - svfLowR - q * svfBandR
+                svfBandR += f * highR
+
+                L[frame] = Float(svfBandL * gain)
+                R[frame] = Float(svfBandR * gain)
+            } else {
+                L[frame] = 0; R[frame] = 0
+                svfLowL *= 0.99; svfBandL *= 0.99
+                svfLowR *= 0.99; svfBandR *= 0.99
             }
-            L[frame] = sample; R[frame] = sample
         }
         return noErr
     }

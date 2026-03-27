@@ -4,12 +4,23 @@ options:
   deploymentTarget:
     iOS: "17.0"
 
+packages:
+  AudioKit:
+    url: https://github.com/AudioKit/AudioKit
+    from: "5.6.0"
+  SoundpipeAudioKit:
+    url: https://github.com/AudioKit/SoundpipeAudioKit
+    from: "5.6.0"
+
 targets:
   Jammerman:
     type: application
     platform: iOS
     sources:
       - Jammerman
+    dependencies:
+      - package: AudioKit
+      - package: SoundpipeAudioKit
     info:
       path: Jammerman/Info.plist
       properties:
