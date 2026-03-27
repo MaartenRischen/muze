@@ -304,8 +304,9 @@ MUZE.Visualizer = {
     // 3. Waveform ring + beat halo → drawn on behind-canvas (behind user)
     //    Follow the face so it sits like a halo behind the head
     const cx = this._faceCx;
-    const cy = this._faceCy;
-    const baseRadius = Math.min(w, h) * 0.18;
+    const headR = Math.min(w, h) * 0.14;
+    const cy = this._faceCy - headR * 0.5; // offset up half a head
+    const baseRadius = Math.min(w, h) * 0.36;
     const beatExpand = this._beatPulse * 30;
     const bloomExpand = this._beatBloomRadius * baseRadius * 0.18;
     const radius = baseRadius + energy * 80 + beatExpand + bloomExpand;
@@ -657,11 +658,11 @@ MUZE.Visualizer = {
   // Gradients start from head radius outward — nothing draws over the face
   // ============================================================
   _drawBeatHalo(ctx, w, h, bass, energy, accentRgb) {
+    const headR = Math.min(w, h) * 0.28; // 2x size
     const cx = this._faceCx;
-    const cy = this._faceCy;
+    const cy = this._faceCy - headR * 0.25; // offset up half a head
     const bp = this._beatPulse;
     const bloom = this._beatBloomRadius;
-    const headR = Math.min(w, h) * 0.14;
 
     // Update halo state
     this._haloGlow += (energy * 0.6 + bp * 0.8 - this._haloGlow) * 0.12;
