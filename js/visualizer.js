@@ -112,8 +112,7 @@ MUZE.Visualizer = {
   // ---- Explosion screen glow ----
   _explosionGlow: null,  // { x, y, life, startTime }
 
-  // ---- Beat halo (own canvas between cam and bg-canvas) ----
-  _haloCanvas: null, _haloCtx: null,
+  // ---- Beat halo (behind-head effect via face-oval clip) ----
   _haloRays: [],
   _haloRings: [],
   _haloGlow: 0,
@@ -127,8 +126,6 @@ MUZE.Visualizer = {
   init() {
     this._canvas = document.getElementById('overlay');
     this._ctx = this._canvas.getContext('2d');
-    this._haloCanvas = document.getElementById('beat-halo-canvas');
-    if (this._haloCanvas) this._haloCtx = this._haloCanvas.getContext('2d');
     // Create offscreen trail canvas for light painting persistence
     this._trailCanvas = document.createElement('canvas');
     this._trailCtx = this._trailCanvas.getContext('2d');
@@ -145,13 +142,6 @@ MUZE.Visualizer = {
     this._canvas.style.width = this._width + 'px';
     this._canvas.style.height = this._height + 'px';
     this._ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (this._haloCanvas) {
-      this._haloCanvas.width = this._width * dpr;
-      this._haloCanvas.height = this._height * dpr;
-      this._haloCanvas.style.width = this._width + 'px';
-      this._haloCanvas.style.height = this._height + 'px';
-      this._haloCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
     // Reset smooth buffers on resize
     this._smoothFFTBins = null;
     this._smoothWaveform = null;
@@ -285,16 +275,35 @@ MUZE.Visualizer = {
     this._updateConstellation();
     this._drawConstellation(ctx, w, h, accentRgb);
 
-    // 3. Circular waveform ring (the centerpiece)
+    // Pre-compute face position early so all layers can use it
+    const landmarks = MUZE.State._rawLandmarks;
+    const hasFace = landmarks && MUZE.State.faceDetected;
+    if (hasFace) {
+      this._computeMirroredLandmarks(landmarks, w, h);
+      // Track face center from nose tip
+      const ml = this._mirroredLandmarks;
+      if (ml && ml[1]) {
+        this._faceCx += (ml[1].x - this._faceCx) * 0.2;
+        this._faceCy += (ml[1].y - this._faceCy) * 0.2;
+      }
+    } else if (this._faceCx === 0) {
+      this._faceCx = w / 2;
+      this._faceCy = h * 0.35;
+    }
+
+    // 3. Waveform ring + beat halo (clipped behind the head)
     const cx = w / 2;
     const cy = h * 0.38;
     const baseRadius = Math.min(w, h) * 0.18;
     const beatExpand = this._beatPulse * 30;
-    // Beat bloom adds 15-20% elastic expansion
     const bloomExpand = this._beatBloomRadius * baseRadius * 0.18;
     const radius = baseRadius + energy * 80 + beatExpand + bloomExpand;
 
+    // Draw waveform ring normally (not on face)
     this._drawWaveformRing(ctx, waveform, cx, cy, radius, energy, accentRgb);
+
+    // Draw beat halo BEHIND the head using face-oval clip
+    this._drawBeatHalo(ctx, w, h, bass, energy, accentRgb);
 
     // 4. Particles
     const particleEnergy = fft ? Math.max(energy, mid * 2) : energy;
@@ -318,14 +327,8 @@ MUZE.Visualizer = {
     this._updateBurstParticles();
     this._drawBurstParticles(ctx);
 
-    // 7b. Beat halo (own canvas, behind user via z-stacking)
-    this._drawBeatHalo(bass, energy, accentRgb);
-
     // 8. Face mesh AR effects (contour glow, iris, particles, aura, trails)
-    const landmarks = MUZE.State._rawLandmarks;
-    if (landmarks && MUZE.State.faceDetected) {
-      // Pre-compute mirrored coordinates once per frame
-      this._computeMirroredLandmarks(landmarks, w, h);
+    if (hasFace) {
       const ml = this._mirroredLandmarks;
 
       // 8a. Head rotation ghost trails (drawn first, behind everything)
@@ -637,27 +640,10 @@ MUZE.Visualizer = {
 
   // ============================================================
   // BEAT HALO — dramatic pulsing light behind user's head
-  // Drawn on overlay canvas BEFORE face mesh so face effects render on top
+  // Uses face-oval evenodd clip so it only renders AROUND the head
   // ============================================================
-  _drawBeatHalo(bass, energy, accentRgb) {
-    const hctx = this._haloCtx;
-    if (!hctx) return;
-    const w = this._width, h = this._height;
-    hctx.clearRect(0, 0, w, h);
-
-    // Compute face center directly from raw landmarks (mirrored X)
-    // This runs before _computeMirroredLandmarks, so we read raw data
-    const lm = MUZE.State._rawLandmarks;
-    if (lm && lm[1] && MUZE.State.faceDetected) {
-      // Landmark 1 = nose tip. Raw coords are 0-1, mirror X for selfie view
-      const targetX = (1 - lm[1].x) * w;
-      const targetY = lm[1].y * h;
-      this._faceCx += (targetX - this._faceCx) * 0.2;
-      this._faceCy += (targetY - this._faceCy) * 0.2;
-    } else if (this._faceCx === 0) {
-      this._faceCx = w / 2;
-      this._faceCy = h * 0.35;
-    }
+  _drawBeatHalo(ctx, w, h, bass, energy, accentRgb) {
+    const hctx = ctx;
     const cx = this._faceCx;
     const cy = this._faceCy;
 
@@ -700,6 +686,36 @@ MUZE.Visualizer = {
 
     hctx.save();
     hctx.globalCompositeOperation = 'lighter';
+
+    // Clip to everything OUTSIDE the face oval so halo appears behind head
+    const ml = this._mirroredLandmarks;
+    const oval = this._FACE_OVAL;
+    if (ml && oval && MUZE.State.faceDetected && ml[oval[0]]) {
+      let fcx = 0, fcy = 0, cnt = 0;
+      for (let i = 0; i < oval.length; i++) {
+        const pt = ml[oval[i]];
+        if (pt) { fcx += pt.x; fcy += pt.y; cnt++; }
+      }
+      if (cnt > 0) {
+        fcx /= cnt; fcy /= cnt;
+        hctx.beginPath();
+        hctx.rect(0, 0, w, h);  // outer rect = full canvas
+        // Face oval path (padded outward 15px) — evenodd creates a hole
+        const pad = 15;
+        for (let i = 0; i < oval.length; i++) {
+          const pt = ml[oval[i]];
+          if (!pt) continue;
+          const dx = pt.x - fcx, dy = pt.y - fcy;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const ex = pt.x + (dx / dist) * pad;
+          const ey = pt.y + (dy / dist) * pad;
+          if (i === 0) hctx.moveTo(ex, ey);
+          else hctx.lineTo(ex, ey);
+        }
+        hctx.closePath();
+        hctx.clip('evenodd');
+      }
+    }
 
     // === PASS 1: Deep outer glow (very large, very soft) ===
     const outerR = 120 + glow * 200 + bloom * 60;
