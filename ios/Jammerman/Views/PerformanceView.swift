@@ -18,6 +18,10 @@ struct PerformanceView: View {
             CameraPreview(session: coordinator.camera.captureSession)
                 .ignoresSafeArea()
 
+            // === VISUALIZER OVERLAY ===
+            VisualizerOverlay(coordinator: coordinator)
+                .ignoresSafeArea()
+
             // === TOP BAR ===
             VStack {
                 topBar.padding(.top, 8)

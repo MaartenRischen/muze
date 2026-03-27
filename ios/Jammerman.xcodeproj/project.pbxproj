@@ -23,6 +23,7 @@
 		94D529ACAA5EFC49CD4F8CBC /* AUv3Host.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0F45595AC9AB89600C9D02 /* AUv3Host.swift */; };
 		A3502D9B826F06CBFCFCB15F /* JammermanState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52285CAB12D6522C3FC53462 /* JammermanState.swift */; };
 		B480A17FE30CF111580A2C47 /* FaceTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C23C27CB0A0F05060A0CFEE /* FaceTracker.swift */; };
+		DB28DF3003B195FAED723574 /* VisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57943F33B859022E2441B2B /* VisualizerView.swift */; };
 		F1E7C5A6DAB1E1EFF8C48C1B /* MetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E55D27AD2331EDB7C71BC8DB /* MetalRenderer.swift */; };
 		F6CDAD16A5988A17A6837B94 /* TrackingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888293D9F6D5BA45BD6E3F66 /* TrackingCoordinator.swift */; };
 /* End PBXBuildFile section */
@@ -48,6 +49,7 @@
 		E55D27AD2331EDB7C71BC8DB /* MetalRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalRenderer.swift; sourceTree = "<group>"; };
 		E73E915AB124276C309368DC /* Jammerman.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Jammerman.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EFC22A67B861D0C0D3E7A75D /* AudioEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEngine.swift; sourceTree = "<group>"; };
+		F57943F33B859022E2441B2B /* VisualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualizerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -63,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				E55D27AD2331EDB7C71BC8DB /* MetalRenderer.swift */,
+				F57943F33B859022E2441B2B /* VisualizerView.swift */,
 			);
 			path = Rendering;
 			sourceTree = "<group>";
@@ -210,6 +213,7 @@
 				7E1FA72994FBB1C68B03ECEC /* SynthPanelView.swift in Sources */,
 				F6CDAD16A5988A17A6837B94 /* TrackingCoordinator.swift in Sources */,
 				0ECA988981E3647DF27370C0 /* TutorialView.swift in Sources */,
+				DB28DF3003B195FAED723574 /* VisualizerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
