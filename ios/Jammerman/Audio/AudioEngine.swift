@@ -791,7 +791,7 @@ class AudioEngine: ObservableObject {
                 // Schedule recovery over ~100ms
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
                     self?.sidechainGain = 0.5
-                    self?.padMixer?.outputVolume = self?.dbToGain(self?.channelVolumes["pad"] ?? -14) ?? 0 * 0.5
+                    self?.padMixer?.outputVolume = (self?.dbToGain(self?.channelVolumes["pad"] ?? -14) ?? 0.2) * 0.5
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                     self?.sidechainGain = 1.0

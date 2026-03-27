@@ -251,5 +251,29 @@ class TrackingCoordinator: ObservableObject {
 
     func toggleMute(_ channel: String) {
         audioEngine.toggleMute(channel: channel)
+
+        // Seed default notes when toggling ON — mirrors web fix (commit 5a3b3b5)
+        // Without this, pad/arp have empty note arrays until face detection runs
+        let nowUnmuted = !audioEngine.isMuted(channel)
+        guard nowUnmuted else { return } // just muted, no seed needed
+
+        let scale = state.currentScale
+        let root = state.effectiveRoot
+        let degree = JammermanConfig.chordDegrees[state.chordIndex % JammermanConfig.chordDegrees.count]
+
+        switch channel {
+        case "pad":
+            let padNotes = MusicTheory.getPadVoicing(root: root, scale: scale, degree: degree)
+            audioEngine.triggerPad(notes: padNotes)
+            currentPadKey = padNotes.joined(separator: ",")
+        case "arp":
+            let notes = MusicTheory.getArpNotes(scale: scale, root: root, degree: degree, octaveRange: 2)
+            audioEngine.updateArpNotes(notes)
+        case "arp2":
+            let notes = MusicTheory.getArpNotes(scale: scale, root: root, degree: degree, octaveRange: 2)
+            audioEngine.updateArp2Notes(notes)
+        default:
+            break
+        }
     }
 }
