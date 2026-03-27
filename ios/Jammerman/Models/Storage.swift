@@ -55,8 +55,15 @@ enum JammermanStorage {
     }
 
     static func load(state: JammermanState, engine: AudioEngine) {
-        // Remove stale v1 data that causes crash
+        // Remove stale data that causes issues
         UserDefaults.standard.removeObject(forKey: "jammerman-settings-v1")
+        // Also clear v2 on first run to prevent bad state from dev builds
+        // TODO: remove this line once app is stable
+        if UserDefaults.standard.bool(forKey: "jammerman-v2-clean") == false {
+            UserDefaults.standard.removeObject(forKey: key)
+            UserDefaults.standard.set(true, forKey: "jammerman-v2-clean")
+            return
+        }
         guard let dict = UserDefaults.standard.dictionary(forKey: key) as? [String: String] else { return }
 
         if let v = dict["rootOffset"], let n = Int(v) { state.rootOffset = n }

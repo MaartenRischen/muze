@@ -982,8 +982,7 @@ func waveformSample(phase: Double, type: WaveformType) -> Double {
 class PadOscillator {
     private var phases: [Double] = []
     private var subPhases: [Double] = []
-    private var _frequencies: [Double] = []
-    private var renderFreqs: [Double] = [] // thread-safe copy for render
+    private var frequencies: [Double] = []
     private var envelope: Double = 0
     private var targetEnvelope: Double = 0
     var attackRate: Double = 0.001
@@ -991,14 +990,14 @@ class PadOscillator {
     var harmonicity: Double = 1.5
     var modulationIndex: Double = 2.5
     var waveformType: WaveformType = .sine
-    private var needsUpdate = false
 
     func triggerNotes(_ midiNotes: [Int]) {
-        _frequencies = midiNotes.map { 440.0 * pow(2.0, Double($0 - 69) / 12.0) }
-        while phases.count < _frequencies.count { phases.append(Double.random(in: 0...1)) }
-        while subPhases.count < _frequencies.count { subPhases.append(0) }
+        let newFreqs = midiNotes.map { 440.0 * pow(2.0, Double($0 - 69) / 12.0) }
+        // Ensure phases arrays are large enough
+        while phases.count < newFreqs.count { phases.append(Double.random(in: 0...1)) }
+        while subPhases.count < newFreqs.count { subPhases.append(0) }
+        frequencies = newFreqs
         targetEnvelope = 1.0
-        needsUpdate = true
     }
 
     func release() { targetEnvelope = 0.0 }
@@ -1008,20 +1007,18 @@ class PadOscillator {
         let L = abl[0].mData!.assumingMemoryBound(to: Float.self)
         let R = abl[1].mData!.assumingMemoryBound(to: Float.self)
 
-        // Copy frequencies from main thread safely
-        if needsUpdate {
-            renderFreqs = _frequencies
-            needsUpdate = false
-        }
+        // Capture current state for this render pass
+        let freqs = frequencies
+        let numFreqs = min(freqs.count, phases.count)
 
         for frame in 0..<Int(frameCount) {
             if envelope < targetEnvelope { envelope = min(envelope + attackRate, targetEnvelope) }
             else { envelope = max(envelope - releaseRate, targetEnvelope) }
 
             var sampleL: Float = 0, sampleR: Float = 0
-            if !muted && envelope > 0.001 {
-                for i in 0..<renderFreqs.count where i < phases.count {
-                    let freq = renderFreqs[i]
+            if !muted && envelope > 0.001 && numFreqs > 0 {
+                for i in 0..<numFreqs {
+                    let freq = freqs[i]
                     // FM synthesis with selectable carrier waveform
                     let modSignal = sin(phases[i] * harmonicity * 2.0 * .pi) * modulationIndex
                     let carrier = waveformSample(phase: phases[i] + modSignal / (2.0 * .pi), type: waveformType)
