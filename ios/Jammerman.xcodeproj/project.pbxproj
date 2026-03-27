@@ -153,6 +153,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					7C4586E6377784A1A6BF1E68 = {
+						DevelopmentTeam = 98KHR6P2RN;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 299F44B556C60AF8189FC501 /* Build configuration list for PBXProject "Jammerman" */;
@@ -204,9 +208,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 98KHR6P2RN;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Jammerman/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Jammerman uses your camera to track face and hand gestures for music control";
@@ -227,9 +232,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 98KHR6P2RN;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Jammerman/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Jammerman uses your camera to track face and hand gestures for music control";

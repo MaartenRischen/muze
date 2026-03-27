@@ -147,10 +147,11 @@ class TrackingCoordinator: ObservableObject {
         let octShift = Int(floor(state.browHeight * Float(JammermanConfig.octaveRange))) * 12
         let effectiveRoot = state.effectiveRoot + octShift
 
-        // Update arp notes
+        // Update arp notes (both arps)
         let degree = JammermanConfig.chordDegrees[state.chordIndex % JammermanConfig.chordDegrees.count]
         let arpNotes = MusicTheory.getArpNotes(scale: scale, root: effectiveRoot, degree: degree, octaveRange: 2)
         audioEngine.updateArpNotes(arpNotes)
+        audioEngine.updateArp2Notes(arpNotes)
 
         // Pad voicing
         let padNotes = MusicTheory.getPadVoicing(root: effectiveRoot, scale: scale, degree: degree)

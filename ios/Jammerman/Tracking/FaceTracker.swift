@@ -76,8 +76,9 @@ class FaceTracker {
         let leftCorner = outerPts[0]
         let rightCorner = outerPts[outerPts.count / 2]
         let lipCenter = Float(topLip.y + bottomLip.y) / 2
-        let leftLift = lipCenter - Float(leftCorner.y)
-        let rightLift = lipCenter - Float(rightCorner.y)
+        // Vision Y is bottom-up, so corners ABOVE center = positive Y = smile
+        let leftLift = Float(leftCorner.y) - lipCenter
+        let rightLift = Float(rightCorner.y) - lipCenter
         let avgLift = (leftLift + rightLift) / 2
         let lipCorner = clamp(remap(avgLift, min: -0.03, max: 0.03), lo: -1, hi: 1)
 
