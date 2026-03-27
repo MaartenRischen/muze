@@ -133,8 +133,9 @@ struct SynthPanelView: View {
     private var performContent: some View {
         VStack(spacing: 4) {
             sectionHeader("PRESET")
-            labelRow("preset", value: JammermanConfig.presetNames[coordinator.state.presetIdx]) {
-                coordinator.state.presetIdx = (coordinator.state.presetIdx + 1) % JammermanConfig.presetNames.count
+            labelRow("preset", value: jammermanPresets[coordinator.state.presetIdx].name) {
+                coordinator.state.presetIdx = (coordinator.state.presetIdx + 1) % jammermanPresets.count
+                coordinator.audioEngine.applyPreset(jammermanPresets[coordinator.state.presetIdx], state: coordinator.state)
             }
 
             sectionHeader("TEMPO")
@@ -217,13 +218,15 @@ struct SynthPanelView: View {
         let currentPattern = id == 1 ? coordinator.audioEngine.arpPattern : coordinator.audioEngine.arp2Pattern
         let currentNote = id == 1 ? coordinator.audioEngine.arpNoteValue : coordinator.audioEngine.arp2NoteValue
 
+        let osc = id == 1 ? coordinator.audioEngine.arpOsc : coordinator.audioEngine.arp2Osc
+
         return VStack(spacing: 4) {
             sectionHeader("SYNTH")
             labelRow("wave", value: "sawtooth") { /* TODO: waveform cycle */ }
-            sliderRow("attack", value: .constant(Float(0.01)), range: 0.001...2)
-            sliderRow("decay", value: .constant(Float(0.30)), range: 0.01...2)
-            sliderRow("sustain", value: .constant(Float(0.60)), range: 0...1)
-            sliderRow("release", value: .constant(Float(0.80)), range: 0.01...4)
+            sliderRow("attack", value: Binding(get: { osc.attack }, set: { osc.attack = $0 }), range: 0.001...2)
+            sliderRow("decay", value: Binding(get: { osc.decay }, set: { osc.decay = $0 }), range: 0.01...2)
+            sliderRow("sustain", value: Binding(get: { osc.sustain }, set: { osc.sustain = $0 }), range: 0...1)
+            sliderRow("release", value: Binding(get: { osc.releaseTime }, set: { osc.releaseTime = $0 }), range: 0.01...4)
 
             sectionHeader("PATTERN")
             labelRow("pattern", value: currentPattern) {
@@ -244,38 +247,42 @@ struct SynthPanelView: View {
     // MARK: - MELODY Tab
 
     private var melodyContent: some View {
-        VStack(spacing: 4) {
+        let mel = coordinator.audioEngine.melodyOsc
+        return VStack(spacing: 4) {
             sectionHeader("MODE")
-            labelRow("porta", value: coordinator.audioEngine.melodyOsc.portamentoEnabled ? "ON" : "OFF") {
-                coordinator.audioEngine.melodyOsc.portamentoEnabled.toggle()
+            labelRow("porta", value: mel.portamentoEnabled ? "ON" : "OFF") {
+                mel.portamentoEnabled.toggle()
             }
-            sliderRow("vibrato", value: .constant(Float(0.0)), range: 0...1)
+            sliderRow("vibrato", value: Binding(get: { mel.vibratoAmount }, set: { mel.vibratoAmount = $0 }), range: 0...1)
 
             sectionHeader("SYNTH")
-            labelRow("wave", value: "triangle") { /* TODO */ }
-            sliderRow("attack", value: .constant(Float(0.05)), range: 0.001...2)
-            sliderRow("decay", value: .constant(Float(0.20)), range: 0.01...2)
-            sliderRow("sustain", value: .constant(Float(0.70)), range: 0...1)
-            sliderRow("release", value: .constant(Float(0.40)), range: 0.01...4)
+            labelRow("wave", value: "triangle") { /* TODO: waveform cycle */ }
+            sliderRow("attack", value: Binding(get: { mel.attack }, set: { mel.attack = $0 }), range: 0.001...2)
+            sliderRow("decay", value: Binding(get: { mel.decay }, set: { mel.decay = $0 }), range: 0.01...2)
+            sliderRow("sustain", value: Binding(get: { mel.sustain }, set: { mel.sustain = $0 }), range: 0...1)
+            sliderRow("release", value: Binding(get: { mel.releaseTime }, set: { mel.releaseTime = $0 }), range: 0.01...4)
         }
     }
 
     // MARK: - PAD Tab
 
     private var padContent: some View {
-        VStack(spacing: 4) {
+        let pad = coordinator.audioEngine.padOsc
+        return VStack(spacing: 4) {
             sectionHeader("SYNTH")
-            labelRow("wave", value: "sine") { /* TODO */ }
+            labelRow("wave", value: "sine") { /* TODO: waveform cycle */ }
             sliderRow("harm", value: Binding(
-                get: { Float(coordinator.audioEngine.padOsc.harmonicity) },
-                set: { coordinator.audioEngine.padOsc.harmonicity = Double($0) }
+                get: { Float(pad.harmonicity) }, set: { pad.harmonicity = Double($0) }
             ), range: 0.5...8, format: "%.1f")
             sliderRow("mod idx", value: Binding(
-                get: { Float(coordinator.audioEngine.padOsc.modulationIndex) },
-                set: { coordinator.audioEngine.padOsc.modulationIndex = Double($0) }
+                get: { Float(pad.modulationIndex) }, set: { pad.modulationIndex = Double($0) }
             ), range: 0...10, format: "%.1f")
-            sliderRow("attack", value: .constant(Float(1.0)), range: 0.01...4)
-            sliderRow("release", value: .constant(Float(2.5)), range: 0.1...8)
+            sliderRow("attack", value: Binding(
+                get: { Float(pad.attackRate * 44100) }, set: { pad.attackRate = 1.0 / (Double($0) * 44100) }
+            ), range: 0.01...4)
+            sliderRow("release", value: Binding(
+                get: { Float(pad.releaseRate * 44100 * 3) }, set: { pad.releaseRate = 1.0 / (Double($0) * 44100) }
+            ), range: 0.1...8)
         }
     }
 
@@ -374,8 +381,4 @@ struct SynthPanelView: View {
     }
 }
 
-// MARK: - Preset Names
-
-extension JammermanConfig {
-    static let presetNames = ["Default", "Ambient Dream", "Dark Techno", "Lo-Fi Chill", "Bright Pop", "Deep Space", "Minimal", "Future Bass"]
-}
+// Presets are defined in Presets.swift (jammermanPresets array)

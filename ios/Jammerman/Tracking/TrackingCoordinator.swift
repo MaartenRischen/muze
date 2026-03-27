@@ -58,12 +58,23 @@ class TrackingCoordinator: ObservableObject {
         audioEngine.setDrumPattern([kick, snare, hat])
     }
 
+    private var saveTimer: Timer?
+
     func start() {
+        // Load saved settings
+        JammermanStorage.load(state: state, engine: audioEngine)
         camera.start()
         audioEngine.start()
+        // Auto-save every 2 seconds
+        saveTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            JammermanStorage.save(state: self.state, engine: self.audioEngine)
+        }
     }
 
     func stop() {
+        JammermanStorage.save(state: state, engine: audioEngine)
+        saveTimer?.invalidate()
         camera.stop()
         audioEngine.stop()
     }

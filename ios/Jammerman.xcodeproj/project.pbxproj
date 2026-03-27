@@ -24,17 +24,20 @@
 		A3502D9B826F06CBFCFCB15F /* JammermanState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52285CAB12D6522C3FC53462 /* JammermanState.swift */; };
 		B480A17FE30CF111580A2C47 /* FaceTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C23C27CB0A0F05060A0CFEE /* FaceTracker.swift */; };
 		DB28DF3003B195FAED723574 /* VisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57943F33B859022E2441B2B /* VisualizerView.swift */; };
-		F1E7C5A6DAB1E1EFF8C48C1B /* MetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E55D27AD2331EDB7C71BC8DB /* MetalRenderer.swift */; };
+		E86DD060D915E14DFA60A6D1 /* Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10631F86D4D4125290AA1567 /* Storage.swift */; };
 		F6CDAD16A5988A17A6837B94 /* TrackingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888293D9F6D5BA45BD6E3F66 /* TrackingCoordinator.swift */; };
+		F7906A15EC5FC4DA95C55F5C /* Presets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71586C73F6D2EE468003C08E /* Presets.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		07F0DD59A09C105F588D6CEB /* OneEuroFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneEuroFilter.swift; sourceTree = "<group>"; };
+		10631F86D4D4125290AA1567 /* Storage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Storage.swift; sourceTree = "<group>"; };
 		2C218E26F294C2AE0DC8DAD4 /* PerformanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceView.swift; sourceTree = "<group>"; };
 		52285CAB12D6522C3FC53462 /* JammermanState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JammermanState.swift; sourceTree = "<group>"; };
 		595A81D709627AD351FAC005 /* FeatureExtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureExtraction.swift; sourceTree = "<group>"; };
 		632721E18A98DF36C69420B7 /* JammermanConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JammermanConfig.swift; sourceTree = "<group>"; };
 		6C23C27CB0A0F05060A0CFEE /* FaceTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceTracker.swift; sourceTree = "<group>"; };
+		71586C73F6D2EE468003C08E /* Presets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presets.swift; sourceTree = "<group>"; };
 		73BC66C0F867C77C59F97840 /* HandTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandTracker.swift; sourceTree = "<group>"; };
 		7E0F45595AC9AB89600C9D02 /* AUv3Host.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AUv3Host.swift; sourceTree = "<group>"; };
 		888293D9F6D5BA45BD6E3F66 /* TrackingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingCoordinator.swift; sourceTree = "<group>"; };
@@ -46,7 +49,6 @@
 		C62BB724F810BD730BEDA99B /* CameraPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreview.swift; sourceTree = "<group>"; };
 		C97973F5C1A764165282ACB4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DEFE69880F0A48B2ED3F15AA /* MusicTheory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheory.swift; sourceTree = "<group>"; };
-		E55D27AD2331EDB7C71BC8DB /* MetalRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalRenderer.swift; sourceTree = "<group>"; };
 		E73E915AB124276C309368DC /* Jammerman.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Jammerman.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EFC22A67B861D0C0D3E7A75D /* AudioEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEngine.swift; sourceTree = "<group>"; };
 		F57943F33B859022E2441B2B /* VisualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualizerView.swift; sourceTree = "<group>"; };
@@ -64,7 +66,6 @@
 		4F0EC3E08828280D2E278405 /* Rendering */ = {
 			isa = PBXGroup;
 			children = (
-				E55D27AD2331EDB7C71BC8DB /* MetalRenderer.swift */,
 				F57943F33B859022E2441B2B /* VisualizerView.swift */,
 			);
 			path = Rendering;
@@ -120,6 +121,8 @@
 				52285CAB12D6522C3FC53462 /* JammermanState.swift */,
 				DEFE69880F0A48B2ED3F15AA /* MusicTheory.swift */,
 				07F0DD59A09C105F588D6CEB /* OneEuroFilter.swift */,
+				71586C73F6D2EE468003C08E /* Presets.swift */,
+				10631F86D4D4125290AA1567 /* Storage.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -205,11 +208,12 @@
 				45BEFE934D3AB2A72CE9174C /* JammermanApp.swift in Sources */,
 				7A9521C0D5D1A6AA2C972357 /* JammermanConfig.swift in Sources */,
 				A3502D9B826F06CBFCFCB15F /* JammermanState.swift in Sources */,
-				F1E7C5A6DAB1E1EFF8C48C1B /* MetalRenderer.swift in Sources */,
 				2295A15C8C491E9C3DC7DDE4 /* MixerPanelView.swift in Sources */,
 				2B8B2879D61927E84DFF23E7 /* MusicTheory.swift in Sources */,
 				21D3864459148D5CAD6C60AF /* OneEuroFilter.swift in Sources */,
 				847CB1108468B8E2E21B763F /* PerformanceView.swift in Sources */,
+				F7906A15EC5FC4DA95C55F5C /* Presets.swift in Sources */,
+				E86DD060D915E14DFA60A6D1 /* Storage.swift in Sources */,
 				7E1FA72994FBB1C68B03ECEC /* SynthPanelView.swift in Sources */,
 				F6CDAD16A5988A17A6837B94 /* TrackingCoordinator.swift in Sources */,
 				0ECA988981E3647DF27370C0 /* TutorialView.swift in Sources */,

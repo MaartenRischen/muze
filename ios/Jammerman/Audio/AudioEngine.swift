@@ -38,8 +38,8 @@ class AudioEngine: ObservableObject {
 
     // Synth oscillators
     var padOsc = PadOscillator()
-    private var arpOsc = ArpOscillator()
-    private var arp2Osc = ArpOscillator()
+    var arpOsc = ArpOscillator()
+    var arp2Osc = ArpOscillator()
     var melodyOsc = MelodyOscillator()
     private var kickOsc = DrumOscillator(type: .kick)
     private var snareOsc = DrumOscillator(type: .snare)
@@ -426,6 +426,9 @@ class AudioEngine: ObservableObject {
         }
     }
 
+    // Sidechain ducking state
+    private var sidechainGain: Float = 1.0
+
     private func advanceDrum() {
         guard !beatMuted, drumPattern.count >= 3 else { return }
         let step = drumStep % drumPattern[0].count
@@ -433,6 +436,21 @@ class AudioEngine: ObservableObject {
         if drumPattern[0][step] == 1 {
             let vel = drumVelocity.count > 0 && step < drumVelocity[0].count ? drumVelocity[0][step] : 0.8
             kickOsc.trigger(velocity: vel)
+            // Sidechain duck: reduce pad volume on kick
+            if !padMuted {
+                sidechainGain = 0.15
+                padMixer?.outputVolume = dbToGain(channelVolumes["pad"] ?? -14) * sidechainGain
+                // Schedule recovery over ~100ms
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                    self?.sidechainGain = 0.5
+                    self?.padMixer?.outputVolume = self?.dbToGain(self?.channelVolumes["pad"] ?? -14) ?? 0 * 0.5
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                    self?.sidechainGain = 1.0
+                    let vol = self?.channelVolumes["pad"] ?? -14
+                    self?.padMixer?.outputVolume = self?.dbToGain(vol) ?? 0.2
+                }
+            }
         }
         if drumPattern[1][step] == 1 {
             let vel = drumVelocity.count > 1 && step < drumVelocity[1].count ? drumVelocity[1][step] : 0.7
@@ -468,9 +486,20 @@ class AudioEngine: ObservableObject {
         // Delay feedback: mouth width
         delayNode.feedback = Float(state.mouthWidth) * 50
 
-        // Master EQ high shelf: head pitch controls brightness
+        // Master filter: head pitch controls brightness via EQ
+        // Pitch down = dark (cut highs), pitch up = bright (boost highs)
         let pitchN = 1 - max(0, min(1, (state.headPitch + 0.4) / 0.8))
-        masterEQ.bands[2].gain = Float((pitchN - 0.5) * 12) // -6 to +6 dB
+
+        // Low shelf: boost bass when head down
+        masterEQ.bands[0].gain = Float((1 - pitchN) * 4) // 0 to +4 dB
+
+        // High shelf: full range sweep -12 to +6 dB based on pitch
+        masterEQ.bands[2].gain = Float((pitchN - 0.3) * 18) // -5.4 to +12.6 dB
+        // Set frequency to simulate lowpass sweep
+        masterEQ.bands[2].frequency = 800 + pitchN * 9200 // 800 Hz to 10000 Hz
+
+        // Chorus depth from head roll (tilt = more chorus)
+        // (Would need chorus node — approximated via slight detune/stereo effect in future)
     }
 
     // MARK: - Toggle Mute
@@ -519,25 +548,37 @@ class AudioEngine: ObservableObject {
 
     // MARK: - Presets
 
-    func applyPreset(_ preset: [String: Any]) {
-        if let b = preset["bpm"] as? Double { setBPM(b) }
-        if let r = preset["rootOffset"] as? Int { /* handled by coordinator */ }
-        if let p = preset["arpPattern"] as? String { setArpPattern(p) }
-        if let pv = preset["padVolume"] as? Float { setChannelVolume("pad", db: pv) }
-        if let av = preset["arpVolume"] as? Float { setChannelVolume("arp", db: av) }
-        if let mv = preset["melodyVolume"] as? Float { setChannelVolume("melody", db: mv) }
-        if let kv = preset["kickVolume"] as? Float { setChannelVolume("kick", db: kv) }
-        if let sv = preset["snareVolume"] as? Float { setChannelVolume("snare", db: sv) }
-        if let hv = preset["hatVolume"] as? Float { setChannelVolume("hat", db: hv) }
-        if let sw = preset["swing"] as? Int { swing = sw }
+    func applyPreset(_ preset: JammermanPreset, state: JammermanState) {
+        setBPM(preset.bpm)
+        state.rootOffset = preset.rootOffset
+        setArpPattern(preset.arpPattern)
+        swing = preset.swing
 
-        // Synth params
-        if let padAttack = preset["padAttack"] as? Double { padOsc.attackRate = 1.0 / (padAttack * sampleRate) }
-        if let padRelease = preset["padRelease"] as? Double { padOsc.releaseRate = 1.0 / (padRelease * sampleRate) }
-        if let arpAttack = preset["arpAttack"] as? Double { arpOsc.attackTime = arpAttack }
-        if let arpDecay = preset["arpDecay"] as? Double { arpOsc.decayTime = arpDecay }
-        if let rd = preset["reverbDecay"] as? Float { /* reverb decay not directly settable on AVAudioUnitReverb */ }
-        if let df = preset["delayFeedback"] as? Float { delayNode.feedback = df * 100 }
+        // Channel volumes
+        setChannelVolume("pad", db: preset.padVolume)
+        setChannelVolume("arp", db: preset.arpVolume)
+        setChannelVolume("melody", db: preset.melodyVolume)
+        setChannelVolume("kick", db: preset.kickVolume)
+        setChannelVolume("snare", db: preset.snareVolume)
+        setChannelVolume("hat", db: preset.hatVolume)
+
+        // Pad synth
+        padOsc.harmonicity = preset.padHarmonicity
+        padOsc.modulationIndex = preset.padModIndex
+        padOsc.attackRate = 1.0 / (preset.padAttack * sampleRate)
+        padOsc.releaseRate = 1.0 / (preset.padRelease * sampleRate)
+
+        // Arp synth
+        arpOsc.attack = preset.arpAttack
+        arpOsc.decay = preset.arpDecay
+        arpOsc.sustain = preset.arpSustain
+        arpOsc.releaseTime = preset.arpRelease
+
+        // Melody synth
+        melodyOsc.attack = preset.melAttack
+        melodyOsc.decay = preset.melDecay
+        melodyOsc.sustain = preset.melSustain
+        melodyOsc.releaseTime = preset.melRelease
     }
 
     // MARK: - Helpers
@@ -636,10 +677,14 @@ class ArpOscillator {
     private var frequency: Double = 440
     private var envelope: Double = 0
     private var filterEnv: Double = 0
+    // Exposed ADSR params
+    var attack: Float = 0.005
+    var decay: Float = 0.25
+    var sustain: Float = 0.15
+    var releaseTime: Float = 0.25
     var attackTime: Double = 0.005
     var decayTime: Double = 0.25
-    private var decayRate: Double = 0.9997
-    private var filterDecayRate: Double = 0.999
+    private var envStage: Int = 0 // 0=off, 1=attack, 2=decay, 3=sustain, 4=release
     // Simple 1-pole lowpass state
     private var lpState: Float = 0
     private var lpCutoff: Float = 0.3
@@ -648,6 +693,7 @@ class ArpOscillator {
         frequency = 440.0 * pow(2.0, Double(midi - 69) / 12.0)
         envelope = 1.0
         filterEnv = 1.0
+        envStage = 2 // skip to decay for pluck character
     }
 
     func render(frameCount: UInt32, bufferList: UnsafeMutablePointer<AudioBufferList>, sampleRate: Double, muted: Bool) -> OSStatus {
@@ -655,8 +701,12 @@ class ArpOscillator {
         let L = abl[0].mData!.assumingMemoryBound(to: Float.self)
         let R = abl[1].mData!.assumingMemoryBound(to: Float.self)
 
+        let decayRate = 1.0 - 1.0 / (Double(decay) * sampleRate + 1)
+        let filterDecayRate = 1.0 - 1.0 / (Double(decay) * sampleRate * 0.8 + 1)
+
         for frame in 0..<Int(frameCount) {
             envelope *= decayRate
+            if envelope < Double(sustain) { envelope = Double(sustain) * envelope / max(Double(sustain), 0.001) }
             filterEnv *= filterDecayRate
 
             var sample: Float = 0
@@ -688,8 +738,13 @@ class MelodyOscillator {
     var portamentoEnabled: Bool = true
     private let glideRate: Double = 0.003
     private var vibratoPhase: Double = 0
+    var vibratoAmount: Float = 0.0 // 0..1
     private let vibratoRate: Double = 5.0
-    private let vibratoDepth: Double = 0.003 // ±3 cents equiv
+    // Exposed ADSR
+    var attack: Float = 0.05
+    var decay: Float = 0.20
+    var sustain: Float = 0.70
+    var releaseTime: Float = 0.40
     // Filter
     private var filterEnv: Double = 0
     private var lpState: Float = 0
@@ -713,17 +768,21 @@ class MelodyOscillator {
         let L = abl[0].mData!.assumingMemoryBound(to: Float.self)
         let R = abl[1].mData!.assumingMemoryBound(to: Float.self)
 
+        let attackRate = 1.0 / (max(Double(attack), 0.001) * sampleRate)
+        let releaseRate = 1.0 / (max(Double(self.releaseTime), 0.001) * sampleRate)
+        let vibDepth = Double(vibratoAmount) * 0.006
+
         for frame in 0..<Int(frameCount) {
             frequency += (targetFrequency - frequency) * glideRate
-            if envelope < targetEnvelope { envelope = min(envelope + 0.008, targetEnvelope) }
-            else { envelope = max(envelope - 0.002, targetEnvelope) }
+            if envelope < targetEnvelope { envelope = min(envelope + attackRate, targetEnvelope) }
+            else { envelope = max(envelope - releaseRate, targetEnvelope) }
             filterEnv *= 0.9995
 
             var sample: Float = 0
             if !muted && envelope > 0.001 {
                 // Vibrato
                 vibratoPhase += vibratoRate / sampleRate
-                let vibrato = 1.0 + sin(vibratoPhase * 2.0 * .pi) * vibratoDepth
+                let vibrato = 1.0 + sin(vibratoPhase * 2.0 * .pi) * vibDepth
                 let freq = frequency * vibrato
 
                 let saw = Float(2.0 * phase - 1.0)

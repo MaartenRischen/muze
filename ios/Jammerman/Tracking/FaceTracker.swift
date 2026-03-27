@@ -106,17 +106,33 @@ class FaceTracker {
         let mouthWidth = abs(Float(leftCorner.x - rightCorner.x))
         let mouthWidthNorm = clamp01(remap(mouthWidth, min: 0.2, max: 0.5))
 
-        // Head rotation — estimated from face contour asymmetry
+        // Head rotation — estimated from face geometry
         let contourPts = faceContour.normalizedPoints
-        let headYaw: Float = 0 // simplified — would need 3D face model for accurate rotation
-        let headPitch: Float = 0
+        let nosePts = nose.normalizedPoints
+        let headYaw: Float
+        let headPitch: Float
         let headRoll: Float
-        if contourPts.count > 2 {
+
+        if contourPts.count > 4, nosePts.count > 2 {
             let left = contourPts[0]
             let right = contourPts[contourPts.count - 1]
+
+            // Yaw: nose position relative to face center (left/right asymmetry)
+            let faceCenter = Float((left.x + right.x) / 2)
+            let noseX = Float(nosePts[nosePts.count / 2].x)
+            headYaw = (noseX - faceCenter) * 4.0 // scale to ~radians
+
+            // Pitch: nose tip vertical position relative to face center
+            let faceTop = contourPts.map { Float($0.y) }.max() ?? 0.5
+            let faceBot = contourPts.map { Float($0.y) }.min() ?? 0.5
+            let faceMidY = (faceTop + faceBot) / 2
+            let noseY = Float(nosePts[nosePts.count / 2].y)
+            headPitch = (noseY - faceMidY) / max(faceTop - faceBot, 0.01) * .pi * 0.3
+
+            // Roll: ear-to-ear tilt
             headRoll = atan2(Float(left.y - right.y), Float(left.x - right.x))
         } else {
-            headRoll = 0
+            headYaw = 0; headPitch = 0; headRoll = 0
         }
 
         return FaceFeatures(
