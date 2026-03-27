@@ -639,17 +639,15 @@ MUZE.Visualizer = {
   },
 
   // ============================================================
-  // BEAT HALO — dramatic pulsing light behind user's head
-  // Renders to offscreen canvas, erases face area, composites onto overlay
+  // BEAT HALO — dramatic pulsing light AROUND user's head
+  // Gradients start from head radius outward — nothing draws over the face
   // ============================================================
-  _haloOffscreen: null, _haloOffCtx: null,
-
   _drawBeatHalo(ctx, w, h, bass, energy, accentRgb) {
     const cx = this._faceCx;
     const cy = this._faceCy;
-
     const bp = this._beatPulse;
     const bloom = this._beatBloomRadius;
+    const headR = Math.min(w, h) * 0.14;
 
     // Update halo state
     this._haloGlow += (energy * 0.6 + bp * 0.8 - this._haloGlow) * 0.12;
@@ -663,7 +661,7 @@ MUZE.Visualizer = {
         const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
         this._haloRays.push({
           angle,
-          length: 60 + Math.random() * 120 + bass * 100,
+          length: headR + 20 + Math.random() * 80 + bass * 100,
           width: 1.5 + Math.random() * 3,
           life: 1.0,
           decay: 0.015 + Math.random() * 0.015,
@@ -675,7 +673,7 @@ MUZE.Visualizer = {
     // Spawn expanding rings on beat
     if (bp > 0.85 && this._haloRings.length < 6) {
       this._haloRings.push({
-        radius: 30,
+        radius: headR + 5,
         alpha: 0.6 + bass * 0.3,
         speed: 3 + bass * 5,
         width: 2 + bass * 3,
@@ -685,58 +683,49 @@ MUZE.Visualizer = {
     const glow = this._haloGlow;
     if (glow < 0.01 && this._haloRays.length === 0 && this._haloRings.length === 0) return;
 
-    // Create/resize offscreen canvas for halo (rendered then composited)
-    const dpr = window.devicePixelRatio || 1;
-    if (!this._haloOffscreen || this._haloOffscreen.width !== w * dpr) {
-      this._haloOffscreen = document.createElement('canvas');
-      this._haloOffscreen.width = w * dpr;
-      this._haloOffscreen.height = h * dpr;
-      this._haloOffCtx = this._haloOffscreen.getContext('2d');
-    }
-    const hctx = this._haloOffCtx;
-    hctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    hctx.clearRect(0, 0, w, h);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const flash = this._haloFlash;
 
-    // === PASS 1: Deep outer glow (very large, very soft) ===
-    const outerR = 120 + glow * 200 + bloom * 60;
-    const outerGrad = hctx.createRadialGradient(cx, cy, 0, cx, cy, outerR);
-    outerGrad.addColorStop(0, `rgba(${accentRgb}, ${(glow * 0.25).toFixed(2)})`);
+    // === PASS 1: Outer glow (starts from head edge, expands outward) ===
+    const outerR = headR + 80 + glow * 200 + bloom * 60;
+    const outerGrad = ctx.createRadialGradient(cx, cy, headR, cx, cy, outerR);
+    outerGrad.addColorStop(0, `rgba(${accentRgb}, ${(glow * 0.3 + flash * 0.2).toFixed(2)})`);
     outerGrad.addColorStop(0.4, `rgba(${accentRgb}, ${(glow * 0.12).toFixed(2)})`);
     outerGrad.addColorStop(1, `rgba(${accentRgb}, 0)`);
-    hctx.beginPath();
-    hctx.arc(cx, cy, outerR, 0, Math.PI * 2);
-    hctx.fillStyle = outerGrad;
-    hctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+    ctx.fillStyle = outerGrad;
+    ctx.fill();
 
-    // === PASS 2: Inner bright core ===
-    const coreR = 40 + glow * 80 + bp * 40;
-    const coreGrad = hctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-    const flash = this._haloFlash;
-    const coreR_val = Math.min(255, parseInt(accentRgb.split(',')[0]) + flash * 120);
-    const coreG_val = Math.min(255, parseInt(accentRgb.split(',')[1]) + flash * 120);
-    const coreB_val = Math.min(255, parseInt(accentRgb.split(',')[2]) + flash * 120);
-    coreGrad.addColorStop(0, `rgba(${Math.round(coreR_val)},${Math.round(coreG_val)},${Math.round(coreB_val)},${(0.3 + glow * 0.4 + flash * 0.3).toFixed(2)})`);
-    coreGrad.addColorStop(0.5, `rgba(${accentRgb}, ${(glow * 0.15).toFixed(2)})`);
-    coreGrad.addColorStop(1, `rgba(${accentRgb}, 0)`);
-    hctx.beginPath();
-    hctx.arc(cx, cy, coreR, 0, Math.PI * 2);
-    hctx.fillStyle = coreGrad;
-    hctx.fill();
+    // === PASS 2: Bright rim at head edge ===
+    const rimR = headR + 25 + glow * 40 + bp * 20;
+    const rimGrad = ctx.createRadialGradient(cx, cy, headR - 2, cx, cy, rimR);
+    const cR = Math.min(255, parseInt(accentRgb.split(',')[0]) + flash * 150);
+    const cG = Math.min(255, parseInt(accentRgb.split(',')[1]) + flash * 150);
+    const cB = Math.min(255, parseInt(accentRgb.split(',')[2]) + flash * 150);
+    rimGrad.addColorStop(0, `rgba(${Math.round(cR)},${Math.round(cG)},${Math.round(cB)},${(0.2 + glow * 0.3 + flash * 0.4).toFixed(2)})`);
+    rimGrad.addColorStop(0.5, `rgba(${accentRgb}, ${(glow * 0.1).toFixed(2)})`);
+    rimGrad.addColorStop(1, `rgba(${accentRgb}, 0)`);
+    ctx.beginPath();
+    ctx.arc(cx, cy, rimR, 0, Math.PI * 2);
+    ctx.fillStyle = rimGrad;
+    ctx.fill();
 
-    // === PASS 3: White-hot flash on strong beats ===
+    // === PASS 3: White-hot flash ring on strong beats ===
     if (flash > 0.05) {
-      const flashR = 30 + flash * 70;
-      const flashGrad = hctx.createRadialGradient(cx, cy, 0, cx, cy, flashR);
-      flashGrad.addColorStop(0, `rgba(255,255,255,${(flash * 0.5).toFixed(2)})`);
-      flashGrad.addColorStop(0.3, `rgba(255,255,255,${(flash * 0.15).toFixed(2)})`);
+      const flashR = headR + 50 + flash * 50;
+      const flashGrad = ctx.createRadialGradient(cx, cy, headR, cx, cy, flashR);
+      flashGrad.addColorStop(0, `rgba(255,255,255,${(flash * 0.4).toFixed(2)})`);
+      flashGrad.addColorStop(0.4, `rgba(255,255,255,${(flash * 0.1).toFixed(2)})`);
       flashGrad.addColorStop(1, 'rgba(255,255,255,0)');
-      hctx.beginPath();
-      hctx.arc(cx, cy, flashR, 0, Math.PI * 2);
-      hctx.fillStyle = flashGrad;
-      hctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx, cy, flashR, 0, Math.PI * 2);
+      ctx.fillStyle = flashGrad;
+      ctx.fill();
     }
 
-    // === PASS 4: Radiant light rays ===
+    // === PASS 4: Radiant light rays (start from head edge) ===
     for (let i = this._haloRays.length - 1; i >= 0; i--) {
       const ray = this._haloRays[i];
       ray.length += ray.speed;
@@ -744,84 +733,38 @@ MUZE.Visualizer = {
       if (ray.life <= 0) { this._haloRays[i] = this._haloRays[this._haloRays.length - 1]; this._haloRays.pop(); continue; }
 
       const a = ray.life * ray.life;
-      const x1 = cx + Math.cos(ray.angle) * 20;
-      const y1 = cy + Math.sin(ray.angle) * 20;
+      const x1 = cx + Math.cos(ray.angle) * headR;
+      const y1 = cy + Math.sin(ray.angle) * headR;
       const x2 = cx + Math.cos(ray.angle) * ray.length;
       const y2 = cy + Math.sin(ray.angle) * ray.length;
 
-      const rayGrad = hctx.createLinearGradient(x1, y1, x2, y2);
+      const rayGrad = ctx.createLinearGradient(x1, y1, x2, y2);
       rayGrad.addColorStop(0, `rgba(${accentRgb}, ${(a * 0.4).toFixed(2)})`);
-      rayGrad.addColorStop(0.4, `rgba(${accentRgb}, ${(a * 0.15).toFixed(2)})`);
+      rayGrad.addColorStop(0.3, `rgba(${accentRgb}, ${(a * 0.15).toFixed(2)})`);
       rayGrad.addColorStop(1, `rgba(${accentRgb}, 0)`);
 
-      hctx.beginPath();
-      hctx.moveTo(x1, y1);
-      hctx.lineTo(x2, y2);
-      hctx.strokeStyle = rayGrad;
-      hctx.lineWidth = ray.width * ray.life;
-      hctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = rayGrad;
+      ctx.lineWidth = ray.width * ray.life;
+      ctx.stroke();
     }
 
-    // === PASS 5: Expanding shockwave rings ===
+    // === PASS 5: Expanding shockwave rings (start from head edge) ===
     for (let i = this._haloRings.length - 1; i >= 0; i--) {
       const ring = this._haloRings[i];
       ring.radius += ring.speed;
       ring.alpha *= 0.96;
       if (ring.alpha < 0.01) { this._haloRings[i] = this._haloRings[this._haloRings.length - 1]; this._haloRings.pop(); continue; }
 
-      hctx.beginPath();
-      hctx.arc(cx, cy, ring.radius, 0, Math.PI * 2);
-      hctx.strokeStyle = `rgba(${accentRgb}, ${ring.alpha.toFixed(2)})`;
-      hctx.lineWidth = ring.width;
-      hctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy, ring.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(${accentRgb}, ${ring.alpha.toFixed(2)})`;
+      ctx.lineWidth = ring.width;
+      ctx.stroke();
     }
 
-    hctx.restore();
-
-    // === PASS 6: Erase face area from offscreen halo ===
-    const ml = this._mirroredLandmarks;
-    const oval = this._FACE_OVAL;
-    if (ml && oval && MUZE.State.faceDetected && ml[oval[0]]) {
-      let fcx = 0, fcy = 0, cnt = 0;
-      for (let i = 0; i < oval.length; i++) {
-        const pt = ml[oval[i]];
-        if (pt) { fcx += pt.x; fcy += pt.y; cnt++; }
-      }
-      if (cnt > 2) {
-        fcx /= cnt; fcy /= cnt;
-        // Erase the face shape from the halo
-        hctx.save();
-        hctx.globalCompositeOperation = 'destination-out';
-        hctx.beginPath();
-        const pad = 20;
-        for (let i = 0; i < oval.length; i++) {
-          const pt = ml[oval[i]];
-          if (!pt) continue;
-          const dx = pt.x - fcx, dy = pt.y - fcy;
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const ex = pt.x + (dx / dist) * pad;
-          const ey = pt.y + (dy / dist) * pad;
-          if (i === 0) hctx.moveTo(ex, ey);
-          else hctx.lineTo(ex, ey);
-        }
-        hctx.closePath();
-        hctx.fill();
-        hctx.restore();
-      }
-    } else {
-      // Fallback: no landmarks available, erase a circle at face center
-      hctx.save();
-      hctx.globalCompositeOperation = 'destination-out';
-      hctx.beginPath();
-      hctx.arc(cx, cy, Math.min(w, h) * 0.14, 0, Math.PI * 2);
-      hctx.fill();
-      hctx.restore();
-    }
-
-    // Composite offscreen halo onto main overlay canvas
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.drawImage(this._haloOffscreen, 0, 0, w, h);
     ctx.restore();
   },
 
