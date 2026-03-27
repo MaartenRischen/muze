@@ -178,6 +178,8 @@ MUZE.Loop = {
     MUZE.Recorder.drawFrame();
     // Mood lighting update (CSS custom properties only — no reflow)
     if (MUZE.MoodLight && MUZE.MoodLight.update) MUZE.MoodLight.update();
+    // Drum grid step highlight (replaces separate rAF loop)
+    if (MUZE.InstrumentToggles.updateDrumGridHighlight) MUZE.InstrumentToggles.updateDrumGridHighlight();
     // PERF: Throttle HUD updates to ~5fps (every 200ms) to avoid DOM reflow every frame
     if (now - this._lastHUDUpdate >= this._hudThrottleMs) {
       this._lastHUDUpdate = now;

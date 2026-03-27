@@ -460,8 +460,7 @@ MUZE.SynthMenu = {
       });
     }
 
-    // Update grid highlight on animation frame
-    this._drumGridRAF();
+    // Grid highlight is updated from main loop via updateDrumGridHighlight()
   },
 
   _updateDrumGridUI() {
@@ -477,23 +476,18 @@ MUZE.SynthMenu = {
     });
   },
 
-  _drumGridRAF() {
-    let lastStep = -1;
-    const update = () => {
-      const step = MUZE.AutoRhythm._currentStep;
-      if (step !== lastStep) {
-        const grid = document.getElementById('drum-grid');
-        if (grid) {
-          grid.querySelectorAll('.drum-step.playing').forEach(el => el.classList.remove('playing'));
-          if (step >= 0 && MUZE.AutoRhythm._active) {
-            grid.querySelectorAll(`.drum-step[data-step="${step}"]`).forEach(el => el.classList.add('playing'));
-          }
-        }
-        lastStep = step;
-      }
-      requestAnimationFrame(update);
-    };
-    requestAnimationFrame(update);
+  // Called from main loop (app.js _tick) — no separate rAF needed
+  _drumLastStep: -1,
+  updateDrumGridHighlight() {
+    const step = MUZE.AutoRhythm._currentStep;
+    if (step === this._drumLastStep) return;
+    this._drumLastStep = step;
+    const grid = document.getElementById('drum-grid');
+    if (!grid) return;
+    grid.querySelectorAll('.drum-step.playing').forEach(el => el.classList.remove('playing'));
+    if (step >= 0 && MUZE.AutoRhythm._active) {
+      grid.querySelectorAll(`.drum-step[data-step="${step}"]`).forEach(el => el.classList.add('playing'));
+    }
   },
 
   _bind(id, fn, isSelect) {

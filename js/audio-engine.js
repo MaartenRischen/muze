@@ -482,52 +482,51 @@ MUZE.Audio = {
   // ============================================================
   // DRUMS (layered)
   // ============================================================
-  triggerDrum(type, velocity, isOpenHat) {
+  // time parameter: use scheduled Transport time for tight quantization.
+  // Falls back to Tone.now() for manual/preview triggers from UI.
+  triggerDrum(type, velocity, isOpenHat, time) {
     const vel = velocity || 0.7;
-    const now = Tone.now();
+    const t = time != null ? time : Tone.now();
     switch (type) {
       case 'kick':
-        this.kickSynth.triggerAttackRelease('C1', '8n', now, vel);
-        this._kickClick.triggerAttackRelease('32n', now, vel * 0.6);
-        // Sidechain: duck pad and arp for punch
-        this._sidechainDuck();
+        this.kickSynth.triggerAttackRelease('C1', '8n', t, vel);
+        this._kickClick.triggerAttackRelease('32n', t, vel * 0.6);
+        this._sidechainDuck(t);
         break;
       case 'snare':
-        this.snareSynth.triggerAttackRelease('8n', now, vel);
-        this._snareBody.triggerAttackRelease('B2', '16n', now, vel * 0.5);
+        this.snareSynth.triggerAttackRelease('8n', t, vel);
+        this._snareBody.triggerAttackRelease('B2', '16n', t, vel * 0.5);
         break;
       case 'hat':
         if (isOpenHat) {
-          this._openHatSynth.triggerAttackRelease('8n', now, vel * 0.5);
+          this._openHatSynth.triggerAttackRelease('8n', t, vel * 0.5);
         } else {
-          this.hatSynth.triggerAttackRelease('32n', now, vel);
+          this.hatSynth.triggerAttackRelease('32n', t, vel);
         }
         break;
     }
   },
 
   // ============================================================
-  // SIDECHAIN DUCK (improved: deeper duck, hold, exponential release, also ducks arp)
+  // SIDECHAIN DUCK — uses scheduled time for Transport-locked ducking
   // ============================================================
-  _sidechainDuck() {
-    const now = Tone.now();
-    // Duck pad to 10% with 5ms attack, 30ms hold, 300ms exponential release
-    // Simplified sidechain: single ramp per channel (was 3+ events each)
+  _sidechainDuck(time) {
+    const t = time != null ? time : Tone.now();
     const padNode = this._nodes.pad;
     if (padNode) {
       const g = padNode.gain.gain;
       const restore = g.value || Tone.dbToGain(MUZE.Mixer.channels.pad.volume);
-      g.cancelScheduledValues(now);
-      g.setValueAtTime(restore * 0.15, now);
-      g.exponentialRampToValueAtTime(restore, now + 0.25);
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(restore * 0.15, t);
+      g.exponentialRampToValueAtTime(restore, t + 0.25);
     }
     const arpNode = this._nodes.arp;
     if (arpNode) {
       const g = arpNode.gain.gain;
       const restore = g.value || Tone.dbToGain(MUZE.Mixer.channels.arp.volume);
-      g.cancelScheduledValues(now);
-      g.setValueAtTime(restore * 0.5, now);
-      g.exponentialRampToValueAtTime(restore, now + 0.2);
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(restore * 0.5, t);
+      g.exponentialRampToValueAtTime(restore, t + 0.2);
     }
   },
 
@@ -961,14 +960,14 @@ MUZE.AutoRhythm = {
       this._currentStep = s;
       if (this._useCustom) {
         const u = this._userPattern;
-        if (u.kick[s] > 0) MUZE.Audio.triggerDrum('kick', u.kick[s]);
-        if (u.snare[s] > 0) MUZE.Audio.triggerDrum('snare', u.snare[s]);
-        if (u.hat[s] > 0) MUZE.Audio.triggerDrum('hat', u.hat[s], s % 8 === 6);
+        if (u.kick[s] > 0) MUZE.Audio.triggerDrum('kick', u.kick[s], false, t);
+        if (u.snare[s] > 0) MUZE.Audio.triggerDrum('snare', u.snare[s], false, t);
+        if (u.hat[s] > 0) MUZE.Audio.triggerDrum('hat', u.hat[s], s % 8 === 6, t);
       } else {
         const p = MUZE.Config.RHYTHM_PATTERNS[this._patIdx];
-        if (p.kick[s]) MUZE.Audio.triggerDrum('kick', 0.7);
-        if (p.snare[s]) MUZE.Audio.triggerDrum('snare', 0.6);
-        if (p.hat[s]) MUZE.Audio.triggerDrum('hat', 0.4, s % 8 === 6);
+        if (p.kick[s]) MUZE.Audio.triggerDrum('kick', 0.7, false, t);
+        if (p.snare[s]) MUZE.Audio.triggerDrum('snare', 0.6, false, t);
+        if (p.hat[s]) MUZE.Audio.triggerDrum('hat', 0.4, s % 8 === 6, t);
       }
     }, [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15], '16n');
     this._seq.start(0);
