@@ -1,0 +1,384 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		21D3864459148D5CAD6C60AF /* OneEuroFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F0DD59A09C105F588D6CEB /* OneEuroFilter.swift */; };
+		2A91DC824FC15DCBDC98719B /* HandTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73BC66C0F867C77C59F97840 /* HandTracker.swift */; };
+		2B8B2879D61927E84DFF23E7 /* MusicTheory.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEFE69880F0A48B2ED3F15AA /* MusicTheory.swift */; };
+		45BEFE934D3AB2A72CE9174C /* JammermanApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C6C42861FFD12A4B35640F /* JammermanApp.swift */; };
+		5E8907EC3B761A8F3D24D576 /* AudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFC22A67B861D0C0D3E7A75D /* AudioEngine.swift */; };
+		705F35AFA04C4FC2766EA62D /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA43053DB003F240045AA7E /* CameraManager.swift */; };
+		74AF2B4F9584CF76556A396A /* FeatureExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 595A81D709627AD351FAC005 /* FeatureExtraction.swift */; };
+		7A9521C0D5D1A6AA2C972357 /* JammermanConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 632721E18A98DF36C69420B7 /* JammermanConfig.swift */; };
+		847CB1108468B8E2E21B763F /* PerformanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C218E26F294C2AE0DC8DAD4 /* PerformanceView.swift */; };
+		94D529ACAA5EFC49CD4F8CBC /* AUv3Host.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0F45595AC9AB89600C9D02 /* AUv3Host.swift */; };
+		A3502D9B826F06CBFCFCB15F /* JammermanState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52285CAB12D6522C3FC53462 /* JammermanState.swift */; };
+		B480A17FE30CF111580A2C47 /* FaceTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C23C27CB0A0F05060A0CFEE /* FaceTracker.swift */; };
+		F1E7C5A6DAB1E1EFF8C48C1B /* MetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E55D27AD2331EDB7C71BC8DB /* MetalRenderer.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		07F0DD59A09C105F588D6CEB /* OneEuroFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneEuroFilter.swift; sourceTree = "<group>"; };
+		2C218E26F294C2AE0DC8DAD4 /* PerformanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceView.swift; sourceTree = "<group>"; };
+		52285CAB12D6522C3FC53462 /* JammermanState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JammermanState.swift; sourceTree = "<group>"; };
+		595A81D709627AD351FAC005 /* FeatureExtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureExtraction.swift; sourceTree = "<group>"; };
+		632721E18A98DF36C69420B7 /* JammermanConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JammermanConfig.swift; sourceTree = "<group>"; };
+		6C23C27CB0A0F05060A0CFEE /* FaceTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceTracker.swift; sourceTree = "<group>"; };
+		73BC66C0F867C77C59F97840 /* HandTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandTracker.swift; sourceTree = "<group>"; };
+		7E0F45595AC9AB89600C9D02 /* AUv3Host.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AUv3Host.swift; sourceTree = "<group>"; };
+		88C6C42861FFD12A4B35640F /* JammermanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JammermanApp.swift; sourceTree = "<group>"; };
+		AEA43053DB003F240045AA7E /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
+		C97973F5C1A764165282ACB4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DEFE69880F0A48B2ED3F15AA /* MusicTheory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheory.swift; sourceTree = "<group>"; };
+		E55D27AD2331EDB7C71BC8DB /* MetalRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalRenderer.swift; sourceTree = "<group>"; };
+		E73E915AB124276C309368DC /* Jammerman.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Jammerman.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EFC22A67B861D0C0D3E7A75D /* AudioEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEngine.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		3804A3735E33B9823593ACAB = {
+			isa = PBXGroup;
+			children = (
+				B755C1C9C748C107F0512117 /* Jammerman */,
+				83DD8DCE6DE37796E69DCB0E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4F0EC3E08828280D2E278405 /* Rendering */ = {
+			isa = PBXGroup;
+			children = (
+				E55D27AD2331EDB7C71BC8DB /* MetalRenderer.swift */,
+			);
+			path = Rendering;
+			sourceTree = "<group>";
+		};
+		83DD8DCE6DE37796E69DCB0E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E73E915AB124276C309368DC /* Jammerman.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8811018B6F0CBDD76245C467 /* Tracking */ = {
+			isa = PBXGroup;
+			children = (
+				AEA43053DB003F240045AA7E /* CameraManager.swift */,
+				6C23C27CB0A0F05060A0CFEE /* FaceTracker.swift */,
+				73BC66C0F867C77C59F97840 /* HandTracker.swift */,
+			);
+			path = Tracking;
+			sourceTree = "<group>";
+		};
+		B755C1C9C748C107F0512117 /* Jammerman */ = {
+			isa = PBXGroup;
+			children = (
+				C97973F5C1A764165282ACB4 /* Info.plist */,
+				88C6C42861FFD12A4B35640F /* JammermanApp.swift */,
+				C144A11D00742FC05821F8CA /* Audio */,
+				EA04B4E7F259B13C41FF4072 /* Models */,
+				4F0EC3E08828280D2E278405 /* Rendering */,
+				8811018B6F0CBDD76245C467 /* Tracking */,
+				F153BEB2DFE5EE1C27745E79 /* Views */,
+			);
+			path = Jammerman;
+			sourceTree = "<group>";
+		};
+		C144A11D00742FC05821F8CA /* Audio */ = {
+			isa = PBXGroup;
+			children = (
+				EFC22A67B861D0C0D3E7A75D /* AudioEngine.swift */,
+				7E0F45595AC9AB89600C9D02 /* AUv3Host.swift */,
+			);
+			path = Audio;
+			sourceTree = "<group>";
+		};
+		EA04B4E7F259B13C41FF4072 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				595A81D709627AD351FAC005 /* FeatureExtraction.swift */,
+				632721E18A98DF36C69420B7 /* JammermanConfig.swift */,
+				52285CAB12D6522C3FC53462 /* JammermanState.swift */,
+				DEFE69880F0A48B2ED3F15AA /* MusicTheory.swift */,
+				07F0DD59A09C105F588D6CEB /* OneEuroFilter.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		F153BEB2DFE5EE1C27745E79 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				2C218E26F294C2AE0DC8DAD4 /* PerformanceView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		7C4586E6377784A1A6BF1E68 /* Jammerman */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9333C5CEFA386119FFBC2901 /* Build configuration list for PBXNativeTarget "Jammerman" */;
+			buildPhases = (
+				C7EC4FA1FC0BF3BB8319EF28 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Jammerman;
+			packageProductDependencies = (
+			);
+			productName = Jammerman;
+			productReference = E73E915AB124276C309368DC /* Jammerman.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2ECB02DA9C4E69922D217690 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 299F44B556C60AF8189FC501 /* Build configuration list for PBXProject "Jammerman" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 3804A3735E33B9823593ACAB;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 83DD8DCE6DE37796E69DCB0E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				7C4586E6377784A1A6BF1E68 /* Jammerman */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C7EC4FA1FC0BF3BB8319EF28 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				94D529ACAA5EFC49CD4F8CBC /* AUv3Host.swift in Sources */,
+				5E8907EC3B761A8F3D24D576 /* AudioEngine.swift in Sources */,
+				705F35AFA04C4FC2766EA62D /* CameraManager.swift in Sources */,
+				B480A17FE30CF111580A2C47 /* FaceTracker.swift in Sources */,
+				74AF2B4F9584CF76556A396A /* FeatureExtraction.swift in Sources */,
+				2A91DC824FC15DCBDC98719B /* HandTracker.swift in Sources */,
+				45BEFE934D3AB2A72CE9174C /* JammermanApp.swift in Sources */,
+				7A9521C0D5D1A6AA2C972357 /* JammermanConfig.swift in Sources */,
+				A3502D9B826F06CBFCFCB15F /* JammermanState.swift in Sources */,
+				F1E7C5A6DAB1E1EFF8C48C1B /* MetalRenderer.swift in Sources */,
+				2B8B2879D61927E84DFF23E7 /* MusicTheory.swift in Sources */,
+				21D3864459148D5CAD6C60AF /* OneEuroFilter.swift in Sources */,
+				847CB1108468B8E2E21B763F /* PerformanceView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		6479324309AB0395FE702F18 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Jammerman/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Jammerman uses your camera to track face and hand gestures for music control";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Jammerman uses the microphone for audio recording";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jammerman.app;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		ADF8D2F4D413DEF73A65CB7C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Jammerman/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Jammerman uses your camera to track face and hand gestures for music control";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Jammerman uses the microphone for audio recording";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jammerman.app;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B58718908E026F872242BAC3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F73D97A22EA084520A008B8F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		299F44B556C60AF8189FC501 /* Build configuration list for PBXProject "Jammerman" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B58718908E026F872242BAC3 /* Debug */,
+				F73D97A22EA084520A008B8F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9333C5CEFA386119FFBC2901 /* Build configuration list for PBXNativeTarget "Jammerman" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6479324309AB0395FE702F18 /* Debug */,
+				ADF8D2F4D413DEF73A65CB7C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 2ECB02DA9C4E69922D217690 /* Project object */;
+}
