@@ -1,6 +1,7 @@
 // Jammerman — Mixer Panel
 // Horizontal scrolling channel strips with faders, M/S buttons
 // Tap channel header for detail view (EQ, sends, pan)
+// All controls fully wired to AudioEngine parameters
 
 import SwiftUI
 
@@ -65,6 +66,7 @@ struct MixerPanelView: View {
     private func channelStrip(name: String, id: String, color: Color) -> some View {
         let vol = coordinator.audioEngine.channelVolumes[id] ?? -10
         let muted = id == "master" ? false : coordinator.audioEngine.isMuted(id)
+        let soloed = coordinator.audioEngine.soloChannel == id
         let stripWidth: CGFloat = (UIScreen.main.bounds.width - 20) / 7.5
 
         return VStack(spacing: 0) {
@@ -78,25 +80,23 @@ struct MixerPanelView: View {
                     .background(color)
             }
 
-            // Fader area
-            ZStack {
-                // Track
-                Rectangle().fill(.white.opacity(0.05))
+            // Fader area with drag gesture
+            GeometryReader { geo in
+                let pct = CGFloat((vol + 60) / 66) // -60 to +6 dB
 
-                // Colored fill from bottom
-                GeometryReader { geo in
-                    let pct = CGFloat((vol + 60) / 66) // -60 to +6 dB
+                ZStack {
+                    // Track
+                    Rectangle().fill(.white.opacity(0.05))
+
+                    // Colored fill from bottom
                     VStack {
                         Spacer()
                         Rectangle()
                             .fill(color.opacity(muted ? 0.1 : 0.3))
                             .frame(height: geo.size.height * max(0, min(1, pct)))
                     }
-                }
 
-                // Fader thumb
-                GeometryReader { geo in
-                    let pct = CGFloat((vol + 60) / 66)
+                    // Fader thumb
                     let y = geo.size.height * (1 - max(0, min(1, pct)))
                     RoundedRectangle(cornerRadius: 2)
                         .fill(.white.opacity(0.7))
@@ -104,9 +104,8 @@ struct MixerPanelView: View {
                         .position(x: geo.size.width / 2, y: y)
                 }
                 .gesture(DragGesture(minimumDistance: 0).onChanged { v in
-                    let geo = UIScreen.main.bounds // approximate
-                    let pct = 1 - Float(v.location.y / 220)
-                    let db = -60 + max(0, min(1, pct)) * 66
+                    let pctNew = 1 - Float(v.location.y / geo.size.height)
+                    let db = -60 + max(0, min(1, pctNew)) * 66
                     if id != "master" {
                         coordinator.audioEngine.setChannelVolume(id, db: db)
                     }
@@ -120,10 +119,17 @@ struct MixerPanelView: View {
                 .foregroundStyle(.white.opacity(0.4))
                 .padding(.vertical, 2)
 
-            // Pan dot
-            Circle()
-                .fill(.white.opacity(0.3))
-                .frame(width: 8, height: 8)
+            // Pan indicator
+            let pan = coordinator.audioEngine.channelPans[id] ?? 0
+            HStack(spacing: 1) {
+                Rectangle().fill(pan < 0 ? color.opacity(0.5) : .white.opacity(0.1))
+                    .frame(width: stripWidth * 0.2, height: 4)
+                Rectangle().fill(abs(pan) < 0.1 ? color.opacity(0.3) : .white.opacity(0.1))
+                    .frame(width: stripWidth * 0.1, height: 4)
+                Rectangle().fill(pan > 0 ? color.opacity(0.5) : .white.opacity(0.1))
+                    .frame(width: stripWidth * 0.2, height: 4)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 2))
 
             // M / S buttons
             HStack(spacing: 2) {
@@ -137,12 +143,16 @@ struct MixerPanelView: View {
                         .background(muted ? .red.opacity(0.15) : .white.opacity(0.05))
                         .clipShape(RoundedRectangle(cornerRadius: 3))
                 }
-                Button { /* TODO: solo */ } label: {
+                Button {
+                    if id != "master" {
+                        coordinator.audioEngine.toggleSolo(id)
+                    }
+                } label: {
                     Text("S")
                         .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(soloed ? .yellow : .white.opacity(0.4))
                         .frame(width: stripWidth * 0.4, height: 22)
-                        .background(.white.opacity(0.05))
+                        .background(soloed ? .yellow.opacity(0.15) : .white.opacity(0.05))
                         .clipShape(RoundedRectangle(cornerRadius: 3))
                 }
             }
@@ -156,107 +166,176 @@ struct MixerPanelView: View {
     private func channelDetail(_ id: String) -> some View {
         let name = channels.first(where: { $0.1 == id })?.0 ?? id
         let color = channels.first(where: { $0.1 == id })?.2 ?? .white
+        let eqGains = coordinator.audioEngine.channelEQGains[id] ?? [0, 0, 0]
 
-        return VStack(spacing: 12) {
-            // Header
-            HStack {
-                Text(name)
-                    .font(.system(size: 14, weight: .heavy, design: .monospaced))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
-                    .background(color)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                Spacer()
-                Button { detailChannel = nil } label: {
-                    Text("BACK")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.6))
+        return ScrollView(showsIndicators: false) {
+            VStack(spacing: 12) {
+                // Header
+                HStack {
+                    Text(name)
+                        .font(.system(size: 14, weight: .heavy, design: .monospaced))
+                        .foregroundStyle(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
-                        .background(.white.opacity(0.08))
+                        .background(color)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.1), lineWidth: 1))
+                    Spacer()
+                    Button { detailChannel = nil } label: {
+                        Text("BACK")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(.white.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.1), lineWidth: 1))
+                    }
                 }
-            }
 
-            // EQ section
-            VStack(alignment: .leading, spacing: 8) {
-                Text("E Q U A L I Z E R")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .tracking(2)
-
-                HStack(spacing: 24) {
-                    eqBand("LOW", value: 0)
-                    eqBand("MID", value: 0)
-                    eqBand("HIGH", value: 0)
-                }
-                .frame(maxWidth: .infinity)
-            }
-
-            // Sends
-            VStack(alignment: .leading, spacing: 8) {
-                Text("S E N D S")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .tracking(2)
-
-                sendRow("REVERB", value: 0, color: color)
-                sendRow("DELAY", value: 0, color: color)
-            }
-
-            // Pan
-            VStack(alignment: .leading, spacing: 8) {
-                Text("P A N")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .tracking(2)
-
-                HStack {
-                    Slider(value: .constant(0.5), in: 0...1)
-                        .tint(.white.opacity(0.3))
-                    Text("C")
-                        .font(.system(size: 11, design: .monospaced))
+                // EQ section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("E Q U A L I Z E R")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.4))
+                        .tracking(2)
+
+                    HStack(spacing: 24) {
+                        eqBandControl("LOW", channel: id, band: 0, value: eqGains[0], color: color)
+                        eqBandControl("MID", channel: id, band: 1, value: eqGains[1], color: color)
+                        eqBandControl("HIGH", channel: id, band: 2, value: eqGains[2], color: color)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+
+                // Sends
+                if id != "master" {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("S E N D S")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .tracking(2)
+
+                        sendControl("REVERB", channel: id, color: color, isReverb: true)
+                        sendControl("DELAY", channel: id, color: color, isReverb: false)
+                    }
+                }
+
+                // Pan
+                if id != "master" {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("P A N")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .tracking(2)
+
+                        let pan = coordinator.audioEngine.channelPans[id] ?? 0
+                        HStack {
+                            Text("L").font(.system(size: 10, design: .monospaced)).foregroundStyle(.white.opacity(0.3))
+                            Slider(value: Binding(
+                                get: { (coordinator.audioEngine.channelPans[id] ?? 0 + 1) / 2 },
+                                set: { coordinator.audioEngine.setChannelPan(id, pan: $0 * 2 - 1) }
+                            ), in: 0...1)
+                            .tint(color)
+                            Text("R").font(.system(size: 10, design: .monospaced)).foregroundStyle(.white.opacity(0.3))
+                            Text(panLabel(pan))
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.4))
+                                .frame(width: 30)
+                        }
+                    }
                 }
             }
-
-            Spacer()
+            .padding(16)
         }
-        .padding(16)
-        .frame(height: 350)
+        .frame(height: 380)
     }
 
-    private func eqBand(_ label: String, value: Float) -> some View {
+    private func panLabel(_ pan: Float) -> String {
+        if abs(pan) < 0.05 { return "C" }
+        if pan < 0 { return "L\(Int(abs(pan) * 100))" }
+        return "R\(Int(pan * 100))"
+    }
+
+    private func eqBandControl(_ label: String, channel: String, band: Int, value: Float, color: Color) -> some View {
         VStack(spacing: 4) {
             Text(label)
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
-            // Vertical slider representation
-            ZStack {
-                RoundedRectangle(cornerRadius: 3).fill(.white.opacity(0.08)).frame(width: 8, height: 100)
-                RoundedRectangle(cornerRadius: 3).fill(.blue.opacity(0.5)).frame(width: 8, height: 50).offset(y: 25)
-                RoundedRectangle(cornerRadius: 2).fill(.white).frame(width: 20, height: 6)
+
+            // Vertical slider
+            GeometryReader { geo in
+                let range: ClosedRange<Float> = -12...12
+                let pct = CGFloat((value - range.lowerBound) / (range.upperBound - range.lowerBound))
+                let thumbY = geo.size.height * (1 - pct)
+
+                ZStack {
+                    // Track
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(.white.opacity(0.08))
+                        .frame(width: 8)
+
+                    // Center line
+                    Rectangle()
+                        .fill(.white.opacity(0.2))
+                        .frame(width: 12, height: 1)
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+
+                    // Fill
+                    let fillHeight = abs(pct - 0.5) * geo.size.height
+                    let fillY = pct > 0.5 ? geo.size.height / 2 - fillHeight / 2 : geo.size.height / 2 + fillHeight / 2 - fillHeight / 2
+                    if fillHeight > 0 {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(color.opacity(0.5))
+                            .frame(width: 8, height: fillHeight)
+                            .position(x: geo.size.width / 2, y: pct > 0.5 ? geo.size.height * (1 - pct) + fillHeight / 2 : geo.size.height / 2 + fillHeight / 2)
+                    }
+
+                    // Thumb
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(.white)
+                        .frame(width: 20, height: 6)
+                        .position(x: geo.size.width / 2, y: thumbY)
+                }
+                .gesture(DragGesture(minimumDistance: 0).onChanged { v in
+                    let pctNew = 1 - Float(v.location.y / geo.size.height)
+                    let gain = range.lowerBound + max(0, min(1, pctNew)) * (range.upperBound - range.lowerBound)
+                    coordinator.audioEngine.setChannelEQ(channel, band: band, gain: gain)
+                })
             }
-            .frame(height: 100)
-            Text("0 dB")
+            .frame(width: 30, height: 100)
+
+            Text("\(Int(value)) dB")
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.4))
         }
     }
 
-    private func sendRow(_ label: String, value: Float, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+    private func sendControl(_ label: String, channel: String, color: Color, isReverb: Bool) -> some View {
+        let value: Float = isReverb
+            ? (coordinator.audioEngine.channelReverbSends[channel] ?? 0)
+            : (coordinator.audioEngine.channelDelaySends[channel] ?? 0)
+
+        return VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
             HStack {
                 Circle().fill(color.opacity(0.5)).frame(width: 12, height: 12)
-                Slider(value: .constant(Float(0)), in: 0...1).tint(color)
-                Text("0%")
+                Slider(value: Binding(
+                    get: { value },
+                    set: { newVal in
+                        if isReverb {
+                            coordinator.audioEngine.setChannelReverbSend(channel, amount: newVal)
+                        } else {
+                            coordinator.audioEngine.setChannelDelaySend(channel, amount: newVal)
+                        }
+                    }
+                ), in: 0...1)
+                .tint(color)
+                Text("\(Int(value * 100))%")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.4))
+                    .frame(width: 35)
             }
         }
     }

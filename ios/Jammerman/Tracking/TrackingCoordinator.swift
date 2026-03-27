@@ -1,5 +1,5 @@
 // Jammerman — Tracking Coordinator
-// Connects camera → face/hand tracking → state → audio
+// Connects camera -> face/hand tracking -> state -> audio
 // Mirrors web's app.js main loop signal flow
 
 import Foundation
@@ -13,6 +13,10 @@ class TrackingCoordinator: ObservableObject {
 
     @Published var state = JammermanState()
     let audioEngine = AudioEngine()
+    let loopRecorder = LoopRecorder()
+    let sceneManager = SceneManager()
+    let gyroscopeManager = GyroscopeManager()
+    let recordingManager = RecordingManager()
 
     // 1-Euro filters for smoothing
     private var filters: [String: OneEuroFilter] = [:]
@@ -30,6 +34,8 @@ class TrackingCoordinator: ObservableObject {
         setupFilters()
         setupCamera()
         setupDefaultDrumPattern()
+        loopRecorder.audioEngine = audioEngine
+        gyroscopeManager.audioEngine = audioEngine
     }
 
     private func setupFilters() {
@@ -77,6 +83,8 @@ class TrackingCoordinator: ObservableObject {
         saveTimer?.invalidate()
         camera.stop()
         audioEngine.stop()
+        gyroscopeManager.deactivate()
+        loopRecorder.clearAll()
     }
 
     // MARK: - Frame Processing (runs on camera queue)
@@ -179,6 +187,8 @@ class TrackingCoordinator: ObservableObject {
                 audioEngine.stopMelody()
                 prevMelodyNote = nil
                 state.melodyNote = nil
+                // Record note off if loop recorder is active
+                loopRecorder.recordNoteOff()
             }
             return
         }
@@ -187,6 +197,13 @@ class TrackingCoordinator: ObservableObject {
         let effectiveRoot = state.effectiveRoot
         let note = MusicTheory.quantize(value: 1 - state.handY, scale: scale, root: effectiveRoot, octaveRange: JammermanConfig.octaveRange)
         state.melodyNote = note
+
+        // Record note if loop recorder is active
+        if loopRecorder.state == .recording || loopRecorder.state == .overdubbing {
+            if note != prevMelodyNote {
+                loopRecorder.recordNote(note)
+            }
+        }
 
         // Articulation change
         if state.handOpen != prevHandOpen {

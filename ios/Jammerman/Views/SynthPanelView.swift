@@ -148,6 +148,24 @@ struct SynthPanelView: View {
                 set: { coordinator.audioEngine.swing = Int($0) }
             ), range: 0...80, format: "%.0f%%")
 
+            // Tap Tempo
+            HStack {
+                Text("tap tempo").font(.system(size: 12, design: .monospaced)).foregroundStyle(.white.opacity(0.5))
+                Spacer()
+                Button {
+                    coordinator.audioEngine.tapTempo()
+                } label: {
+                    Text("TAP")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+                        .background(accentColor.opacity(0.2))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(accentColor.opacity(0.4), lineWidth: 1))
+                }
+            }
+
             sectionHeader("KEY & SCALE")
             labelRow("key", value: JammermanConfig.noteNames[coordinator.state.rootOffset]) {
                 coordinator.state.rootOffset = (coordinator.state.rootOffset + 1) % 12
@@ -161,52 +179,197 @@ struct SynthPanelView: View {
             }
 
             sectionHeader("CHORDS")
-            labelRow("auto", value: "OFF") { /* TODO: chord auto-advance */ }
+            HStack {
+                Text("auto").font(.system(size: 12, design: .monospaced)).foregroundStyle(.white.opacity(0.5))
+                Spacer()
+                Button {
+                    coordinator.audioEngine.toggleChordAutoAdvance(state: coordinator.state)
+                } label: {
+                    Text(coordinator.audioEngine.chordAutoAdvance ? "AUTO" : "OFF")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(coordinator.audioEngine.chordAutoAdvance ? accentColor : .white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(coordinator.audioEngine.chordAutoAdvance ? accentColor.opacity(0.15) : .white.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(coordinator.audioEngine.chordAutoAdvance ? accentColor.opacity(0.4) : .white.opacity(0.12), lineWidth: 1))
+                }
+            }
 
             sectionHeader("SCENES")
             HStack(spacing: 8) {
                 ForEach(1...4, id: \.self) { i in
-                    Button { /* TODO: recall scene */ } label: {
+                    let idx = i - 1
+                    let hasScene = coordinator.sceneManager.hasScene(idx)
+                    let isActive = coordinator.sceneManager.activeSlot == idx
+                    let isSaveMode = coordinator.sceneManager.saveMode
+                    Button {
+                        coordinator.sceneManager.slotTapped(idx, coordinator: coordinator)
+                    } label: {
                         Text("\(i)")
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(isActive ? accentColor : hasScene ? .white.opacity(0.8) : .white.opacity(0.4))
                             .frame(width: 40, height: 36)
-                            .background(.white.opacity(0.08))
+                            .background(isSaveMode ? .orange.opacity(0.15) : isActive ? accentColor.opacity(0.15) : hasScene ? .white.opacity(0.1) : .white.opacity(0.06))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.12), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(
+                                isSaveMode ? .orange.opacity(0.5) : isActive ? accentColor.opacity(0.5) : .white.opacity(0.12), lineWidth: 1))
                     }
                 }
-                Button { /* TODO: save scene */ } label: {
+                Button {
+                    coordinator.sceneManager.toggleSaveMode()
+                } label: {
                     Text("SAVE")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(coordinator.sceneManager.saveMode ? .orange : .white.opacity(0.6))
                         .frame(width: 50, height: 36)
-                        .background(.white.opacity(0.08))
+                        .background(coordinator.sceneManager.saveMode ? .orange.opacity(0.2) : .white.opacity(0.08))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.12), lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(
+                            coordinator.sceneManager.saveMode ? .orange.opacity(0.5) : .white.opacity(0.12), lineWidth: 1))
                 }
             }
 
             sectionHeader("LOOP RECORDER")
+            // Progress bar
+            if coordinator.loopRecorder.state != .empty {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(.white.opacity(0.1))
+                            .frame(height: 4)
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(loopProgressColor)
+                            .frame(width: geo.size.width * coordinator.loopRecorder.progress, height: 4)
+                    }
+                }
+                .frame(height: 4)
+                .padding(.bottom, 4)
+            }
+
             HStack(spacing: 6) {
-                loopButton("● REC", color: .red)
-                loopButton("+ OVR", color: .white)
-                loopButton("UNDO", color: .white)
-                loopButton("×", color: .white)
+                // REC / STOP / OVR button
+                Button {
+                    coordinator.loopRecorder.onRecButton()
+                } label: {
+                    Text(coordinator.loopRecorder.recButtonLabel)
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Color(hex: coordinator.loopRecorder.recButtonColor).opacity(0.9))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(.white.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.1), lineWidth: 1))
+                }
+
+                // OVR button
+                Button {
+                    coordinator.loopRecorder.onOverdubButton()
+                } label: {
+                    Text("+ OVR")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(coordinator.loopRecorder.canOverdub ? 0.7 : 0.3))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(.white.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.1), lineWidth: 1))
+                }
+                .disabled(!coordinator.loopRecorder.canOverdub)
+
+                // UNDO button
+                Button {
+                    coordinator.loopRecorder.undoLayer()
+                } label: {
+                    Text("UNDO")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(coordinator.loopRecorder.canUndo ? 0.7 : 0.3))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(.white.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.1), lineWidth: 1))
+                }
+                .disabled(!coordinator.loopRecorder.canUndo)
+
+                // Clear button
+                Button {
+                    coordinator.loopRecorder.clearAll()
+                } label: {
+                    Text("x")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(coordinator.loopRecorder.canClear ? 0.7 : 0.3))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(.white.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.1), lineWidth: 1))
+                }
+                .disabled(!coordinator.loopRecorder.canClear)
+            }
+
+            // Bar count and layer count
+            HStack(spacing: 12) {
+                Button {
+                    coordinator.loopRecorder.cycleBarCount()
+                } label: {
+                    Text("\(coordinator.loopRecorder.barCount) BAR\(coordinator.loopRecorder.barCount > 1 ? "S" : "")")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.white.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+
+                if coordinator.loopRecorder.layerCount > 0 {
+                    Text("\(coordinator.loopRecorder.layerCount) layer\(coordinator.loopRecorder.layerCount > 1 ? "s" : "")")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+            }
+            .padding(.top, 4)
+
+            sectionHeader("GYROSCOPE")
+            HStack {
+                Text("tilt control").font(.system(size: 12, design: .monospaced)).foregroundStyle(.white.opacity(0.5))
+                Spacer()
+                Button {
+                    coordinator.gyroscopeManager.toggle()
+                } label: {
+                    Text(coordinator.gyroscopeManager.active ? "ON" : "OFF")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(coordinator.gyroscopeManager.active ? .green : .white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(coordinator.gyroscopeManager.active ? .green.opacity(0.15) : .white.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(coordinator.gyroscopeManager.active ? .green.opacity(0.4) : .white.opacity(0.12), lineWidth: 1))
+                }
+            }
+            if coordinator.gyroscopeManager.active {
+                HStack(spacing: 12) {
+                    VStack(spacing: 2) {
+                        Text("PAN").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.white.opacity(0.3))
+                        Text(String(format: "%.1f", coordinator.gyroscopeManager.panValue))
+                            .font(.system(size: 11, design: .monospaced)).foregroundStyle(.white.opacity(0.5))
+                    }
+                    VStack(spacing: 2) {
+                        Text("REVERB").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.white.opacity(0.3))
+                        Text(String(format: "%.0f%%", coordinator.gyroscopeManager.reverbMod * 100))
+                            .font(.system(size: 11, design: .monospaced)).foregroundStyle(.white.opacity(0.5))
+                    }
+                }
+                .padding(.top, 4)
             }
         }
     }
 
-    private func loopButton(_ label: String, color: Color) -> some View {
-        Button { /* TODO */ } label: {
-            Text(label)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(color.opacity(0.7))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(.white.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.1), lineWidth: 1))
+    private var loopProgressColor: Color {
+        switch coordinator.loopRecorder.state {
+        case .recording: return .red
+        case .overdubbing: return .orange
+        default: return accentColor
         }
     }
 
@@ -222,7 +385,9 @@ struct SynthPanelView: View {
 
         return VStack(spacing: 4) {
             sectionHeader("SYNTH")
-            labelRow("wave", value: "sawtooth") { /* TODO: waveform cycle */ }
+            labelRow("wave", value: osc.waveformType.rawValue) {
+                osc.waveformType = osc.waveformType.next
+            }
             sliderRow("attack", value: Binding(get: { osc.attack }, set: { osc.attack = $0 }), range: 0.001...2)
             sliderRow("decay", value: Binding(get: { osc.decay }, set: { osc.decay = $0 }), range: 0.01...2)
             sliderRow("sustain", value: Binding(get: { osc.sustain }, set: { osc.sustain = $0 }), range: 0...1)
@@ -256,7 +421,9 @@ struct SynthPanelView: View {
             sliderRow("vibrato", value: Binding(get: { mel.vibratoAmount }, set: { mel.vibratoAmount = $0 }), range: 0...1)
 
             sectionHeader("SYNTH")
-            labelRow("wave", value: "triangle") { /* TODO: waveform cycle */ }
+            labelRow("wave", value: mel.waveformType.rawValue) {
+                mel.waveformType = mel.waveformType.next
+            }
             sliderRow("attack", value: Binding(get: { mel.attack }, set: { mel.attack = $0 }), range: 0.001...2)
             sliderRow("decay", value: Binding(get: { mel.decay }, set: { mel.decay = $0 }), range: 0.01...2)
             sliderRow("sustain", value: Binding(get: { mel.sustain }, set: { mel.sustain = $0 }), range: 0...1)
@@ -270,7 +437,9 @@ struct SynthPanelView: View {
         let pad = coordinator.audioEngine.padOsc
         return VStack(spacing: 4) {
             sectionHeader("SYNTH")
-            labelRow("wave", value: "sine") { /* TODO: waveform cycle */ }
+            labelRow("wave", value: pad.waveformType.rawValue) {
+                pad.waveformType = pad.waveformType.next
+            }
             sliderRow("harm", value: Binding(
                 get: { Float(pad.harmonicity) }, set: { pad.harmonicity = Double($0) }
             ), range: 0.5...8, format: "%.1f")
@@ -291,13 +460,14 @@ struct SynthPanelView: View {
     private var drumsContent: some View {
         VStack(spacing: 4) {
             sectionHeader("STEP SEQUENCER")
-            labelRow("source", value: "custom") { /* TODO */ }
-            labelRow("preset", value: "Custom") { /* TODO: cycle presets */ }
+            labelRow("source", value: "custom") { /* reserved */ }
+            labelRow("preset", value: "Custom") { /* reserved */ }
 
-            // Step grid
+            // Step grid with current step highlight
             if coordinator.audioEngine.drumPattern.count >= 3 {
                 let drumLabels = ["HH", "SN", "KK"]
                 let steps = coordinator.audioEngine.drumPattern[0].count
+                let currentStep = coordinator.audioEngine.drumStep % steps
 
                 VStack(spacing: 3) {
                     ForEach(0..<3, id: \.self) { drum in
@@ -308,11 +478,15 @@ struct SynthPanelView: View {
                                 .frame(width: 20)
                             ForEach(0..<steps, id: \.self) { step in
                                 let active = coordinator.audioEngine.drumPattern[drum][step] == 1
+                                let isCurrentStep = step == currentStep
                                 Rectangle()
-                                    .fill(active ? drumColor(drum) : .white.opacity(0.06))
+                                    .fill(active ? drumColor(drum) : isCurrentStep ? .white.opacity(0.15) : .white.opacity(0.06))
                                     .frame(height: 18)
                                     .clipShape(RoundedRectangle(cornerRadius: 2))
-                                    .overlay(RoundedRectangle(cornerRadius: 2).stroke(.white.opacity(0.08), lineWidth: 0.5))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .stroke(isCurrentStep ? .white.opacity(0.5) : .white.opacity(0.08), lineWidth: isCurrentStep ? 1.5 : 0.5)
+                                    )
                                     .onTapGesture {
                                         coordinator.audioEngine.setDrumStep(drum: drum, step: step, active: !active)
                                     }
@@ -325,16 +499,6 @@ struct SynthPanelView: View {
                 HStack(spacing: 12) {
                     Button { clearDrums() } label: {
                         Text("clear")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(.white.opacity(0.06))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.1), lineWidth: 1))
-                    }
-                    Button { /* TODO */ } label: {
-                        Text("copy preset")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.5))
                             .padding(.horizontal, 16)

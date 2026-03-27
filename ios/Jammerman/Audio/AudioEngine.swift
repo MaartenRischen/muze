@@ -1,9 +1,24 @@
 // Jammerman — Audio Engine
 // AVAudioEngine with send/return bus topology mirroring web's architecture
-// Synths: Pad (FM + sub), Arp1, Arp2, Melody, Drums (kick/snare/hat), Binaural
+// Synths: Pad (FM + sub), Arp1, Arp2, Melody, Drums (kick/snare/hat), Binaural, Riser
 
 import AVFoundation
 import Accelerate
+
+// MARK: - Waveform Type
+
+enum WaveformType: String, CaseIterable {
+    case sine
+    case triangle
+    case sawtooth
+    case square
+
+    var next: WaveformType {
+        let all = WaveformType.allCases
+        let idx = all.firstIndex(of: self) ?? 0
+        return all[(idx + 1) % all.count]
+    }
+}
 
 class AudioEngine: ObservableObject {
     let engine = AVAudioEngine()
@@ -17,6 +32,7 @@ class AudioEngine: ObservableObject {
     private var snareNode: AVAudioSourceNode!
     private var hatNode: AVAudioSourceNode!
     private var binauralNode: AVAudioSourceNode!
+    private var riserNode: AVAudioSourceNode!
 
     // Channel mixers
     private var padMixer: AVAudioMixerNode!
@@ -27,6 +43,20 @@ class AudioEngine: ObservableObject {
     private var snareMixer: AVAudioMixerNode!
     private var hatMixer: AVAudioMixerNode!
     private var binauralMixer: AVAudioMixerNode!
+    private var riserMixer: AVAudioMixerNode!
+
+    // Per-channel reverb send mixers
+    private var padReverbSendMixer: AVAudioMixerNode!
+    private var arpReverbSendMixer: AVAudioMixerNode!
+    private var arp2ReverbSendMixer: AVAudioMixerNode!
+    private var melodyReverbSendMixer: AVAudioMixerNode!
+
+    // Per-channel delay send mixers
+    private var arpDelaySendMixer: AVAudioMixerNode!
+    private var arp2DelaySendMixer: AVAudioMixerNode!
+
+    // Per-channel EQs
+    private var channelEQs: [String: AVAudioUnitEQ] = [:]
 
     // Effects
     private var reverbNode: AVAudioUnitReverb!
@@ -45,6 +75,7 @@ class AudioEngine: ObservableObject {
     private var snareOsc = DrumOscillator(type: .snare)
     private var hatOsc = DrumOscillator(type: .hat)
     private var binauralOsc = BinauralOscillator()
+    var riserOsc = RiserOscillator()
 
     // Arp 1 sequencer
     private var arpTimer: Timer?
@@ -81,11 +112,52 @@ class AudioEngine: ObservableObject {
     @Published var beatMuted = true
     @Published var binauralActive = false
 
+    // Riser state
+    @Published var riserActive = false
+    private var riserTimer: Timer?
+    private var preRiserGains: [String: Float] = [:]
+
+    // Chord auto-advance
+    @Published var chordAutoAdvance = false
+    private var chordAdvanceTimer: Timer?
+    private var chordAdvanceStep = 0
+
+    // Solo state
+    @Published var soloChannel: String? = nil
+
     // Channel volumes (dB)
     var channelVolumes: [String: Float] = [
         "pad": -14, "arp": -8, "arp2": -10, "melody": -6,
         "kick": -6, "snare": -10, "hat": -16, "binaural": -20
     ]
+
+    // Per-channel pan (-1 to +1)
+    var channelPans: [String: Float] = [
+        "pad": 0, "arp": 0, "arp2": 0, "melody": 0,
+        "kick": 0, "snare": 0, "hat": 0, "binaural": 0
+    ]
+
+    // Per-channel reverb send (0 to 1)
+    var channelReverbSends: [String: Float] = [
+        "pad": 0.3, "arp": 0.2, "arp2": 0.2, "melody": 0.15,
+        "kick": 0, "snare": 0.05, "hat": 0, "binaural": 0
+    ]
+
+    // Per-channel delay send (0 to 1)
+    var channelDelaySends: [String: Float] = [
+        "pad": 0, "arp": 0.25, "arp2": 0.2, "melody": 0.1,
+        "kick": 0, "snare": 0, "hat": 0, "binaural": 0
+    ]
+
+    // Per-channel EQ gains (low, mid, high)
+    var channelEQGains: [String: [Float]] = [
+        "pad": [0, 0, 0], "arp": [0, 0, 0], "arp2": [0, 0, 0], "melody": [0, 0, 0],
+        "kick": [0, 0, 0], "snare": [0, 0, 0], "hat": [0, 0, 0], "binaural": [0, 0, 0]
+    ]
+
+    // Tap tempo
+    private var tapTimes: [Date] = []
+    @Published var lastTapBPM: Double = 0
 
     // Binaural
     @Published var binauralBeatHz: Float = 2.5
@@ -153,6 +225,10 @@ class AudioEngine: ObservableObject {
             guard let self else { return noErr }
             return self.binauralOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: !self.binauralActive)
         }
+        riserNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+            guard let self else { return noErr }
+            return self.riserOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: !self.riserActive)
+        }
 
         // Mixers
         padMixer = AVAudioMixerNode()
@@ -163,7 +239,37 @@ class AudioEngine: ObservableObject {
         snareMixer = AVAudioMixerNode()
         hatMixer = AVAudioMixerNode()
         binauralMixer = AVAudioMixerNode()
+        riserMixer = AVAudioMixerNode()
         masterMixer = AVAudioMixerNode()
+
+        // Per-channel reverb send mixers
+        padReverbSendMixer = AVAudioMixerNode()
+        arpReverbSendMixer = AVAudioMixerNode()
+        arp2ReverbSendMixer = AVAudioMixerNode()
+        melodyReverbSendMixer = AVAudioMixerNode()
+
+        // Per-channel delay send mixers
+        arpDelaySendMixer = AVAudioMixerNode()
+        arp2DelaySendMixer = AVAudioMixerNode()
+
+        // Per-channel EQs (3-band each)
+        let channelNames = ["pad", "arp", "arp2", "melody", "kick", "snare", "hat", "binaural"]
+        for name in channelNames {
+            let eq = AVAudioUnitEQ(numberOfBands: 3)
+            eq.bands[0].filterType = .lowShelf
+            eq.bands[0].frequency = 200
+            eq.bands[0].gain = 0
+            eq.bands[0].bypass = false
+            eq.bands[1].filterType = .parametric
+            eq.bands[1].frequency = 2000
+            eq.bands[1].gain = 0
+            eq.bands[1].bypass = false
+            eq.bands[2].filterType = .highShelf
+            eq.bands[2].frequency = 8000
+            eq.bands[2].gain = 0
+            eq.bands[2].bypass = false
+            channelEQs[name] = eq
+        }
 
         // Effects
         reverbNode = AVAudioUnitReverb()
@@ -190,41 +296,64 @@ class AudioEngine: ObservableObject {
         masterEQ.bands[2].gain = 0
         masterEQ.bands[2].bypass = false
 
-        // Attach all
-        let allNodes: [AVAudioNode] = [
+        // Attach all nodes
+        var allNodes: [AVAudioNode] = [
             padNode, arpNode, arp2Node, melodyNode,
-            kickNode, snareNode, hatNode, binauralNode,
+            kickNode, snareNode, hatNode, binauralNode, riserNode,
             padMixer, arpMixer, arp2Mixer, melodyMixer,
-            kickMixer, snareMixer, hatMixer, binauralMixer,
-            masterMixer, reverbNode, delayNode, masterEQ
+            kickMixer, snareMixer, hatMixer, binauralMixer, riserMixer,
+            masterMixer, reverbNode, delayNode, masterEQ,
+            padReverbSendMixer, arpReverbSendMixer, arp2ReverbSendMixer, melodyReverbSendMixer,
+            arpDelaySendMixer, arp2DelaySendMixer
         ]
+        for eq in channelEQs.values { allNodes.append(eq) }
         for node in allNodes { engine.attach(node) }
 
-        // Wire: synths → channel mixers
-        engine.connect(padNode, to: padMixer, format: format)
-        engine.connect(arpNode, to: arpMixer, format: format)
-        engine.connect(arp2Node, to: arp2Mixer, format: format)
-        engine.connect(melodyNode, to: melodyMixer, format: format)
-        engine.connect(kickNode, to: kickMixer, format: format)
-        engine.connect(snareNode, to: snareMixer, format: format)
-        engine.connect(hatNode, to: hatMixer, format: format)
-        engine.connect(binauralNode, to: binauralMixer, format: format)
+        // Wire: synths → channel EQs → channel mixers
+        let sourceToMixer: [(AVAudioSourceNode, String, AVAudioMixerNode)] = [
+            (padNode, "pad", padMixer),
+            (arpNode, "arp", arpMixer),
+            (arp2Node, "arp2", arp2Mixer),
+            (melodyNode, "melody", melodyMixer),
+            (kickNode, "kick", kickMixer),
+            (snareNode, "snare", snareMixer),
+            (hatNode, "hat", hatMixer),
+            (binauralNode, "binaural", binauralMixer),
+        ]
+        for (src, name, mixer) in sourceToMixer {
+            if let eq = channelEQs[name] {
+                engine.connect(src, to: eq, format: format)
+                engine.connect(eq, to: mixer, format: format)
+            } else {
+                engine.connect(src, to: mixer, format: format)
+            }
+        }
 
-        // Wire: channel mixers → master (dry) + effects sends
-        let channels: [AVAudioMixerNode] = [padMixer, arpMixer, arp2Mixer, melodyMixer, kickMixer, snareMixer, hatMixer, binauralMixer]
-        for ch in channels {
+        // Riser has no per-channel EQ
+        engine.connect(riserNode, to: riserMixer, format: format)
+
+        // Wire: channel mixers → master (dry)
+        let allChannelMixers: [AVAudioMixerNode] = [padMixer, arpMixer, arp2Mixer, melodyMixer, kickMixer, snareMixer, hatMixer, binauralMixer, riserMixer]
+        for ch in allChannelMixers {
             engine.connect(ch, to: masterMixer, format: format)
         }
 
-        // Send: pad, arp, arp2 → reverb
-        engine.connect(padMixer, to: reverbNode, format: format)
-        engine.connect(arpMixer, to: reverbNode, format: format)
-        engine.connect(arp2Mixer, to: reverbNode, format: format)
+        // Send: reverb sends (pad, arp, arp2, melody → reverb)
+        engine.connect(padMixer, to: padReverbSendMixer, format: format)
+        engine.connect(arpMixer, to: arpReverbSendMixer, format: format)
+        engine.connect(arp2Mixer, to: arp2ReverbSendMixer, format: format)
+        engine.connect(melodyMixer, to: melodyReverbSendMixer, format: format)
+        engine.connect(padReverbSendMixer, to: reverbNode, format: format)
+        engine.connect(arpReverbSendMixer, to: reverbNode, format: format)
+        engine.connect(arp2ReverbSendMixer, to: reverbNode, format: format)
+        engine.connect(melodyReverbSendMixer, to: reverbNode, format: format)
         engine.connect(reverbNode, to: masterMixer, format: format)
 
-        // Send: arp, arp2 → delay
-        engine.connect(arpMixer, to: delayNode, format: format)
-        engine.connect(arp2Mixer, to: delayNode, format: format)
+        // Send: delay sends (arp, arp2 → delay)
+        engine.connect(arpMixer, to: arpDelaySendMixer, format: format)
+        engine.connect(arp2Mixer, to: arp2DelaySendMixer, format: format)
+        engine.connect(arpDelaySendMixer, to: delayNode, format: format)
+        engine.connect(arp2DelaySendMixer, to: delayNode, format: format)
         engine.connect(delayNode, to: masterMixer, format: format)
 
         // Master → EQ → output
@@ -232,6 +361,9 @@ class AudioEngine: ObservableObject {
         engine.connect(masterEQ, to: engine.mainMixerNode, format: format)
 
         applyChannelVolumes()
+        applyChannelPans()
+        applyReverbSends()
+        applyDelaySends()
     }
 
     private func applyChannelVolumes() {
@@ -243,6 +375,29 @@ class AudioEngine: ObservableObject {
         snareMixer.outputVolume = dbToGain(channelVolumes["snare"] ?? -10)
         hatMixer.outputVolume = dbToGain(channelVolumes["hat"] ?? -16)
         binauralMixer.outputVolume = dbToGain(channelVolumes["binaural"] ?? -20)
+    }
+
+    private func applyChannelPans() {
+        padMixer.pan = channelPans["pad"] ?? 0
+        arpMixer.pan = channelPans["arp"] ?? 0
+        arp2Mixer.pan = channelPans["arp2"] ?? 0
+        melodyMixer.pan = channelPans["melody"] ?? 0
+        kickMixer.pan = channelPans["kick"] ?? 0
+        snareMixer.pan = channelPans["snare"] ?? 0
+        hatMixer.pan = channelPans["hat"] ?? 0
+        binauralMixer.pan = channelPans["binaural"] ?? 0
+    }
+
+    private func applyReverbSends() {
+        padReverbSendMixer.outputVolume = channelReverbSends["pad"] ?? 0.3
+        arpReverbSendMixer.outputVolume = channelReverbSends["arp"] ?? 0.2
+        arp2ReverbSendMixer.outputVolume = channelReverbSends["arp2"] ?? 0.2
+        melodyReverbSendMixer.outputVolume = channelReverbSends["melody"] ?? 0.15
+    }
+
+    private func applyDelaySends() {
+        arpDelaySendMixer.outputVolume = channelDelaySends["arp"] ?? 0.25
+        arp2DelaySendMixer.outputVolume = channelDelaySends["arp2"] ?? 0.2
     }
 
     private func dbToGain(_ db: Float) -> Float {
@@ -275,8 +430,195 @@ class AudioEngine: ObservableObject {
         arpTimer?.invalidate()
         arp2Timer?.invalidate()
         drumTimer?.invalidate()
+        chordAdvanceTimer?.invalidate()
+        riserTimer?.invalidate()
         engine.stop()
         isPlaying = false
+    }
+
+    // MARK: - Riser Synth
+
+    func startRiser() {
+        riserActive = true
+        riserOsc.startSweep()
+
+        // Duck pad + drums over 4 seconds
+        for ch in ["pad", "kick", "snare", "hat"] {
+            preRiserGains[ch] = channelVolumes[ch] ?? -10
+        }
+
+        // Gradual duck over 4 seconds using timer
+        let steps = 20
+        let stepInterval = 4.0 / Double(steps)
+        var currentStep = 0
+        riserTimer = Timer.scheduledTimer(withTimeInterval: stepInterval, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            currentStep += 1
+            let progress = Float(currentStep) / Float(steps)
+            let duckFactor = 1.0 - progress * 0.9  // duck to 10%
+
+            for ch in ["pad", "kick", "snare", "hat"] {
+                let baseGain = self.dbToGain(self.preRiserGains[ch] ?? -10)
+                self.mixerForChannel(ch)?.outputVolume = baseGain * duckFactor
+            }
+
+            if currentStep >= steps {
+                timer.invalidate()
+                // Auto-drop after 4 seconds
+                self.dropRiser()
+            }
+        }
+    }
+
+    func dropRiser() {
+        riserActive = false
+        riserOsc.stopSweep()
+        riserTimer?.invalidate()
+
+        // Big kick hit
+        kickOsc.trigger(velocity: 1.0)
+
+        // Restore ducked volumes
+        for ch in ["pad", "kick", "snare", "hat"] {
+            let vol = preRiserGains[ch] ?? channelVolumes[ch] ?? -10
+            mixerForChannel(ch)?.outputVolume = dbToGain(vol)
+        }
+        preRiserGains = [:]
+    }
+
+    func cancelRiser() {
+        riserActive = false
+        riserOsc.stopSweep()
+        riserTimer?.invalidate()
+
+        for ch in ["pad", "kick", "snare", "hat"] {
+            let vol = preRiserGains[ch] ?? channelVolumes[ch] ?? -10
+            mixerForChannel(ch)?.outputVolume = dbToGain(vol)
+        }
+        preRiserGains = [:]
+    }
+
+    // MARK: - Tap Tempo
+
+    func tapTempo() {
+        let now = Date()
+        tapTimes.append(now)
+
+        // Keep only taps within 3 seconds
+        tapTimes = tapTimes.filter { now.timeIntervalSince($0) < 3.0 }
+
+        guard tapTimes.count >= 2 else { return }
+
+        // Calculate average interval between taps
+        var intervals: [Double] = []
+        for i in 1..<tapTimes.count {
+            intervals.append(tapTimes[i].timeIntervalSince(tapTimes[i-1]))
+        }
+        let avgInterval = intervals.reduce(0, +) / Double(intervals.count)
+        let newBPM = 60.0 / avgInterval
+        lastTapBPM = newBPM
+        setBPM(max(40, min(200, newBPM)))
+    }
+
+    // MARK: - Chord Auto-Advance
+
+    func toggleChordAutoAdvance(state: JammermanState) {
+        chordAutoAdvance.toggle()
+        if chordAutoAdvance {
+            startChordAdvance(state: state)
+        } else {
+            stopChordAdvance()
+        }
+    }
+
+    private func startChordAdvance(state: JammermanState) {
+        chordAdvanceStep = state.chordIndex
+        let barDuration = (60.0 / bpm) * 4.0 // 4 beats per bar
+        chordAdvanceTimer = Timer.scheduledTimer(withTimeInterval: barDuration, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.chordAdvanceStep = (self.chordAdvanceStep + 1) % 6
+            DispatchQueue.main.async {
+                state.chordIndex = self.chordAdvanceStep
+            }
+        }
+    }
+
+    private func stopChordAdvance() {
+        chordAdvanceTimer?.invalidate()
+        chordAdvanceTimer = nil
+    }
+
+    // MARK: - Per-channel Pan Control
+
+    func setChannelPan(_ channel: String, pan: Float) {
+        channelPans[channel] = max(-1, min(1, pan))
+        mixerForChannel(channel)?.pan = channelPans[channel] ?? 0
+    }
+
+    // MARK: - Per-channel Reverb Send
+
+    func setChannelReverbSend(_ channel: String, amount: Float) {
+        channelReverbSends[channel] = max(0, min(1, amount))
+        switch channel {
+        case "pad": padReverbSendMixer?.outputVolume = amount
+        case "arp": arpReverbSendMixer?.outputVolume = amount
+        case "arp2": arp2ReverbSendMixer?.outputVolume = amount
+        case "melody": melodyReverbSendMixer?.outputVolume = amount
+        default: break
+        }
+    }
+
+    // MARK: - Per-channel Delay Send
+
+    func setChannelDelaySend(_ channel: String, amount: Float) {
+        channelDelaySends[channel] = max(0, min(1, amount))
+        switch channel {
+        case "arp": arpDelaySendMixer?.outputVolume = amount
+        case "arp2": arp2DelaySendMixer?.outputVolume = amount
+        default: break
+        }
+    }
+
+    // MARK: - Per-channel EQ
+
+    func setChannelEQ(_ channel: String, band: Int, gain: Float) {
+        guard band >= 0, band < 3 else { return }
+        var gains = channelEQGains[channel] ?? [0, 0, 0]
+        gains[band] = max(-12, min(12, gain))
+        channelEQGains[channel] = gains
+        channelEQs[channel]?.bands[band].gain = gains[band]
+    }
+
+    // MARK: - Solo
+
+    func toggleSolo(_ channel: String) {
+        if soloChannel == channel {
+            soloChannel = nil
+        } else {
+            soloChannel = channel
+        }
+    }
+
+    // MARK: - Hat Trigger (for count-in clicks)
+
+    func triggerHat(velocity: Float = 0.5) {
+        hatOsc.trigger(velocity: velocity)
+    }
+
+    // MARK: - Mixer Helper
+
+    private func mixerForChannel(_ channel: String) -> AVAudioMixerNode? {
+        switch channel {
+        case "pad": return padMixer
+        case "arp": return arpMixer
+        case "arp2": return arp2Mixer
+        case "melody": return melodyMixer
+        case "kick": return kickMixer
+        case "snare": return snareMixer
+        case "hat": return hatMixer
+        case "binaural": return binauralMixer
+        default: return nil
+        }
     }
 
     // MARK: - Pad
@@ -613,6 +955,22 @@ class AudioEngine: ObservableObject {
     }
 }
 
+// MARK: - Waveform Helper
+
+func waveformSample(phase: Double, type: WaveformType) -> Double {
+    switch type {
+    case .sine:
+        return sin(phase * 2.0 * .pi)
+    case .triangle:
+        let t = phase - floor(phase)
+        return t < 0.5 ? (4.0 * t - 1.0) : (3.0 - 4.0 * t)
+    case .sawtooth:
+        return 2.0 * (phase - floor(phase)) - 1.0
+    case .square:
+        return (phase - floor(phase)) < 0.5 ? 1.0 : -1.0
+    }
+}
+
 // MARK: - Pad Oscillator (FM + Sub)
 
 class PadOscillator {
@@ -625,6 +983,7 @@ class PadOscillator {
     var releaseRate: Double = 0.0003
     var harmonicity: Double = 1.5
     var modulationIndex: Double = 2.5
+    var waveformType: WaveformType = .sine
 
     func triggerNotes(_ midiNotes: [Int]) {
         frequencies = midiNotes.map { 440.0 * pow(2.0, Double($0 - 69) / 12.0) }
@@ -648,9 +1007,9 @@ class PadOscillator {
             if !muted && envelope > 0.001 {
                 for i in 0..<frequencies.count where i < phases.count {
                     let freq = frequencies[i]
-                    // FM synthesis
+                    // FM synthesis with selectable carrier waveform
                     let modSignal = sin(phases[i] * harmonicity * 2.0 * .pi) * modulationIndex
-                    let carrier = sin((phases[i] + modSignal / (2.0 * .pi)) * 2.0 * .pi)
+                    let carrier = waveformSample(phase: phases[i] + modSignal / (2.0 * .pi), type: waveformType)
                     // Sub oscillator (one octave down)
                     let sub = sin(subPhases[i] * 2.0 * .pi) * 0.4
                     // Slight stereo spread via detuning
@@ -688,6 +1047,7 @@ class ArpOscillator {
     // Simple 1-pole lowpass state
     private var lpState: Float = 0
     private var lpCutoff: Float = 0.3
+    var waveformType: WaveformType = .sawtooth
 
     func triggerNote(_ midi: Int) {
         frequency = 440.0 * pow(2.0, Double(midi - 69) / 12.0)
@@ -711,11 +1071,10 @@ class ArpOscillator {
 
             var sample: Float = 0
             if !muted && envelope > 0.001 {
-                // Band-limited sawtooth (2 harmonics for less aliasing)
-                let saw = Float(2.0 * phase - 1.0)
+                let raw = Float(waveformSample(phase: phase, type: waveformType))
                 // 1-pole lowpass filter
                 lpCutoff = Float(0.05 + filterEnv * 0.45)
-                lpState += lpCutoff * (saw - lpState)
+                lpState += lpCutoff * (raw - lpState)
                 sample = lpState * Float(envelope) * 0.3
 
                 phase += frequency / sampleRate
@@ -748,6 +1107,7 @@ class MelodyOscillator {
     // Filter
     private var filterEnv: Double = 0
     private var lpState: Float = 0
+    var waveformType: WaveformType = .sawtooth
 
     func triggerNote(_ midi: Int) {
         targetFrequency = 440.0 * pow(2.0, Double(midi - 69) / 12.0)
@@ -785,10 +1145,10 @@ class MelodyOscillator {
                 let vibrato = 1.0 + sin(vibratoPhase * 2.0 * .pi) * vibDepth
                 let freq = frequency * vibrato
 
-                let saw = Float(2.0 * phase - 1.0)
+                let raw = Float(waveformSample(phase: phase, type: waveformType))
                 // Filter
                 let cutoff = Float(0.1 + filterEnv * 0.4)
-                lpState += cutoff * (saw - lpState)
+                lpState += cutoff * (raw - lpState)
                 sample = lpState * Float(envelope) * 0.35
 
                 phase += freq / sampleRate
@@ -889,6 +1249,60 @@ class BinauralOscillator {
                 if phaseL > 1.0 { phaseL -= 1.0 }
                 if phaseR > 1.0 { phaseR -= 1.0 }
             }
+        }
+        return noErr
+    }
+}
+
+// MARK: - Riser Oscillator (Filtered Noise Sweep)
+
+class RiserOscillator {
+    private var noiseState: UInt32 = 54321
+    private var gain: Double = 0
+    private var targetGain: Double = 0
+    private var filterFreq: Double = 200
+    private var targetFilterFreq: Double = 200
+    private var sweeping = false
+    // Simple 1-pole bandpass state
+    private var bpState: Float = 0
+
+    func startSweep() {
+        sweeping = true
+        targetGain = 0.3
+        targetFilterFreq = 4000
+    }
+
+    func stopSweep() {
+        sweeping = false
+        targetGain = 0
+        targetFilterFreq = 200
+    }
+
+    func render(frameCount: UInt32, bufferList: UnsafeMutablePointer<AudioBufferList>, sampleRate: Double, muted: Bool) -> OSStatus {
+        let abl = UnsafeMutableAudioBufferListPointer(bufferList)
+        let L = abl[0].mData!.assumingMemoryBound(to: Float.self)
+        let R = abl[1].mData!.assumingMemoryBound(to: Float.self)
+
+        let gainRate = sweeping ? 0.0001 : 0.001  // slow ramp up, fast ramp down
+        let filterRate = sweeping ? 0.0002 : 0.002
+
+        for frame in 0..<Int(frameCount) {
+            // Smooth gain and filter
+            gain += (targetGain - gain) * gainRate
+            filterFreq += (targetFilterFreq - filterFreq) * filterRate
+
+            var sample: Float = 0
+            if !muted && gain > 0.001 {
+                // Pink-ish noise
+                noiseState = noiseState &* 1103515245 &+ 12345
+                let noise = Float(Int32(bitPattern: noiseState)) / Float(Int32.max)
+
+                // Simple bandpass: 1-pole lowpass as approximation
+                let cutoff = Float(min(0.9, filterFreq / sampleRate * 2.0))
+                bpState += cutoff * (noise - bpState)
+                sample = bpState * Float(gain)
+            }
+            L[frame] = sample; R[frame] = sample
         }
         return noErr
     }

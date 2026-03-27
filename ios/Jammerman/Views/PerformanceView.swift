@@ -157,9 +157,31 @@ struct PerformanceView: View {
             Spacer()
 
             // Riser
-            topBarButton(icon: "arrow.up", action: { /* TODO: riser */ })
+            Button {
+                if coordinator.audioEngine.riserActive {
+                    coordinator.audioEngine.dropRiser()
+                } else {
+                    coordinator.audioEngine.startRiser()
+                }
+            } label: {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 13))
+                    .foregroundStyle(coordinator.audioEngine.riserActive ? .orange : .white.opacity(0.7))
+                    .frame(width: 36, height: 36)
+                    .background(coordinator.audioEngine.riserActive ? .orange.opacity(0.2) : .white.opacity(0.08))
+                    .clipShape(Circle())
+            }
             // Record
-            topBarButton(icon: "circle.fill", action: { /* TODO: record */ }, tint: .red.opacity(0.6))
+            Button {
+                coordinator.recordingManager.toggleRecording()
+            } label: {
+                Image(systemName: coordinator.recordingManager.isRecording ? "stop.fill" : "circle.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(coordinator.recordingManager.isRecording ? .red : .red.opacity(0.6))
+                    .frame(width: 36, height: 36)
+                    .background(coordinator.recordingManager.isRecording ? .red.opacity(0.2) : .white.opacity(0.08))
+                    .clipShape(Circle())
+            }
             // MIX
             Button { showMixer.toggle() } label: {
                 Text("MIX")
