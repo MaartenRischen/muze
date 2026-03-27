@@ -512,21 +512,30 @@ MUZE.Audio = {
   // ============================================================
   _sidechainDuck(time) {
     const t = time != null ? time : Tone.now();
-    const padNode = this._nodes.pad;
-    if (padNode) {
-      const g = padNode.gain.gain;
-      const restore = g.value || Tone.dbToGain(MUZE.Mixer.channels.pad.volume);
-      g.cancelScheduledValues(t);
-      g.setValueAtTime(restore * 0.15, t);
-      g.exponentialRampToValueAtTime(restore, t + 0.25);
+    // Only duck channels that are NOT muted — otherwise ducking restores them to audible
+    if (!MUZE.Mixer.channels.pad.mute) {
+      const padNode = this._nodes.pad;
+      if (padNode) {
+        const g = padNode.gain.gain;
+        const cur = g.value;
+        if (cur > 0.001) {
+          g.cancelScheduledValues(t);
+          g.setValueAtTime(cur * 0.15, t);
+          g.exponentialRampToValueAtTime(cur, t + 0.25);
+        }
+      }
     }
-    const arpNode = this._nodes.arp;
-    if (arpNode) {
-      const g = arpNode.gain.gain;
-      const restore = g.value || Tone.dbToGain(MUZE.Mixer.channels.arp.volume);
-      g.cancelScheduledValues(t);
-      g.setValueAtTime(restore * 0.5, t);
-      g.exponentialRampToValueAtTime(restore, t + 0.2);
+    if (!MUZE.Mixer.channels.arp.mute) {
+      const arpNode = this._nodes.arp;
+      if (arpNode) {
+        const g = arpNode.gain.gain;
+        const cur = g.value;
+        if (cur > 0.001) {
+          g.cancelScheduledValues(t);
+          g.setValueAtTime(cur * 0.5, t);
+          g.exponentialRampToValueAtTime(cur, t + 0.2);
+        }
+      }
     }
   },
 
