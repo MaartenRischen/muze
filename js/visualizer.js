@@ -112,13 +112,13 @@ MUZE.Visualizer = {
   // ---- Explosion screen glow ----
   _explosionGlow: null,  // { x, y, life, startTime }
 
-  // ---- Beat halo (drawn on overlay canvas, before face mesh) ----
-  _haloRays: [],          // radiant light rays on beat
-  _haloRings: [],         // expanding shockwave rings
-  _haloGlow: 0,           // ambient glow intensity
-  _haloFlash: 0,          // white-hot flash on hard beat
-  _faceCx: 0, _faceCy: 0, // smoothed face center
-  _faceCxTarget: 0, _faceCyTarget: 0,
+  // ---- Beat halo (own canvas between cam and bg-canvas) ----
+  _haloCanvas: null, _haloCtx: null,
+  _haloRays: [],
+  _haloRings: [],
+  _haloGlow: 0,
+  _haloFlash: 0,
+  _faceCx: 0, _faceCy: 0,
 
   // ---- Arpeggio visualization (vertical, dual) ----
   _arp1LastIdx: -1, _arp1Flash: 0, _arp1Sparks: [],
@@ -127,6 +127,8 @@ MUZE.Visualizer = {
   init() {
     this._canvas = document.getElementById('overlay');
     this._ctx = this._canvas.getContext('2d');
+    this._haloCanvas = document.getElementById('beat-halo-canvas');
+    if (this._haloCanvas) this._haloCtx = this._haloCanvas.getContext('2d');
     // Create offscreen trail canvas for light painting persistence
     this._trailCanvas = document.createElement('canvas');
     this._trailCtx = this._trailCanvas.getContext('2d');
@@ -143,6 +145,13 @@ MUZE.Visualizer = {
     this._canvas.style.width = this._width + 'px';
     this._canvas.style.height = this._height + 'px';
     this._ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (this._haloCanvas) {
+      this._haloCanvas.width = this._width * dpr;
+      this._haloCanvas.height = this._height * dpr;
+      this._haloCanvas.style.width = this._width + 'px';
+      this._haloCanvas.style.height = this._height + 'px';
+      this._haloCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
     // Reset smooth buffers on resize
     this._smoothFFTBins = null;
     this._smoothWaveform = null;
@@ -309,8 +318,8 @@ MUZE.Visualizer = {
     this._updateBurstParticles();
     this._drawBurstParticles(ctx);
 
-    // 7b. Beat halo (drawn before face mesh so face effects render on top)
-    this._drawBeatHalo(ctx, bass, energy, accentRgb);
+    // 7b. Beat halo (own canvas, behind user via z-stacking)
+    this._drawBeatHalo(bass, energy, accentRgb);
 
     // 8. Face mesh AR effects (contour glow, iris, particles, aura, trails)
     const landmarks = MUZE.State._rawLandmarks;
@@ -318,12 +327,6 @@ MUZE.Visualizer = {
       // Pre-compute mirrored coordinates once per frame
       this._computeMirroredLandmarks(landmarks, w, h);
       const ml = this._mirroredLandmarks;
-
-      // Update face center for halo tracking
-      if (ml[1]) {
-        this._faceCxTarget = ml[1].x;
-        this._faceCyTarget = ml[1].y;
-      }
 
       // 8a. Head rotation ghost trails (drawn first, behind everything)
       this._updateContourSnapshots(ml);
@@ -636,16 +639,22 @@ MUZE.Visualizer = {
   // BEAT HALO — dramatic pulsing light behind user's head
   // Drawn on overlay canvas BEFORE face mesh so face effects render on top
   // ============================================================
-  _drawBeatHalo(ctx, bass, energy, accentRgb) {
-    const hctx = ctx;
+  _drawBeatHalo(bass, energy, accentRgb) {
+    const hctx = this._haloCtx;
+    if (!hctx) return;
     const w = this._width, h = this._height;
+    hctx.clearRect(0, 0, w, h);
 
-    // Smooth face center position (lerp toward target)
-    if (this._faceCxTarget > 0) {
-      this._faceCx += (this._faceCxTarget - this._faceCx) * 0.15;
-      this._faceCy += (this._faceCyTarget - this._faceCy) * 0.15;
-    } else {
-      // No face yet — center of screen
+    // Compute face center directly from raw landmarks (mirrored X)
+    // This runs before _computeMirroredLandmarks, so we read raw data
+    const lm = MUZE.State._rawLandmarks;
+    if (lm && lm[1] && MUZE.State.faceDetected) {
+      // Landmark 1 = nose tip. Raw coords are 0-1, mirror X for selfie view
+      const targetX = (1 - lm[1].x) * w;
+      const targetY = lm[1].y * h;
+      this._faceCx += (targetX - this._faceCx) * 0.2;
+      this._faceCy += (targetY - this._faceCy) * 0.2;
+    } else if (this._faceCx === 0) {
       this._faceCx = w / 2;
       this._faceCy = h * 0.35;
     }
@@ -691,16 +700,6 @@ MUZE.Visualizer = {
 
     hctx.save();
     hctx.globalCompositeOperation = 'lighter';
-
-    // Clip to everything OUTSIDE the head (so halo appears behind)
-    // Uses smoothed face center + estimated head radius — no landmark dependency
-    if (MUZE.State.faceDetected && this._faceCxTarget > 0) {
-      const headR = Math.min(w, h) * 0.13; // approximate head radius
-      hctx.beginPath();
-      hctx.rect(0, 0, w, h);
-      hctx.arc(cx, cy, headR, 0, Math.PI * 2, true); // CCW = hole
-      hctx.clip('evenodd');
-    }
 
     // === PASS 1: Deep outer glow (very large, very soft) ===
     const outerR = 120 + glow * 200 + bloom * 60;
