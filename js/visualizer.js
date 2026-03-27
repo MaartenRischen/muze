@@ -112,6 +112,15 @@ MUZE.Visualizer = {
   // ---- Explosion screen glow ----
   _explosionGlow: null,  // { x, y, life, startTime }
 
+  // ---- Beat halo (behind user head) ----
+  _haloCanvas: null, _haloCtx: null,
+  _haloRays: [],          // radiant light rays on beat
+  _haloRings: [],         // expanding shockwave rings
+  _haloGlow: 0,           // ambient glow intensity
+  _haloFlash: 0,          // white-hot flash on hard beat
+  _faceCx: 0, _faceCy: 0, // smoothed face center
+  _faceCxTarget: 0, _faceCyTarget: 0,
+
   // ---- Arpeggio visualization (vertical, dual) ----
   _arp1LastIdx: -1, _arp1Flash: 0, _arp1Sparks: [],
   _arp2LastIdx: -1, _arp2Flash: 0, _arp2Sparks: [],
@@ -119,6 +128,9 @@ MUZE.Visualizer = {
   init() {
     this._canvas = document.getElementById('overlay');
     this._ctx = this._canvas.getContext('2d');
+    // Beat halo canvas (rendered behind user, between cam and bg-canvas)
+    this._haloCanvas = document.getElementById('beat-halo-canvas');
+    if (this._haloCanvas) this._haloCtx = this._haloCanvas.getContext('2d');
     // Create offscreen trail canvas for light painting persistence
     this._trailCanvas = document.createElement('canvas');
     this._trailCtx = this._trailCanvas.getContext('2d');
@@ -135,6 +147,14 @@ MUZE.Visualizer = {
     this._canvas.style.width = this._width + 'px';
     this._canvas.style.height = this._height + 'px';
     this._ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Resize halo canvas
+    if (this._haloCanvas) {
+      this._haloCanvas.width = this._width * dpr;
+      this._haloCanvas.height = this._height * dpr;
+      this._haloCanvas.style.width = this._width + 'px';
+      this._haloCanvas.style.height = this._height + 'px';
+      this._haloCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
     // Reset smooth buffers on resize
     this._smoothFFTBins = null;
     this._smoothWaveform = null;
@@ -257,6 +277,9 @@ MUZE.Visualizer = {
     // causing the background blur to disappear and the camera to darken.
     // Vignette writes REMOVED — vignette is display:none.
 
+    // ---- Beat halo (separate canvas, behind user) ----
+    this._drawBeatHalo(bass, energy, accentRgb);
+
     // ---- Advance geometry phase ----
     this._geoPhase += 0.003;
 
@@ -307,6 +330,13 @@ MUZE.Visualizer = {
       // Pre-compute mirrored coordinates once per frame
       this._computeMirroredLandmarks(landmarks, w, h);
       const ml = this._mirroredLandmarks;
+
+      // Update face center for beat halo (smooth toward target)
+      // Use nose tip (landmark 1) as center reference
+      if (ml[1]) {
+        this._faceCxTarget = ml[1].x;
+        this._faceCyTarget = ml[1].y;
+      }
 
       // 8a. Head rotation ghost trails (drawn first, behind everything)
       this._updateContourSnapshots(ml);
@@ -613,6 +643,150 @@ MUZE.Visualizer = {
       ctx.fill();
     }
     if (sparks.length > 60) sparks.length = 60;
+  },
+
+  // ============================================================
+  // BEAT HALO — dramatic pulsing light behind user's head
+  // Renders on separate canvas between camera and foreground
+  // ============================================================
+  _drawBeatHalo(bass, energy, accentRgb) {
+    const hctx = this._haloCtx;
+    if (!hctx) return;
+    const w = this._width, h = this._height;
+    hctx.clearRect(0, 0, w, h);
+
+    // Smooth face center position (lerp toward target)
+    if (this._faceCxTarget > 0) {
+      this._faceCx += (this._faceCxTarget - this._faceCx) * 0.15;
+      this._faceCy += (this._faceCyTarget - this._faceCy) * 0.15;
+    } else {
+      // No face yet — center of screen
+      this._faceCx = w / 2;
+      this._faceCy = h * 0.35;
+    }
+    const cx = this._faceCx;
+    const cy = this._faceCy;
+
+    const bp = this._beatPulse;
+    const bloom = this._beatBloomRadius;
+
+    // Update halo state
+    this._haloGlow += (energy * 0.6 + bp * 0.8 - this._haloGlow) * 0.12;
+    if (bp > 0.8) this._haloFlash = 1.0;
+    this._haloFlash *= 0.85;
+
+    // Spawn rays on beat
+    if (bp > 0.9 && this._haloRays.length < 24) {
+      const count = 8 + Math.floor(bass * 8);
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+        this._haloRays.push({
+          angle,
+          length: 60 + Math.random() * 120 + bass * 100,
+          width: 1.5 + Math.random() * 3,
+          life: 1.0,
+          decay: 0.015 + Math.random() * 0.015,
+          speed: 2 + Math.random() * 4,
+        });
+      }
+    }
+
+    // Spawn expanding rings on beat
+    if (bp > 0.85 && this._haloRings.length < 6) {
+      this._haloRings.push({
+        radius: 30,
+        alpha: 0.6 + bass * 0.3,
+        speed: 3 + bass * 5,
+        width: 2 + bass * 3,
+      });
+    }
+
+    const glow = this._haloGlow;
+    if (glow < 0.01 && this._haloRays.length === 0 && this._haloRings.length === 0) return;
+
+    hctx.save();
+    hctx.globalCompositeOperation = 'lighter';
+
+    // === PASS 1: Deep outer glow (very large, very soft) ===
+    const outerR = 120 + glow * 200 + bloom * 60;
+    const outerGrad = hctx.createRadialGradient(cx, cy, 0, cx, cy, outerR);
+    outerGrad.addColorStop(0, `rgba(${accentRgb}, ${(glow * 0.25).toFixed(2)})`);
+    outerGrad.addColorStop(0.4, `rgba(${accentRgb}, ${(glow * 0.12).toFixed(2)})`);
+    outerGrad.addColorStop(1, `rgba(${accentRgb}, 0)`);
+    hctx.beginPath();
+    hctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+    hctx.fillStyle = outerGrad;
+    hctx.fill();
+
+    // === PASS 2: Inner bright core ===
+    const coreR = 40 + glow * 80 + bp * 40;
+    const coreGrad = hctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
+    const flash = this._haloFlash;
+    const coreR_val = Math.min(255, parseInt(accentRgb.split(',')[0]) + flash * 120);
+    const coreG_val = Math.min(255, parseInt(accentRgb.split(',')[1]) + flash * 120);
+    const coreB_val = Math.min(255, parseInt(accentRgb.split(',')[2]) + flash * 120);
+    coreGrad.addColorStop(0, `rgba(${Math.round(coreR_val)},${Math.round(coreG_val)},${Math.round(coreB_val)},${(0.3 + glow * 0.4 + flash * 0.3).toFixed(2)})`);
+    coreGrad.addColorStop(0.5, `rgba(${accentRgb}, ${(glow * 0.15).toFixed(2)})`);
+    coreGrad.addColorStop(1, `rgba(${accentRgb}, 0)`);
+    hctx.beginPath();
+    hctx.arc(cx, cy, coreR, 0, Math.PI * 2);
+    hctx.fillStyle = coreGrad;
+    hctx.fill();
+
+    // === PASS 3: White-hot flash on strong beats ===
+    if (flash > 0.05) {
+      const flashR = 30 + flash * 70;
+      const flashGrad = hctx.createRadialGradient(cx, cy, 0, cx, cy, flashR);
+      flashGrad.addColorStop(0, `rgba(255,255,255,${(flash * 0.5).toFixed(2)})`);
+      flashGrad.addColorStop(0.3, `rgba(255,255,255,${(flash * 0.15).toFixed(2)})`);
+      flashGrad.addColorStop(1, 'rgba(255,255,255,0)');
+      hctx.beginPath();
+      hctx.arc(cx, cy, flashR, 0, Math.PI * 2);
+      hctx.fillStyle = flashGrad;
+      hctx.fill();
+    }
+
+    // === PASS 4: Radiant light rays ===
+    for (let i = this._haloRays.length - 1; i >= 0; i--) {
+      const ray = this._haloRays[i];
+      ray.length += ray.speed;
+      ray.life -= ray.decay;
+      if (ray.life <= 0) { this._haloRays[i] = this._haloRays[this._haloRays.length - 1]; this._haloRays.pop(); continue; }
+
+      const a = ray.life * ray.life;
+      const x1 = cx + Math.cos(ray.angle) * 20;
+      const y1 = cy + Math.sin(ray.angle) * 20;
+      const x2 = cx + Math.cos(ray.angle) * ray.length;
+      const y2 = cy + Math.sin(ray.angle) * ray.length;
+
+      const rayGrad = hctx.createLinearGradient(x1, y1, x2, y2);
+      rayGrad.addColorStop(0, `rgba(${accentRgb}, ${(a * 0.4).toFixed(2)})`);
+      rayGrad.addColorStop(0.4, `rgba(${accentRgb}, ${(a * 0.15).toFixed(2)})`);
+      rayGrad.addColorStop(1, `rgba(${accentRgb}, 0)`);
+
+      hctx.beginPath();
+      hctx.moveTo(x1, y1);
+      hctx.lineTo(x2, y2);
+      hctx.strokeStyle = rayGrad;
+      hctx.lineWidth = ray.width * ray.life;
+      hctx.stroke();
+    }
+
+    // === PASS 5: Expanding shockwave rings ===
+    for (let i = this._haloRings.length - 1; i >= 0; i--) {
+      const ring = this._haloRings[i];
+      ring.radius += ring.speed;
+      ring.alpha *= 0.96;
+      if (ring.alpha < 0.01) { this._haloRings[i] = this._haloRings[this._haloRings.length - 1]; this._haloRings.pop(); continue; }
+
+      hctx.beginPath();
+      hctx.arc(cx, cy, ring.radius, 0, Math.PI * 2);
+      hctx.strokeStyle = `rgba(${accentRgb}, ${ring.alpha.toFixed(2)})`;
+      hctx.lineWidth = ring.width;
+      hctx.stroke();
+    }
+
+    hctx.restore();
   },
 
   // ============================================================
