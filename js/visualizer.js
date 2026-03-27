@@ -771,6 +771,42 @@ MUZE.Visualizer = {
       hctx.stroke();
     }
 
+    // === PASS 6: Knockout face area so halo appears BEHIND head ===
+    if (this._mirroredLandmarks && MUZE.State.faceDetected) {
+      const ml = this._mirroredLandmarks;
+      const oval = this._FACE_OVAL;
+      if (oval && oval.length > 2 && ml[oval[0]]) {
+        hctx.globalCompositeOperation = 'destination-out';
+        hctx.beginPath();
+        // Build face oval path with padding for soft edge
+        const pad = 8;
+        let fcx = 0, fcy = 0;
+        for (let i = 0; i < oval.length; i++) {
+          const pt = ml[oval[i]];
+          if (!pt) continue;
+          fcx += pt.x; fcy += pt.y;
+        }
+        fcx /= oval.length; fcy /= oval.length;
+        for (let i = 0; i < oval.length; i++) {
+          const pt = ml[oval[i]];
+          if (!pt) continue;
+          const dx = pt.x - fcx, dy = pt.y - fcy;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const ex = pt.x + (dx / dist) * pad;
+          const ey = pt.y + (dy / dist) * pad;
+          if (i === 0) hctx.moveTo(ex, ey);
+          else hctx.lineTo(ex, ey);
+        }
+        hctx.closePath();
+        // Soft feathered edge via shadow blur
+        hctx.shadowColor = 'rgba(0,0,0,1)';
+        hctx.shadowBlur = 18;
+        hctx.fillStyle = 'rgba(0,0,0,1)';
+        hctx.fill();
+        hctx.shadowBlur = 0;
+      }
+    }
+
     hctx.restore();
   },
 
