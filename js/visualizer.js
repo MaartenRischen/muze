@@ -302,8 +302,9 @@ MUZE.Visualizer = {
     }
 
     // 3. Waveform ring + beat halo → drawn on behind-canvas (behind user)
-    const cx = w / 2;
-    const cy = h * 0.38;
+    //    Follow the face so it sits like a halo behind the head
+    const cx = this._faceCx;
+    const cy = this._faceCy;
     const baseRadius = Math.min(w, h) * 0.18;
     const beatExpand = this._beatPulse * 30;
     const bloomExpand = this._beatBloomRadius * baseRadius * 0.18;
