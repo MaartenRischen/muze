@@ -781,7 +781,7 @@ MUZE.Visualizer = {
     // === PASS 6: Erase face area from offscreen halo ===
     const ml = this._mirroredLandmarks;
     const oval = this._FACE_OVAL;
-    if (ml && oval && MUZE.State.faceDetected) {
+    if (ml && oval && MUZE.State.faceDetected && ml[oval[0]]) {
       let fcx = 0, fcy = 0, cnt = 0;
       for (let i = 0; i < oval.length; i++) {
         const pt = ml[oval[i]];
@@ -789,10 +789,11 @@ MUZE.Visualizer = {
       }
       if (cnt > 2) {
         fcx /= cnt; fcy /= cnt;
+        // Erase the face shape from the halo
         hctx.save();
         hctx.globalCompositeOperation = 'destination-out';
         hctx.beginPath();
-        const pad = 18;
+        const pad = 20;
         for (let i = 0; i < oval.length; i++) {
           const pt = ml[oval[i]];
           if (!pt) continue;
@@ -804,10 +805,17 @@ MUZE.Visualizer = {
           else hctx.lineTo(ex, ey);
         }
         hctx.closePath();
-        hctx.fillStyle = '#000';
         hctx.fill();
         hctx.restore();
       }
+    } else {
+      // Fallback: no landmarks available, erase a circle at face center
+      hctx.save();
+      hctx.globalCompositeOperation = 'destination-out';
+      hctx.beginPath();
+      hctx.arc(cx, cy, Math.min(w, h) * 0.14, 0, Math.PI * 2);
+      hctx.fill();
+      hctx.restore();
     }
 
     // Composite offscreen halo onto main overlay canvas
