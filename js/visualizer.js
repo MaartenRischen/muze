@@ -692,38 +692,14 @@ MUZE.Visualizer = {
     hctx.save();
     hctx.globalCompositeOperation = 'lighter';
 
-    // Clip to everything OUTSIDE the face oval (so halo appears behind head)
-    if (this._mirroredLandmarks && MUZE.State.faceDetected) {
-      const ml = this._mirroredLandmarks;
-      const oval = this._FACE_OVAL;
-      if (oval && oval.length > 2 && ml[oval[0]]) {
-        // Compute face center for padding
-        let fcx = 0, fcy = 0, count = 0;
-        for (let i = 0; i < oval.length; i++) {
-          const pt = ml[oval[i]];
-          if (pt) { fcx += pt.x; fcy += pt.y; count++; }
-        }
-        if (count > 0) {
-          fcx /= count; fcy /= count;
-          hctx.beginPath();
-          // Outer rect (full canvas)
-          hctx.rect(0, 0, w, h);
-          // Inner face oval (wound opposite direction for evenodd cutout)
-          const pad = 12;
-          for (let i = oval.length - 1; i >= 0; i--) {
-            const pt = ml[oval[i]];
-            if (!pt) continue;
-            const dx = pt.x - fcx, dy = pt.y - fcy;
-            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            const ex = pt.x + (dx / dist) * pad;
-            const ey = pt.y + (dy / dist) * pad;
-            if (i === oval.length - 1) hctx.moveTo(ex, ey);
-            else hctx.lineTo(ex, ey);
-          }
-          hctx.closePath();
-          hctx.clip('evenodd');
-        }
-      }
+    // Clip to everything OUTSIDE the head (so halo appears behind)
+    // Uses smoothed face center + estimated head radius — no landmark dependency
+    if (MUZE.State.faceDetected && this._faceCxTarget > 0) {
+      const headR = Math.min(w, h) * 0.13; // approximate head radius
+      hctx.beginPath();
+      hctx.rect(0, 0, w, h);
+      hctx.arc(cx, cy, headR, 0, Math.PI * 2, true); // CCW = hole
+      hctx.clip('evenodd');
     }
 
     // === PASS 1: Deep outer glow (very large, very soft) ===
