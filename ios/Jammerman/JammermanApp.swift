@@ -4,15 +4,12 @@ import SwiftUI
 
 @main
 struct JammermanApp: App {
-    @State private var state = JammermanState()
+    @StateObject private var coordinator = TrackingCoordinator()
 
     var body: some Scene {
         WindowGroup {
-            Text("Jammerman")
-                .font(.largeTitle)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(.black)
+            PerformanceView(coordinator: coordinator)
+                .preferredColorScheme(.dark)
         }
     }
 }

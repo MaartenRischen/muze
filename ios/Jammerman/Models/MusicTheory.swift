@@ -80,6 +80,20 @@ enum MusicTheory {
         return bestNote
     }
 
+    /// Get the name of a scale from its intervals.
+    static func getScaleName(_ scale: [Int]) -> String {
+        if scale == Scale.lydian { return "lydian" }
+        if scale == Scale.ionian { return "ionian" }
+        if scale == Scale.mixolydian { return "mixolydian" }
+        if scale == Scale.dorian { return "dorian" }
+        if scale == Scale.aeolian { return "aeolian" }
+        if scale == Scale.phrygian { return "phrygian" }
+        for (name, intervals) in Scale.extra {
+            if scale == intervals { return name }
+        }
+        return "?"
+    }
+
     /// Bjorklund's Euclidean rhythm algorithm.
     static func euclidean(pulses: Int, steps: Int) -> [Int] {
         if pulses >= steps { return Array(repeating: 1, count: steps) }
