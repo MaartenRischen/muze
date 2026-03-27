@@ -1,116 +1,112 @@
 // Jammerman — Storage (UserDefaults persistence)
-// Mirrors web's storage.js — saves/loads all settings
+// Uses JSON encoding to avoid NSUserDefaults plist compatibility issues
 
 import Foundation
 
 enum JammermanStorage {
-    private static let key = "jammerman-settings-v1"
+    private static let key = "jammerman-settings-v2"
 
     static func save(state: JammermanState, engine: AudioEngine) {
-        var dict: [String: Any] = [:]
+        var dict: [String: String] = [:] // all values as strings for plist safety
 
-        // State
-        dict["rootOffset"] = state.rootOffset
-        dict["presetIdx"] = state.presetIdx
-        dict["extraScaleMode"] = state.extraScaleMode as Any
-        dict["modeFrozen"] = state.modeFrozen
+        dict["rootOffset"] = "\(state.rootOffset)"
+        dict["presetIdx"] = "\(state.presetIdx)"
+        dict["extraScaleMode"] = state.extraScaleMode ?? ""
+        dict["modeFrozen"] = state.modeFrozen ? "1" : "0"
 
-        // Transport
-        dict["bpm"] = engine.bpm
-        dict["swing"] = engine.swing
+        dict["bpm"] = "\(engine.bpm)"
+        dict["swing"] = "\(engine.swing)"
 
-        // Arp settings
         dict["arpPattern"] = engine.arpPattern
         dict["arpNoteValue"] = engine.arpNoteValue
         dict["arp2Pattern"] = engine.arp2Pattern
         dict["arp2NoteValue"] = engine.arp2NoteValue
 
-        // Channel volumes
-        dict["channelVolumes"] = engine.channelVolumes
+        // Volumes as comma-separated key:value pairs
+        dict["volumes"] = engine.channelVolumes.map { "\($0.key):\($0.value)" }.joined(separator: ",")
 
-        // Mute states
-        dict["padMuted"] = engine.padMuted
-        dict["arpMuted"] = engine.arpMuted
-        dict["arp2Muted"] = engine.arp2Muted
-        dict["melodyMuted"] = engine.melodyMuted
-        dict["beatMuted"] = engine.beatMuted
-        dict["binauralActive"] = engine.binauralActive
+        dict["padMuted"] = engine.padMuted ? "1" : "0"
+        dict["arpMuted"] = engine.arpMuted ? "1" : "0"
+        dict["arp2Muted"] = engine.arp2Muted ? "1" : "0"
+        dict["melodyMuted"] = engine.melodyMuted ? "1" : "0"
+        dict["beatMuted"] = engine.beatMuted ? "1" : "0"
+        dict["binauralActive"] = engine.binauralActive ? "1" : "0"
 
-        // Binaural
-        dict["binauralBeatHz"] = engine.binauralBeatHz
-        dict["binauralFollowChord"] = engine.binauralFollowChord
+        dict["binauralBeatHz"] = "\(engine.binauralBeatHz)"
+        dict["binauralFollowChord"] = engine.binauralFollowChord ? "1" : "0"
 
-        // Synth params
-        dict["padHarmonicity"] = engine.padOsc.harmonicity
-        dict["padModIndex"] = engine.padOsc.modulationIndex
-        dict["arpAttack"] = engine.arpOsc.attack
-        dict["arpDecay"] = engine.arpOsc.decay
-        dict["arpSustain"] = engine.arpOsc.sustain
-        dict["arpRelease"] = engine.arpOsc.releaseTime
-        dict["melAttack"] = engine.melodyOsc.attack
-        dict["melDecay"] = engine.melodyOsc.decay
-        dict["melSustain"] = engine.melodyOsc.sustain
-        dict["melRelease"] = engine.melodyOsc.releaseTime
-        dict["melVibrato"] = engine.melodyOsc.vibratoAmount
-        dict["portamento"] = engine.melodyOsc.portamentoEnabled
+        dict["padHarmonicity"] = "\(engine.padOsc.harmonicity)"
+        dict["padModIndex"] = "\(engine.padOsc.modulationIndex)"
+        dict["arpAttack"] = "\(engine.arpOsc.attack)"
+        dict["arpDecay"] = "\(engine.arpOsc.decay)"
+        dict["arpSustain"] = "\(engine.arpOsc.sustain)"
+        dict["arpRelease"] = "\(engine.arpOsc.releaseTime)"
+        dict["melAttack"] = "\(engine.melodyOsc.attack)"
+        dict["melDecay"] = "\(engine.melodyOsc.decay)"
+        dict["melSustain"] = "\(engine.melodyOsc.sustain)"
+        dict["melRelease"] = "\(engine.melodyOsc.releaseTime)"
+        dict["melVibrato"] = "\(engine.melodyOsc.vibratoAmount)"
+        dict["portamento"] = engine.melodyOsc.portamentoEnabled ? "1" : "0"
 
-        // Drum pattern
-        dict["drumPattern"] = engine.drumPattern
+        // Drum pattern as semicolon-separated rows of comma-separated values
+        dict["drumPattern"] = engine.drumPattern.map { $0.map(String.init).joined(separator: ",") }.joined(separator: ";")
 
         UserDefaults.standard.set(dict, forKey: key)
     }
 
     static func load(state: JammermanState, engine: AudioEngine) {
-        guard let dict = UserDefaults.standard.dictionary(forKey: key) else { return }
+        // Remove stale v1 data that causes crash
+        UserDefaults.standard.removeObject(forKey: "jammerman-settings-v1")
+        guard let dict = UserDefaults.standard.dictionary(forKey: key) as? [String: String] else { return }
 
-        // State
-        if let v = dict["rootOffset"] as? Int { state.rootOffset = v }
-        if let v = dict["presetIdx"] as? Int { state.presetIdx = v }
-        if let v = dict["extraScaleMode"] as? String { state.extraScaleMode = v }
-        if let v = dict["modeFrozen"] as? Bool { state.modeFrozen = v }
+        if let v = dict["rootOffset"], let n = Int(v) { state.rootOffset = n }
+        if let v = dict["presetIdx"], let n = Int(v) { state.presetIdx = n }
+        if let v = dict["extraScaleMode"] { state.extraScaleMode = v.isEmpty ? nil : v }
+        if let v = dict["modeFrozen"] { state.modeFrozen = v == "1" }
 
-        // Transport
-        if let v = dict["bpm"] as? Double { engine.setBPM(v) }
-        if let v = dict["swing"] as? Int { engine.swing = v }
+        if let v = dict["bpm"], let n = Double(v) { engine.setBPM(n) }
+        if let v = dict["swing"], let n = Int(v) { engine.swing = n }
 
-        // Arp
-        if let v = dict["arpPattern"] as? String { engine.setArpPattern(v) }
-        if let v = dict["arpNoteValue"] as? String { engine.setArpNoteValue(v) }
-        if let v = dict["arp2Pattern"] as? String { engine.setArp2Pattern(v) }
-        if let v = dict["arp2NoteValue"] as? String { engine.setArp2NoteValue(v) }
+        if let v = dict["arpPattern"] { engine.setArpPattern(v) }
+        if let v = dict["arpNoteValue"] { engine.setArpNoteValue(v) }
+        if let v = dict["arp2Pattern"] { engine.setArp2Pattern(v) }
+        if let v = dict["arp2NoteValue"] { engine.setArp2NoteValue(v) }
 
-        // Volumes
-        if let vols = dict["channelVolumes"] as? [String: Float] {
-            for (ch, db) in vols { engine.setChannelVolume(ch, db: db) }
+        if let v = dict["volumes"] {
+            for pair in v.split(separator: ",") {
+                let parts = pair.split(separator: ":")
+                if parts.count == 2, let db = Float(parts[1]) {
+                    engine.setChannelVolume(String(parts[0]), db: db)
+                }
+            }
         }
 
-        // Mutes
-        if let v = dict["padMuted"] as? Bool { engine.padMuted = v }
-        if let v = dict["arpMuted"] as? Bool { engine.arpMuted = v }
-        if let v = dict["arp2Muted"] as? Bool { engine.arp2Muted = v }
-        if let v = dict["melodyMuted"] as? Bool { engine.melodyMuted = v }
-        if let v = dict["beatMuted"] as? Bool { engine.beatMuted = v }
-        if let v = dict["binauralActive"] as? Bool { engine.binauralActive = v }
+        if let v = dict["padMuted"] { engine.padMuted = v == "1" }
+        if let v = dict["arpMuted"] { engine.arpMuted = v == "1" }
+        if let v = dict["arp2Muted"] { engine.arp2Muted = v == "1" }
+        if let v = dict["melodyMuted"] { engine.melodyMuted = v == "1" }
+        if let v = dict["beatMuted"] { engine.beatMuted = v == "1" }
+        if let v = dict["binauralActive"] { engine.binauralActive = v == "1" }
 
-        // Binaural
-        if let v = dict["binauralBeatHz"] as? Float { engine.setBinauralBeatHz(v) }
-        if let v = dict["binauralFollowChord"] as? Bool { engine.binauralFollowChord = v }
+        if let v = dict["binauralBeatHz"], let n = Float(v) { engine.setBinauralBeatHz(n) }
+        if let v = dict["binauralFollowChord"] { engine.binauralFollowChord = v == "1" }
 
-        // Synth params
-        if let v = dict["padHarmonicity"] as? Double { engine.padOsc.harmonicity = v }
-        if let v = dict["padModIndex"] as? Double { engine.padOsc.modulationIndex = v }
-        if let v = dict["arpAttack"] as? Float { engine.arpOsc.attack = v }
-        if let v = dict["arpDecay"] as? Float { engine.arpOsc.decay = v }
-        if let v = dict["arpSustain"] as? Float { engine.arpOsc.sustain = v }
-        if let v = dict["arpRelease"] as? Float { engine.arpOsc.releaseTime = v }
-        if let v = dict["melAttack"] as? Float { engine.melodyOsc.attack = v }
-        if let v = dict["melDecay"] as? Float { engine.melodyOsc.decay = v }
-        if let v = dict["melSustain"] as? Float { engine.melodyOsc.sustain = v }
-        if let v = dict["melRelease"] as? Float { engine.melodyOsc.releaseTime = v }
-        if let v = dict["melVibrato"] as? Float { engine.melodyOsc.vibratoAmount = v }
-        if let v = dict["portamento"] as? Bool { engine.melodyOsc.portamentoEnabled = v }
+        if let v = dict["padHarmonicity"], let n = Double(v) { engine.padOsc.harmonicity = n }
+        if let v = dict["padModIndex"], let n = Double(v) { engine.padOsc.modulationIndex = n }
+        if let v = dict["arpAttack"], let n = Float(v) { engine.arpOsc.attack = n }
+        if let v = dict["arpDecay"], let n = Float(v) { engine.arpOsc.decay = n }
+        if let v = dict["arpSustain"], let n = Float(v) { engine.arpOsc.sustain = n }
+        if let v = dict["arpRelease"], let n = Float(v) { engine.arpOsc.releaseTime = n }
+        if let v = dict["melAttack"], let n = Float(v) { engine.melodyOsc.attack = n }
+        if let v = dict["melDecay"], let n = Float(v) { engine.melodyOsc.decay = n }
+        if let v = dict["melSustain"], let n = Float(v) { engine.melodyOsc.sustain = n }
+        if let v = dict["melRelease"], let n = Float(v) { engine.melodyOsc.releaseTime = n }
+        if let v = dict["melVibrato"], let n = Float(v) { engine.melodyOsc.vibratoAmount = n }
+        if let v = dict["portamento"] { engine.melodyOsc.portamentoEnabled = v == "1" }
 
-        // Drum pattern
-        if let v = dict["drumPattern"] as? [[Int]] { engine.setDrumPattern(v) }
+        if let v = dict["drumPattern"] {
+            let rows = v.split(separator: ";").map { $0.split(separator: ",").compactMap { Int($0) } }
+            if rows.count >= 3 { engine.setDrumPattern(rows) }
+        }
     }
 }
