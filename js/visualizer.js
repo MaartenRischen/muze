@@ -640,10 +640,11 @@ MUZE.Visualizer = {
 
   // ============================================================
   // BEAT HALO — dramatic pulsing light behind user's head
-  // Uses face-oval evenodd clip so it only renders AROUND the head
+  // Renders to offscreen canvas, erases face area, composites onto overlay
   // ============================================================
+  _haloOffscreen: null, _haloOffCtx: null,
+
   _drawBeatHalo(ctx, w, h, bass, energy, accentRgb) {
-    const hctx = ctx;
     const cx = this._faceCx;
     const cy = this._faceCy;
 
@@ -684,38 +685,17 @@ MUZE.Visualizer = {
     const glow = this._haloGlow;
     if (glow < 0.01 && this._haloRays.length === 0 && this._haloRings.length === 0) return;
 
-    hctx.save();
-    hctx.globalCompositeOperation = 'lighter';
-
-    // Clip to everything OUTSIDE the face oval so halo appears behind head
-    const ml = this._mirroredLandmarks;
-    const oval = this._FACE_OVAL;
-    if (ml && oval && MUZE.State.faceDetected && ml[oval[0]]) {
-      let fcx = 0, fcy = 0, cnt = 0;
-      for (let i = 0; i < oval.length; i++) {
-        const pt = ml[oval[i]];
-        if (pt) { fcx += pt.x; fcy += pt.y; cnt++; }
-      }
-      if (cnt > 0) {
-        fcx /= cnt; fcy /= cnt;
-        hctx.beginPath();
-        hctx.rect(0, 0, w, h);  // outer rect = full canvas
-        // Face oval path (padded outward 15px) — evenodd creates a hole
-        const pad = 15;
-        for (let i = 0; i < oval.length; i++) {
-          const pt = ml[oval[i]];
-          if (!pt) continue;
-          const dx = pt.x - fcx, dy = pt.y - fcy;
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const ex = pt.x + (dx / dist) * pad;
-          const ey = pt.y + (dy / dist) * pad;
-          if (i === 0) hctx.moveTo(ex, ey);
-          else hctx.lineTo(ex, ey);
-        }
-        hctx.closePath();
-        hctx.clip('evenodd');
-      }
+    // Create/resize offscreen canvas for halo (rendered then composited)
+    const dpr = window.devicePixelRatio || 1;
+    if (!this._haloOffscreen || this._haloOffscreen.width !== w * dpr) {
+      this._haloOffscreen = document.createElement('canvas');
+      this._haloOffscreen.width = w * dpr;
+      this._haloOffscreen.height = h * dpr;
+      this._haloOffCtx = this._haloOffscreen.getContext('2d');
     }
+    const hctx = this._haloOffCtx;
+    hctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    hctx.clearRect(0, 0, w, h);
 
     // === PASS 1: Deep outer glow (very large, very soft) ===
     const outerR = 120 + glow * 200 + bloom * 60;
@@ -797,6 +777,44 @@ MUZE.Visualizer = {
     }
 
     hctx.restore();
+
+    // === PASS 6: Erase face area from offscreen halo ===
+    const ml = this._mirroredLandmarks;
+    const oval = this._FACE_OVAL;
+    if (ml && oval && MUZE.State.faceDetected) {
+      let fcx = 0, fcy = 0, cnt = 0;
+      for (let i = 0; i < oval.length; i++) {
+        const pt = ml[oval[i]];
+        if (pt) { fcx += pt.x; fcy += pt.y; cnt++; }
+      }
+      if (cnt > 2) {
+        fcx /= cnt; fcy /= cnt;
+        hctx.save();
+        hctx.globalCompositeOperation = 'destination-out';
+        hctx.beginPath();
+        const pad = 18;
+        for (let i = 0; i < oval.length; i++) {
+          const pt = ml[oval[i]];
+          if (!pt) continue;
+          const dx = pt.x - fcx, dy = pt.y - fcy;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const ex = pt.x + (dx / dist) * pad;
+          const ey = pt.y + (dy / dist) * pad;
+          if (i === 0) hctx.moveTo(ex, ey);
+          else hctx.lineTo(ex, ey);
+        }
+        hctx.closePath();
+        hctx.fillStyle = '#000';
+        hctx.fill();
+        hctx.restore();
+      }
+    }
+
+    // Composite offscreen halo onto main overlay canvas
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(this._haloOffscreen, 0, 0, w, h);
+    ctx.restore();
   },
 
   // ============================================================
