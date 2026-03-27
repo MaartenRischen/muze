@@ -135,6 +135,10 @@ class FaceTracker {
             headYaw = 0; headPitch = 0; headRoll = 0
         }
 
+        // Face center from bounding box (Vision coords: origin bottom-left)
+        let fcx = Float(boundingBox.midX)
+        let fcy = 1 - Float(boundingBox.midY) // flip Y to top-left origin
+
         return FaceFeatures(
             mouthOpenness: mouthOpenness,
             lipCorner: lipCorner,
@@ -143,7 +147,9 @@ class FaceTracker {
             mouthWidth: mouthWidthNorm,
             headPitch: headPitch,
             headYaw: headYaw,
-            headRoll: headRoll
+            headRoll: headRoll,
+            faceCenterX: fcx,
+            faceCenterY: fcy
         )
     }
 

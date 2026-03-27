@@ -22,6 +22,8 @@ struct FaceFeatures {
     let headPitch: Float       // radians
     let headYaw: Float         // radians
     let headRoll: Float        // radians
+    let faceCenterX: Float     // 0..1 normalized
+    let faceCenterY: Float     // 0..1 normalized
 }
 
 struct HandFeatures {
@@ -109,7 +111,8 @@ enum FaceExtractor {
             mouthOpenness: mouthOpen, lipCorner: lipCorner,
             browHeight: browHeight, eyeOpenness: eyeOpenness,
             mouthWidth: mouthWidth, headPitch: headPitch,
-            headYaw: headYaw, headRoll: headRoll
+            headYaw: headYaw, headRoll: headRoll,
+            faceCenterX: 0.5, faceCenterY: 0.35 // default — FaceTracker provides real values
         )
     }
 }

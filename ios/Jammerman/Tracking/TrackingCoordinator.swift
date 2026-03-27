@@ -18,6 +18,12 @@ class TrackingCoordinator: ObservableObject {
     let gyroscopeManager = GyroscopeManager()
     let recordingManager = RecordingManager()
 
+    // Forward audioEngine changes to trigger SwiftUI re-renders
+    private var audioEngineCancellable: AnyCancellable?
+    private var loopRecorderCancellable: AnyCancellable?
+    private var sceneManagerCancellable: AnyCancellable?
+    private var recordingCancellable: AnyCancellable?
+
     // 1-Euro filters for smoothing
     private var filters: [String: OneEuroFilter] = [:]
 
@@ -35,6 +41,20 @@ class TrackingCoordinator: ObservableObject {
         setupCamera()
         setupDefaultDrumPattern()
         loopRecorder.audioEngine = audioEngine
+
+        // Forward child objectWillChange to self so SwiftUI re-renders
+        audioEngineCancellable = audioEngine.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+        loopRecorderCancellable = loopRecorder.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+        sceneManagerCancellable = sceneManager.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+        recordingCancellable = recordingManager.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
         gyroscopeManager.audioEngine = audioEngine
     }
 
@@ -108,6 +128,8 @@ class TrackingCoordinator: ObservableObject {
                 self.state.headPitch = face.headPitch
                 self.state.headYaw = face.headYaw
                 self.state.headRoll = face.headRoll
+                self.state.faceCenterX = face.faceCenterX
+                self.state.faceCenterY = face.faceCenterY
                 self.state.faceDetected = true
                 self.updateAudio()
             }

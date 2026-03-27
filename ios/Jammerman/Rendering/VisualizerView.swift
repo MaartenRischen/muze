@@ -120,13 +120,12 @@ class VisualizerUIView: UIView {
         ringRotation += 0.008
         geoPhase += 0.003
 
-        // Face position
+        // Face position from tracking (normalized 0..1 → screen coords)
         if state.faceDetected {
-            // Approximate face center (Vision coords → screen)
-            let targetX = w * 0.5 // centered (camera is mirrored)
-            let targetY = h * 0.35
-            faceCx += (targetX - faceCx) * 0.1
-            faceCy += (targetY - faceCy) * 0.1
+            let targetX = CGFloat(state.faceCenterX) * w
+            let targetY = CGFloat(state.faceCenterY) * h
+            faceCx += (targetX - faceCx) * 0.15
+            faceCy += (targetY - faceCy) * 0.15
         } else if faceCx == 0 {
             faceCx = w / 2
             faceCy = h * 0.35
@@ -409,12 +408,9 @@ class VisualizerUIView: UIView {
     // MARK: - Face Mesh (contour outline, eyes, brows, lips)
 
     private func drawFaceMesh(ctx: CGContext, w: CGFloat, h: CGFloat, state: JammermanState, energy: CGFloat) {
-        // Use Vision face landmarks to draw contour
-        // Since we don't have raw landmark points in the state, we approximate
-        // using the detected face center and known proportions
-
-        let cx = w * 0.5
-        let cy = h * 0.38
+        // Use tracked face center position
+        let cx = faceCx
+        let cy = faceCy
         let faceW = w * 0.28
         let faceH = h * 0.22
         let alpha = 0.4 + energy * 0.3

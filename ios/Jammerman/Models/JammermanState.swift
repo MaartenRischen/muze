@@ -16,6 +16,10 @@ class JammermanState {
     var headRoll: Float = 0
     var faceDetected: Bool = false
 
+    // Face position (normalized 0..1, for visualizer)
+    var faceCenterX: Float = 0.5
+    var faceCenterY: Float = 0.35
+
     // Hand features
     var handPresent: Bool = false
     var handY: Float = 0.5

@@ -628,7 +628,8 @@ class AudioEngine: ObservableObject {
         padOsc.triggerNotes(midiNotes)
         // Update binaural if following chord
         if binauralFollowChord, let first = midiNotes.first {
-            let baseFreq = 440.0 * pow(2.0, Double(first - 69) / 12.0)
+            // Divide by 2 to keep binaural in low range (~A2 = 110Hz), matching web
+            let baseFreq = 440.0 * pow(2.0, Double(first - 69) / 12.0) / 2.0
             binauralOsc.setBaseFrequency(Float(baseFreq))
         }
     }
