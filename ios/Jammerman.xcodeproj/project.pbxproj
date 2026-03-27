@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0ECA988981E3647DF27370C0 /* TutorialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFFC794AEAB27CD65E320C2E /* TutorialView.swift */; };
 		21D3864459148D5CAD6C60AF /* OneEuroFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F0DD59A09C105F588D6CEB /* OneEuroFilter.swift */; };
+		2295A15C8C491E9C3DC7DDE4 /* MixerPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03825479B9B72708C7873D5 /* MixerPanelView.swift */; };
 		2A91DC824FC15DCBDC98719B /* HandTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73BC66C0F867C77C59F97840 /* HandTracker.swift */; };
 		2B8B2879D61927E84DFF23E7 /* MusicTheory.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEFE69880F0A48B2ED3F15AA /* MusicTheory.swift */; };
 		45BEFE934D3AB2A72CE9174C /* JammermanApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C6C42861FFD12A4B35640F /* JammermanApp.swift */; };
@@ -16,6 +18,7 @@
 		705F35AFA04C4FC2766EA62D /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEA43053DB003F240045AA7E /* CameraManager.swift */; };
 		74AF2B4F9584CF76556A396A /* FeatureExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 595A81D709627AD351FAC005 /* FeatureExtraction.swift */; };
 		7A9521C0D5D1A6AA2C972357 /* JammermanConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 632721E18A98DF36C69420B7 /* JammermanConfig.swift */; };
+		7E1FA72994FBB1C68B03ECEC /* SynthPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB61258A32E116A9BDF327E7 /* SynthPanelView.swift */; };
 		847CB1108468B8E2E21B763F /* PerformanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C218E26F294C2AE0DC8DAD4 /* PerformanceView.swift */; };
 		94D529ACAA5EFC49CD4F8CBC /* AUv3Host.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0F45595AC9AB89600C9D02 /* AUv3Host.swift */; };
 		A3502D9B826F06CBFCFCB15F /* JammermanState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52285CAB12D6522C3FC53462 /* JammermanState.swift */; };
@@ -36,6 +39,9 @@
 		888293D9F6D5BA45BD6E3F66 /* TrackingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingCoordinator.swift; sourceTree = "<group>"; };
 		88C6C42861FFD12A4B35640F /* JammermanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JammermanApp.swift; sourceTree = "<group>"; };
 		AEA43053DB003F240045AA7E /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
+		BB61258A32E116A9BDF327E7 /* SynthPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynthPanelView.swift; sourceTree = "<group>"; };
+		BFFC794AEAB27CD65E320C2E /* TutorialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialView.swift; sourceTree = "<group>"; };
+		C03825479B9B72708C7873D5 /* MixerPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixerPanelView.swift; sourceTree = "<group>"; };
 		C62BB724F810BD730BEDA99B /* CameraPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreview.swift; sourceTree = "<group>"; };
 		C97973F5C1A764165282ACB4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DEFE69880F0A48B2ED3F15AA /* MusicTheory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicTheory.swift; sourceTree = "<group>"; };
@@ -119,7 +125,10 @@
 			isa = PBXGroup;
 			children = (
 				C62BB724F810BD730BEDA99B /* CameraPreview.swift */,
+				C03825479B9B72708C7873D5 /* MixerPanelView.swift */,
 				2C218E26F294C2AE0DC8DAD4 /* PerformanceView.swift */,
+				BB61258A32E116A9BDF327E7 /* SynthPanelView.swift */,
+				BFFC794AEAB27CD65E320C2E /* TutorialView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -194,10 +203,13 @@
 				7A9521C0D5D1A6AA2C972357 /* JammermanConfig.swift in Sources */,
 				A3502D9B826F06CBFCFCB15F /* JammermanState.swift in Sources */,
 				F1E7C5A6DAB1E1EFF8C48C1B /* MetalRenderer.swift in Sources */,
+				2295A15C8C491E9C3DC7DDE4 /* MixerPanelView.swift in Sources */,
 				2B8B2879D61927E84DFF23E7 /* MusicTheory.swift in Sources */,
 				21D3864459148D5CAD6C60AF /* OneEuroFilter.swift in Sources */,
 				847CB1108468B8E2E21B763F /* PerformanceView.swift in Sources */,
+				7E1FA72994FBB1C68B03ECEC /* SynthPanelView.swift in Sources */,
 				F6CDAD16A5988A17A6837B94 /* TrackingCoordinator.swift in Sources */,
+				0ECA988981E3647DF27370C0 /* TutorialView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

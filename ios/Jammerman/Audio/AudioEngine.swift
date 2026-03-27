@@ -37,10 +37,10 @@ class AudioEngine: ObservableObject {
     private var masterMixer: AVAudioMixerNode!
 
     // Synth oscillators
-    private var padOsc = PadOscillator()
+    var padOsc = PadOscillator()
     private var arpOsc = ArpOscillator()
     private var arp2Osc = ArpOscillator()
-    private var melodyOsc = MelodyOscillator()
+    var melodyOsc = MelodyOscillator()
     private var kickOsc = DrumOscillator(type: .kick)
     private var snareOsc = DrumOscillator(type: .snare)
     private var hatOsc = DrumOscillator(type: .hat)
