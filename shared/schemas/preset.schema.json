@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Jammerman Preset",
+  "description": "Full preset definition shared across iOS and web. Web ignores iOS-only fields.",
+  "type": "object",
+  "required": ["name", "bpm", "rootOffset"],
+  "properties": {
+    "name": { "type": "string" },
+    "bpm": { "type": "integer", "minimum": 40, "maximum": 200 },
+    "rootOffset": { "type": "integer", "minimum": 0, "maximum": 11, "description": "Semitones from C4" },
+    "padVolume": { "type": "number", "description": "dB" },
+    "arpVolume": { "type": "number" },
+    "melodyVolume": { "type": "number" },
+    "kickVolume": { "type": "number" },
+    "snareVolume": { "type": "number" },
+    "hatVolume": { "type": "number" },
+    "padOsc": { "type": "string", "enum": ["sine", "triangle", "sawtooth", "square"] },
+    "padHarm": { "type": "number", "description": "FM harmonicity ratio" },
+    "padMod": { "type": "number", "description": "FM modulation index" },
+    "padAttack": { "type": "number", "minimum": 0 },
+    "padRelease": { "type": "number", "minimum": 0 },
+    "arpOsc": { "type": "string", "enum": ["sine", "triangle", "sawtooth", "square"] },
+    "arpAttack": { "type": "number", "minimum": 0 },
+    "arpDecay": { "type": "number", "minimum": 0 },
+    "arpSustain": { "type": "number", "minimum": 0, "maximum": 1 },
+    "arpRelease": { "type": "number", "minimum": 0 },
+    "melOsc": { "type": "string", "enum": ["sine", "triangle", "sawtooth", "square"] },
+    "melAttack": { "type": "number", "minimum": 0 },
+    "melDecay": { "type": "number", "minimum": 0 },
+    "melSustain": { "type": "number", "minimum": 0, "maximum": 1 },
+    "melRelease": { "type": "number", "minimum": 0 },
+    "arpPattern": { "type": "string", "enum": ["up-down", "up", "down", "random", "up-up-down", "played"] },
+    "rhythmPattern": { "type": "integer", "minimum": 0 },
+    "swing": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "reverbDecay": { "type": "number", "minimum": 0 },
+    "delayFeedback": { "type": "number", "minimum": 0, "maximum": 1 },
+    "padReverb": { "type": "number", "minimum": 0, "maximum": 1 },
+    "padDelay": { "type": "number", "minimum": 0, "maximum": 1 },
+    "arpReverb": { "type": "number", "minimum": 0, "maximum": 1 },
+    "arpDelay": { "type": "number", "minimum": 0, "maximum": 1 },
+
+    "_ios": {
+      "type": "object",
+      "description": "iOS-only fields (ignored by web)",
+      "properties": {
+        "auv3Plugins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "channel": { "type": "string" },
+              "bundleId": { "type": "string" },
+              "parameters": { "type": "object" }
+            }
+          }
+        },
+        "samplePacks": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

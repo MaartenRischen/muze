@@ -1,0 +1,13 @@
+{
+  "description": "quantize(value, scale, root, octaveRange) -> MIDI note",
+  "cases": [
+    { "input": { "value": 0.0, "scale": [0,2,3,5,7,9,10], "root": 60, "octaveRange": 2 }, "expected": 60, "label": "lowest -> root (C4)" },
+    { "input": { "value": 1.0, "scale": [0,2,3,5,7,9,10], "root": 60, "octaveRange": 2 }, "expected": 82, "label": "highest -> top of range (Dorian)" },
+    { "input": { "value": 0.5, "scale": [0,2,3,5,7,9,10], "root": 60, "octaveRange": 2 }, "expected": 72, "label": "middle -> midpoint of Dorian 2oct" },
+    { "input": { "value": 0.0, "scale": [0,2,4,5,7,9,11], "root": 60, "octaveRange": 2 }, "expected": 60, "label": "lowest Ionian -> C4" },
+    { "input": { "value": 1.0, "scale": [0,2,4,5,7,9,11], "root": 60, "octaveRange": 2 }, "expected": 83, "label": "highest Ionian 2oct" },
+    { "input": { "value": 0.5, "scale": [0,2,4,7,9], "root": 60, "octaveRange": 2 }, "expected": 69, "label": "pent major midpoint" },
+    { "input": { "value": 0.0, "scale": [0,2,4,6,7,9,11], "root": 65, "octaveRange": 2 }, "expected": 65, "label": "root=F4 lowest" },
+    { "input": { "value": 0.25, "scale": [0,2,3,5,7,9,10], "root": 60, "octaveRange": 2 }, "expected": 65, "label": "quarter Dorian 2oct" }
+  ]
+}

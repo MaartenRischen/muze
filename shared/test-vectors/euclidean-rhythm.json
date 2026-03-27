@@ -1,0 +1,15 @@
+{
+  "description": "euclidean(pulses, steps) -> binary pattern array",
+  "cases": [
+    { "input": { "pulses": 3, "steps": 8 }, "expected": [1,0,0,1,0,0,1,0], "label": "classic 3/8 tresillo" },
+    { "input": { "pulses": 5, "steps": 8 }, "expected": [1,0,1,1,0,1,1,0], "label": "5/8 cinquillo" },
+    { "input": { "pulses": 4, "steps": 16 }, "expected": [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], "label": "4/16 four-on-floor" },
+    { "input": { "pulses": 7, "steps": 16 }, "expected": [1,0,0,1,0,1,0,1,0,0,1,0,1,0,1,0], "label": "7/16" },
+    { "input": { "pulses": 0, "steps": 8 }, "expected": [0,0,0,0,0,0,0,0], "label": "zero pulses" },
+    { "input": { "pulses": 8, "steps": 8 }, "expected": [1,1,1,1,1,1,1,1], "label": "all pulses" },
+    { "input": { "pulses": 1, "steps": 4 }, "expected": [1,0,0,0], "label": "single pulse" },
+    { "input": { "pulses": 2, "steps": 5 }, "expected": [1,0,1,0,0], "label": "2/5" },
+    { "input": { "pulses": 3, "steps": 4 }, "expected": [1,0,1,1], "label": "3/4" },
+    { "input": { "pulses": 5, "steps": 16 }, "expected": [1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0], "label": "5/16" }
+  ]
+}

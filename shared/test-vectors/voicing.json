@@ -1,0 +1,13 @@
+{
+  "description": "getPadVoicing(root, scale, degree) -> [noteStr x4] and getArpNotes(scale, root, degree, octaveRange) -> [noteStr...]",
+  "padVoicing": [
+    { "input": { "root": 60, "scale": [0,2,3,5,7,9,10], "degree": 0 }, "expected": ["C3", "D#4", "G4", "A#4"], "label": "Dorian root chord" },
+    { "input": { "root": 60, "scale": [0,2,4,5,7,9,11], "degree": 0 }, "expected": ["C3", "E4", "G4", "B4"], "label": "Ionian root chord (Cmaj7)" },
+    { "input": { "root": 60, "scale": [0,2,3,5,7,9,10], "degree": 1 }, "expected": ["D3", "F4", "A4", "C5"], "label": "Dorian ii chord" },
+    { "input": { "root": 65, "scale": [0,2,4,6,7,9,11], "degree": 0 }, "expected": ["F3", "A4", "C#5", "E5"], "label": "Lydian root=F" }
+  ],
+  "arpNotes": [
+    { "input": { "scale": [0,2,3,5,7,9,10], "root": 60, "degree": 0, "octaveRange": 2 }, "expected": ["C4", "D#4", "G4", "A#4", "C5", "D#5", "G5", "A#5"], "label": "Dorian root 2oct" },
+    { "input": { "scale": [0,2,4,5,7,9,11], "root": 60, "degree": 0, "octaveRange": 1 }, "expected": ["C4", "E4", "G4", "B4"], "label": "Ionian root 1oct" }
+  ]
+}
