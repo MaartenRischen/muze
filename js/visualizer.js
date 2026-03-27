@@ -306,7 +306,7 @@ MUZE.Visualizer = {
     const cx = this._faceCx;
     const headR = Math.min(w, h) * 0.14;
     const cy = this._faceCy - headR * 0.5; // offset up half a head
-    const baseRadius = Math.min(w, h) * 0.36;
+    const baseRadius = Math.min(w, h) * 0.54;
     const beatExpand = this._beatPulse * 30;
     const bloomExpand = this._beatBloomRadius * baseRadius * 0.18;
     const radius = baseRadius + energy * 80 + beatExpand + bloomExpand;
@@ -658,7 +658,7 @@ MUZE.Visualizer = {
   // Gradients start from head radius outward — nothing draws over the face
   // ============================================================
   _drawBeatHalo(ctx, w, h, bass, energy, accentRgb) {
-    const headR = Math.min(w, h) * 0.28; // 2x size
+    const headR = Math.min(w, h) * 0.42; // 3x original
     const cx = this._faceCx;
     const cy = this._faceCy - headR * 0.25; // offset up half a head
     const bp = this._beatPulse;
