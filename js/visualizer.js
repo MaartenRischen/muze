@@ -690,7 +690,8 @@ MUZE.Visualizer = {
     // === PASS 1: Outer glow (starts from head edge, expands outward) ===
     const outerR = headR + 80 + glow * 200 + bloom * 60;
     const outerGrad = ctx.createRadialGradient(cx, cy, headR, cx, cy, outerR);
-    outerGrad.addColorStop(0, `rgba(${accentRgb}, ${(glow * 0.3 + flash * 0.2).toFixed(2)})`);
+    outerGrad.addColorStop(0, `rgba(${accentRgb}, 0)`);
+    outerGrad.addColorStop(0.02, `rgba(${accentRgb}, ${(glow * 0.3 + flash * 0.2).toFixed(2)})`);
     outerGrad.addColorStop(0.4, `rgba(${accentRgb}, ${(glow * 0.12).toFixed(2)})`);
     outerGrad.addColorStop(1, `rgba(${accentRgb}, 0)`);
     ctx.beginPath();
@@ -704,7 +705,8 @@ MUZE.Visualizer = {
     const cR = Math.min(255, parseInt(accentRgb.split(',')[0]) + flash * 150);
     const cG = Math.min(255, parseInt(accentRgb.split(',')[1]) + flash * 150);
     const cB = Math.min(255, parseInt(accentRgb.split(',')[2]) + flash * 150);
-    rimGrad.addColorStop(0, `rgba(${Math.round(cR)},${Math.round(cG)},${Math.round(cB)},${(0.2 + glow * 0.3 + flash * 0.4).toFixed(2)})`);
+    rimGrad.addColorStop(0, `rgba(${Math.round(cR)},${Math.round(cG)},${Math.round(cB)}, 0)`);
+    rimGrad.addColorStop(0.02, `rgba(${Math.round(cR)},${Math.round(cG)},${Math.round(cB)},${(0.2 + glow * 0.3 + flash * 0.4).toFixed(2)})`);
     rimGrad.addColorStop(0.5, `rgba(${accentRgb}, ${(glow * 0.1).toFixed(2)})`);
     rimGrad.addColorStop(1, `rgba(${accentRgb}, 0)`);
     ctx.beginPath();
@@ -716,7 +718,8 @@ MUZE.Visualizer = {
     if (flash > 0.05) {
       const flashR = headR + 50 + flash * 50;
       const flashGrad = ctx.createRadialGradient(cx, cy, headR, cx, cy, flashR);
-      flashGrad.addColorStop(0, `rgba(255,255,255,${(flash * 0.4).toFixed(2)})`);
+      flashGrad.addColorStop(0, 'rgba(255,255,255,0)');
+      flashGrad.addColorStop(0.02, `rgba(255,255,255,${(flash * 0.4).toFixed(2)})`);
       flashGrad.addColorStop(0.4, `rgba(255,255,255,${(flash * 0.1).toFixed(2)})`);
       flashGrad.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.beginPath();
