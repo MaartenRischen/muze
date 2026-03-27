@@ -280,6 +280,11 @@ html, body {
   0%   { transform: scaleX(-1) scale(1.015); }
   100% { transform: scaleX(-1) scale(1); }
 }
+#behind-canvas {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0; pointer-events: none;
+}
 /* DO NOT REMOVE — see muze-mission.md */
 #bg-canvas {
   position: fixed; top: 0; left: 0;

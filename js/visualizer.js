@@ -112,7 +112,8 @@ MUZE.Visualizer = {
   // ---- Explosion screen glow ----
   _explosionGlow: null,  // { x, y, life, startTime }
 
-  // ---- Beat halo (behind-head effect via face-oval clip) ----
+  // ---- Behind-canvas (waveform ring + halo rendered behind user) ----
+  _behindCanvas: null, _behindCtx: null,
   _haloRays: [],
   _haloRings: [],
   _haloGlow: 0,
@@ -126,6 +127,8 @@ MUZE.Visualizer = {
   init() {
     this._canvas = document.getElementById('overlay');
     this._ctx = this._canvas.getContext('2d');
+    this._behindCanvas = document.getElementById('behind-canvas');
+    if (this._behindCanvas) this._behindCtx = this._behindCanvas.getContext('2d');
     // Create offscreen trail canvas for light painting persistence
     this._trailCanvas = document.createElement('canvas');
     this._trailCtx = this._trailCanvas.getContext('2d');
@@ -142,6 +145,13 @@ MUZE.Visualizer = {
     this._canvas.style.width = this._width + 'px';
     this._canvas.style.height = this._height + 'px';
     this._ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (this._behindCanvas) {
+      this._behindCanvas.width = this._width * dpr;
+      this._behindCanvas.height = this._height * dpr;
+      this._behindCanvas.style.width = this._width + 'px';
+      this._behindCanvas.style.height = this._height + 'px';
+      this._behindCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
     // Reset smooth buffers on resize
     this._smoothFFTBins = null;
     this._smoothWaveform = null;
@@ -291,7 +301,7 @@ MUZE.Visualizer = {
       this._faceCy = h * 0.35;
     }
 
-    // 3. Waveform ring + beat halo (clipped behind the head)
+    // 3. Waveform ring + beat halo → drawn on behind-canvas (behind user)
     const cx = w / 2;
     const cy = h * 0.38;
     const baseRadius = Math.min(w, h) * 0.18;
@@ -299,11 +309,14 @@ MUZE.Visualizer = {
     const bloomExpand = this._beatBloomRadius * baseRadius * 0.18;
     const radius = baseRadius + energy * 80 + beatExpand + bloomExpand;
 
-    // Draw waveform ring normally (not on face)
-    this._drawWaveformRing(ctx, waveform, cx, cy, radius, energy, accentRgb);
-
-    // Draw beat halo — DISABLED to identify which circle user sees
-    // this._drawBeatHalo(ctx, w, h, bass, energy, accentRgb);
+    if (this._behindCtx) {
+      this._behindCtx.clearRect(0, 0, w, h);
+      this._drawWaveformRing(this._behindCtx, waveform, cx, cy, radius, energy, accentRgb);
+      this._drawBeatHalo(this._behindCtx, w, h, bass, energy, accentRgb);
+    } else {
+      // Fallback if behind-canvas not available
+      this._drawWaveformRing(ctx, waveform, cx, cy, radius, energy, accentRgb);
+    }
 
     // 4. Particles
     const particleEnergy = fft ? Math.max(energy, mid * 2) : energy;
