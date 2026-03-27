@@ -302,8 +302,8 @@ MUZE.Visualizer = {
     // Draw waveform ring normally (not on face)
     this._drawWaveformRing(ctx, waveform, cx, cy, radius, energy, accentRgb);
 
-    // Draw beat halo BEHIND the head using face-oval clip
-    this._drawBeatHalo(ctx, w, h, bass, energy, accentRgb);
+    // Draw beat halo — DISABLED to identify which circle user sees
+    // this._drawBeatHalo(ctx, w, h, bass, energy, accentRgb);
 
     // 4. Particles
     const particleEnergy = fft ? Math.max(energy, mid * 2) : energy;
