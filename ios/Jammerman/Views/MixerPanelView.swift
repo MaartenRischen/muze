@@ -196,7 +196,6 @@ struct ChannelDetailView: View {
     @State private var pan: Double = 0
     @State private var reverbSend: Double = 0
     @State private var delaySend: Double = 0
-    @State private var sidechainAmount: Double = 0
     @State private var eqLow: Double = 0
     @State private var eqMid: Double = 0
     @State private var eqHigh: Double = 0
@@ -275,9 +274,6 @@ struct ChannelDetailView: View {
                             sliderRow("Delay", value: $delaySend, color: color) { new in
                                 coordinator.audioEngine.setChannelDelaySend(id, amount: Float(new))
                             }
-                            sliderRow("Sidechain", value: $sidechainAmount, color: .orange) { new in
-                                coordinator.audioEngine.setChannelSidechainAmount(id, amount: Float(new))
-                            }
                         }
                         .padding(12)
                         .background(.white.opacity(0.04))
@@ -317,7 +313,6 @@ struct ChannelDetailView: View {
         pan = Double(coordinator.audioEngine.channelPans[id] ?? 0)
         reverbSend = Double(coordinator.audioEngine.channelReverbSends[id] ?? 0)
         delaySend = Double(coordinator.audioEngine.channelDelaySends[id] ?? 0)
-        sidechainAmount = Double(coordinator.audioEngine.channelSidechainAmounts[id] ?? 0)
     }
 
     private func sliderRow(_ label: String, value: Binding<Double>, color: Color, onChange: @escaping (Double) -> Void) -> some View {

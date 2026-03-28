@@ -156,25 +156,7 @@ class AudioEngine: ObservableObject {
         "kick": 0, "snare": 0, "hat": 0, "binaural": 0
     ]
 
-    // Per-channel sidechain amount (0 to 1) — how much this channel ducks on kick
-    var channelSidechainAmounts: [String: Float] = [
-        "pad": 0.7, "arp": 0.3, "arp2": 0.3, "melody": 0,
-        "kick": 0, "snare": 0, "hat": 0, "binaural": 0
-    ]
-
-    // Sidechain compressor parameters
-    @Published var sidechainAttack: Float = 0.5   // ms (fast attack for punchy duck)
-    @Published var sidechainRelease: Float = 100   // ms
-    @Published var sidechainRatio: Float = 8       // compression ratio
-    @Published var sidechainEnabled: Bool = true
-
-    // Sidechain state
-    private var sidechainGainReduction: [String: Float] = [
-        "pad": 1, "arp": 1, "arp2": 1, "melody": 1
-    ]
-    private var kickTriggered: Bool = false
-    private var kickTriggerSample: UInt64 = 0  // when kick last fired
-    private lazy var sidechainHoldSamples: UInt64 = UInt64(0.050 * sampleRate)  // 50ms hold
+    // Sidechain removed — was causing pad to go silent
 
     // Thread-safe drum step for UI (written from audio thread, read from main)
     private var _pendingDrumStep: Int = -1
@@ -285,9 +267,6 @@ class AudioEngine: ObservableObject {
             let localArp2NoteValue = self.arp2NoteValue
             let localDrumPattern = self.drumPattern // copy array of arrays
             let localDrumVelocity = self.drumVelocity
-            let localSidechainEnabled = self.sidechainEnabled
-            let localSidechainRelease = self.sidechainRelease
-            let localHoldSamples = self.sidechainHoldSamples
 
             let samplesPerBeat = sr * 60.0 / currentBpm
             let samplesPerSixteenth = samplesPerBeat / 4.0
@@ -319,11 +298,6 @@ class AudioEngine: ObservableObject {
                             let vel: Float = (localDrumVelocity.count > 0 && step < localDrumVelocity[0].count) ? localDrumVelocity[0][step] : 0.8
                             self.kickOsc.trigger(velocity: vel)
                             self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmKick, withVelocity: UInt8(vel * 127), onChannel: 9)
-                            // Trigger sidechain — mark sample position
-                            if localSidechainEnabled {
-                                self.kickTriggered = true
-                                self.kickTriggerSample = self.globalSampleCount + UInt64(i)
-                            }
                         }
                         // Snare
                         if localDrumPattern[1].count > 0 {
@@ -403,57 +377,6 @@ class AudioEngine: ObservableObject {
                 }
             }
             self.globalSampleCount += UInt64(frameCount)
-
-            // Sidechain compressor — apply gain reduction to ducked channels
-            if localSidechainEnabled {
-                let currentSample = self.globalSampleCount
-                let samplesSinceKick = currentSample > self.kickTriggerSample ? currentSample - self.kickTriggerSample : UInt64.max
-                let inHold = samplesSinceKick < localHoldSamples
-                let releaseProgress = inHold ? Float(0) : min(1, Float(samplesSinceKick - localHoldSamples) / (localSidechainRelease * 0.001 * Float(sr)))
-
-                var needsUpdate = false
-                for ch in ["pad", "arp", "arp2", "melody"] {
-                    let amount = self.channelSidechainAmounts[ch] ?? 0
-                    guard amount > 0 else { continue }
-
-                    let gr: Float
-                    if inHold {
-                        gr = 1.0 - amount  // full duck
-                    } else {
-                        gr = (1.0 - amount) + amount * releaseProgress  // recovering
-                    }
-
-                    let prev = self.sidechainGainReduction[ch] ?? 1.0
-                    if abs(gr - prev) > 0.01 {
-                        self.sidechainGainReduction[ch] = gr
-                        needsUpdate = true
-                    }
-                }
-
-                if needsUpdate {
-                    // Apply on main thread since AVAudioMixerNode properties may not be audio-thread safe
-                    let reductions = self.sidechainGainReduction
-                    let volumes = self.channelVolumes
-                    let isMuted = (localPadMuted, localArpMuted, localArp2Muted, localMelodyMuted)
-                    DispatchQueue.main.async { [weak self] in
-                        guard let self else { return }
-                        for ch in ["pad", "arp", "arp2", "melody"] {
-                            let chMuted: Bool
-                            switch ch {
-                            case "pad": chMuted = isMuted.0
-                            case "arp": chMuted = isMuted.1
-                            case "arp2": chMuted = isMuted.2
-                            case "melody": chMuted = isMuted.3
-                            default: chMuted = false
-                            }
-                            guard !chMuted else { continue }
-                            let baseVol = self.dbToGain(volumes[ch] ?? -10)
-                            let gr = reductions[ch] ?? 1.0
-                            self.mixerForChannel(ch)?.outputVolume = baseVol * gr
-                        }
-                    }
-                }
-            }
 
             return self.kickOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: sr, muted: localBeatMuted)
         }
@@ -866,10 +789,6 @@ class AudioEngine: ObservableObject {
     }
 
     // MARK: - Sidechain Send
-
-    func setChannelSidechainAmount(_ channel: String, amount: Float) {
-        channelSidechainAmounts[channel] = max(0, min(1, amount))
-    }
 
     // MARK: - FX Parameters
 
