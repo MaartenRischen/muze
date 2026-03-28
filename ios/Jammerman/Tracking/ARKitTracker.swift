@@ -103,18 +103,14 @@ class ARKitTracker: NSObject {
         let jawOpen = (blendShapes[.jawOpen]?.floatValue) ?? 0
         let mouthOpenness = clamp01(jawOpen)
 
-        // Lip corner (smile): average of left+right smile, remap from 0..~0.7 to -1..1
-        // Neutral smile is around 0.15
+        // Lip corner (smile): average of left+right smile blend shapes
+        // ARKit mouthSmile: 0 = neutral/frown, ~0.3 = slight smile, ~0.8 = big smile
         let smileL = (blendShapes[.mouthSmileLeft]?.floatValue) ?? 0
         let smileR = (blendShapes[.mouthSmileRight]?.floatValue) ?? 0
         let avgSmile = (smileL + smileR) / 2
-        // Remap: 0.15 = neutral (0), 0 = -1 (frown), 0.7 = +1 (smile)
-        let lipCorner: Float
-        if avgSmile < 0.15 {
-            lipCorner = clamp((avgSmile - 0.15) / 0.15, lo: -1, hi: 0) // frown range
-        } else {
-            lipCorner = clamp((avgSmile - 0.15) / 0.55, lo: 0, hi: 1) // smile range
-        }
+        // Simple linear remap: 0 = frown (-1), 0.2 = neutral (0), 0.6 = big smile (+1)
+        // This gives equal sensitivity on both sides of neutral
+        let lipCorner = clamp((avgSmile - 0.2) / 0.4 * 2.0, lo: -1, hi: 1)
 
         // Brow height: browInnerUp 0..1
         let browInnerUp = (blendShapes[.browInnerUp]?.floatValue) ?? 0
