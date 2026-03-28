@@ -20,6 +20,7 @@ protocol ARKitTrackerDelegate: AnyObject {
     func arKitTracker(_ tracker: ARKitTracker, didUpdateHand hand: HandFeatures)
     func arKitTracker(_ tracker: ARKitTracker, didLoseFace: Bool)
     func arKitTracker(_ tracker: ARKitTracker, didUpdateSegmentation buffer: CVPixelBuffer?)
+    func arKitTracker(_ tracker: ARKitTracker, didUpdateVisionLandmarks landmarks: VNFaceLandmarks2D, boundingBox: CGRect)
 }
 
 // MARK: - ARKit Tracker
@@ -28,10 +29,11 @@ class ARKitTracker: NSObject {
     weak var delegate: ARKitTrackerDelegate?
 
     // Tunable valence parameters (exposed for UI calibration)
-    var valenceNeutral: Float = 0.0     // rawValence value that maps to center (Mixolydian)
-    var valenceScale: Float = 2.0       // multiplier for rawValence spread
-    var valenceOffset: Float = 0.5      // added after scaling (shifts whole range up/down)
-    var frownWeight: Float = 2.0        // how much mouthFrown contributes vs mouthSmile
+    // Calibrated valence parameters
+    var valenceNeutral: Float = 0.23
+    var valenceScale: Float = 1.21
+    var valenceOffset: Float = 0.5
+    var frownWeight: Float = 2.0
 
     #if !targetEnvironment(simulator)
     private var arSession: ARSession?
@@ -41,6 +43,12 @@ class ARKitTracker: NSObject {
     private let handRequest = VNDetectHumanHandPoseRequest()
     private var handFrameCount = 0
     private var lastHandOpen: Bool?
+
+    // Vision face landmarks for precise contour rendering (runs on ARFrame)
+    #if !targetEnvironment(simulator)
+    private let visionFaceRequest = VNDetectFaceLandmarksRequest()
+    private var visionFrameCount = 0
+    #endif
 
     // No frame retention — use arSession?.currentFrame when needed
 
@@ -248,6 +256,19 @@ class ARKitTracker: NSObject {
             handOpen: open
         )
     }
+    // Vision face detection on ARFrame for precise contour landmarks
+    private func detectVisionFace(in frame: ARFrame) {
+        let pixelBuffer = frame.capturedImage
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right)
+        let faceRequest = VNDetectFaceLandmarksRequest()
+        try? handler.perform([faceRequest])
+
+        guard let faceObs = faceRequest.results?.first,
+              let landmarks = faceObs.landmarks else { return }
+
+        let bb = faceObs.boundingBox
+        delegate?.arKitTracker(self, didUpdateVisionLandmarks: landmarks, boundingBox: bb)
+    }
     #endif
 
     // MARK: - Helpers
@@ -270,9 +291,14 @@ class ARKitTracker: NSObject {
 #if !targetEnvironment(simulator)
 extension ARKitTracker: ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        // Don't retain frame — use arSession?.currentFrame when needed
         // Hand detection on every frame (internally staggered)
         detectHand(in: frame)
+
+        // Vision face landmarks for precise contour rendering (every 3rd frame)
+        visionFrameCount += 1
+        if visionFrameCount % 3 == 0 {
+            detectVisionFace(in: frame)
+        }
 
         // Forward segmentation buffer if available
         if let segBuffer = frame.segmentationBuffer {

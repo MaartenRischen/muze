@@ -6,6 +6,7 @@ import Foundation
 import Combine
 import CoreMedia
 import simd
+import Vision
 
 class TrackingCoordinator: ObservableObject {
     let camera = CameraManager()
@@ -378,6 +379,14 @@ extension TrackingCoordinator: ARKitTrackerDelegate {
     func arKitTracker(_ tracker: ARKitTracker, didUpdateSegmentation buffer: CVPixelBuffer?) {
         DispatchQueue.main.async { [weak self] in
             self?.state.segmentationBuffer = buffer
+        }
+    }
+
+    func arKitTracker(_ tracker: ARKitTracker, didUpdateVisionLandmarks landmarks: VNFaceLandmarks2D, boundingBox: CGRect) {
+        // Store Vision landmarks for precise face contour rendering in the visualizer
+        DispatchQueue.main.async { [weak self] in
+            self?.state.rawLandmarks = landmarks
+            self?.state.faceBoundingBox = boundingBox
         }
     }
 }
