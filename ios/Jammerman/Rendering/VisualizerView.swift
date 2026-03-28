@@ -60,11 +60,11 @@ class VisualizerUIView: UIView {
 
     // ---- Particles ----
     private var particles: [VizParticle] = []
-    private let maxParticles = 25
+    private let maxParticles = 50
     private var faceParticles: [VizParticle] = []
-    private let maxFaceParticles = 40
+    private let maxFaceParticles = 60
     private var burstParticles: [BurstParticle] = []
-    private let maxBurstParticles = 50
+    private let maxBurstParticles = 80
     private var burstRings: [BurstRing] = []
     private var lastBurstNote: Int?
     private var explosionParticles: [ExplosionParticle] = []
@@ -297,10 +297,12 @@ class VisualizerUIView: UIView {
         updateAndDrawExplosion(ctx: ctx, w: w, h: h)
 
         // 11. Beat flash overlay (matches web CSS beat-flash class)
-        if beatPulse > 0.5 {
-            let flashAlpha = (beatPulse - 0.5) * 0.12
+        if beatPulse > 0.4 {
+            let flashAlpha = (beatPulse - 0.4) * 0.18
             ctx.saveGState()
-            ctx.setFillColor(UIColor(white: 1, alpha: flashAlpha).cgColor)
+            ctx.setBlendMode(.plusLighter)
+            // Accent-tinted flash for more character
+            ctx.setFillColor(UIColor(red: accentR * 0.3 + 0.7, green: accentG * 0.3 + 0.7, blue: accentB * 0.3 + 0.7, alpha: flashAlpha).cgColor)
             ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
             ctx.restoreGState()
         }
@@ -333,12 +335,18 @@ class VisualizerUIView: UIView {
 
     private func drawApproximateFace(ctx: CGContext, cx: CGFloat, cy: CGFloat,
                                      w: CGFloat, h: CGFloat, state: JammermanState, energy: CGFloat) {
-        let faceW = w * 0.22
-        let faceH = h * 0.17
-        let alpha = 0.3 + energy * 0.25
+        // Scale face to ~40% of screen width, ~30% of height — covers real face area
+        let faceW = w * 0.38
+        let faceH = h * 0.28
+        let alpha = 0.4 + energy * 0.35
 
-        // 3-pass neon glow
-        let passes: [(CGFloat, CGFloat)] = [(6, 0.06), (3, 0.15), (1.2, alpha)]
+        // 4-pass neon glow: ultra-wide bloom → wide glow → medium → hot core
+        let passes: [(CGFloat, CGFloat)] = [
+            (14, 0.03 + beatPulse * 0.02),
+            (7, 0.08 + beatPulse * 0.04),
+            (3, 0.18 + energy * 0.1),
+            (1.2, alpha)
+        ]
 
         for (lineW, a) in passes {
             ctx.saveGState()
@@ -348,57 +356,74 @@ class VisualizerUIView: UIView {
             ctx.setLineJoin(.round)
 
             // Face oval
-            ctx.strokeEllipse(in: CGRect(x: cx - faceW, y: cy - faceH, width: faceW * 2, height: faceH * 2))
+            ctx.strokeEllipse(in: CGRect(x: cx - faceW/2, y: cy - faceH/2, width: faceW, height: faceH))
 
             // Eyes
-            let eyeW = faceW * 0.32
-            let eyeH = faceH * 0.1 + CGFloat(state.eyeOpenness) * faceH * 0.05
-            let eyeY = cy - faceH * 0.15
-            ctx.strokeEllipse(in: CGRect(x: cx - faceW * 0.42 - eyeW/2, y: eyeY - eyeH/2, width: eyeW, height: eyeH))
-            ctx.strokeEllipse(in: CGRect(x: cx + faceW * 0.42 - eyeW/2, y: eyeY - eyeH/2, width: eyeW, height: eyeH))
+            let eyeW = faceW * 0.22
+            let eyeH = faceH * 0.06 + CGFloat(state.eyeOpenness) * faceH * 0.04
+            let eyeY = cy - faceH * 0.12
+            let eyeSpacing = faceW * 0.22
+            ctx.strokeEllipse(in: CGRect(x: cx - eyeSpacing - eyeW/2, y: eyeY - eyeH/2, width: eyeW, height: eyeH))
+            ctx.strokeEllipse(in: CGRect(x: cx + eyeSpacing - eyeW/2, y: eyeY - eyeH/2, width: eyeW, height: eyeH))
 
             // Eyebrows
-            let browY = eyeY - faceH * 0.17 - CGFloat(state.browHeight) * 6
+            let browY = eyeY - faceH * 0.1 - CGFloat(state.browHeight) * 8
+            let browSpread = faceW * 0.28
             ctx.beginPath()
-            ctx.move(to: CGPoint(x: cx - faceW * 0.5, y: browY + 2))
-            ctx.addQuadCurve(to: CGPoint(x: cx - faceW * 0.12, y: browY + 2), control: CGPoint(x: cx - faceW * 0.32, y: browY))
+            ctx.move(to: CGPoint(x: cx - browSpread, y: browY + 3))
+            ctx.addQuadCurve(to: CGPoint(x: cx - browSpread * 0.2, y: browY + 3), control: CGPoint(x: cx - browSpread * 0.6, y: browY))
             ctx.strokePath()
             ctx.beginPath()
-            ctx.move(to: CGPoint(x: cx + faceW * 0.12, y: browY + 2))
-            ctx.addQuadCurve(to: CGPoint(x: cx + faceW * 0.5, y: browY + 2), control: CGPoint(x: cx + faceW * 0.32, y: browY))
+            ctx.move(to: CGPoint(x: cx + browSpread * 0.2, y: browY + 3))
+            ctx.addQuadCurve(to: CGPoint(x: cx + browSpread, y: browY + 3), control: CGPoint(x: cx + browSpread * 0.6, y: browY))
             ctx.strokePath()
 
             // Nose
             ctx.beginPath()
-            ctx.move(to: CGPoint(x: cx, y: cy - faceH * 0.05))
-            ctx.addLine(to: CGPoint(x: cx, y: cy + faceH * 0.12))
+            ctx.move(to: CGPoint(x: cx, y: cy - faceH * 0.02))
+            ctx.addLine(to: CGPoint(x: cx - faceW * 0.04, y: cy + faceH * 0.1))
+            ctx.addLine(to: CGPoint(x: cx + faceW * 0.04, y: cy + faceH * 0.1))
             ctx.strokePath()
 
-            // Mouth
-            let lipW = faceW * 0.35
-            let lipY = cy + faceH * 0.32
-            let mouthOpen = CGFloat(state.mouthOpenness) * 8
+            // Mouth — wider, more expressive
+            let lipW = faceW * 0.22
+            let lipY = cy + faceH * 0.25
+            let mouthOpen = CGFloat(state.mouthOpenness) * 14
+            let smileCurve: CGFloat = CGFloat(state.lipCorner) * 4 - 2
             ctx.beginPath()
             ctx.move(to: CGPoint(x: cx - lipW, y: lipY))
-            ctx.addQuadCurve(to: CGPoint(x: cx + lipW, y: lipY), control: CGPoint(x: cx, y: lipY - 3))
+            ctx.addQuadCurve(to: CGPoint(x: cx + lipW, y: lipY), control: CGPoint(x: cx, y: lipY - smileCurve))
             ctx.strokePath()
-            if mouthOpen > 1 {
+            if mouthOpen > 1.5 {
                 ctx.beginPath()
-                ctx.move(to: CGPoint(x: cx - lipW * 0.8, y: lipY))
-                ctx.addQuadCurve(to: CGPoint(x: cx + lipW * 0.8, y: lipY), control: CGPoint(x: cx, y: lipY + mouthOpen))
+                ctx.move(to: CGPoint(x: cx - lipW * 0.85, y: lipY + 1))
+                ctx.addQuadCurve(to: CGPoint(x: cx + lipW * 0.85, y: lipY + 1), control: CGPoint(x: cx, y: lipY + mouthOpen))
                 ctx.strokePath()
             }
 
             ctx.restoreGState()
         }
 
-        // Iris glow dots
-        let eyeY = cy - faceH * 0.15
+        // Hot white core on inner features (eyes, mouth) for depth
         ctx.saveGState()
-        ctx.setFillColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0.6 + beatPulse * 0.3).cgColor)
-        ctx.setShadow(offset: .zero, blur: 8, color: UIColor(red: accentR, green: accentG, blue: accentB, alpha: 1).cgColor)
-        ctx.fillEllipse(in: CGRect(x: cx - faceW * 0.42 - 2, y: eyeY - 2, width: 4, height: 4))
-        ctx.fillEllipse(in: CGRect(x: cx + faceW * 0.42 - 2, y: eyeY - 2, width: 4, height: 4))
+        ctx.setStrokeColor(UIColor(white: 1, alpha: 0.15 + energy * 0.15 + beatPulse * 0.1).cgColor)
+        ctx.setLineWidth(0.6)
+        ctx.setLineCap(.round)
+        let eyeY2 = cy - faceH * 0.12
+        let eyeSpacing2 = faceW * 0.22
+        let eyeW2 = faceW * 0.22
+        let eyeH2 = faceH * 0.06 + CGFloat(state.eyeOpenness) * faceH * 0.04
+        ctx.strokeEllipse(in: CGRect(x: cx - eyeSpacing2 - eyeW2/2, y: eyeY2 - eyeH2/2, width: eyeW2, height: eyeH2))
+        ctx.strokeEllipse(in: CGRect(x: cx + eyeSpacing2 - eyeW2/2, y: eyeY2 - eyeH2/2, width: eyeW2, height: eyeH2))
+        ctx.restoreGState()
+
+        // Iris glow dots — bigger and brighter
+        ctx.saveGState()
+        ctx.setBlendMode(.plusLighter)
+        ctx.setFillColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0.7 + beatPulse * 0.3).cgColor)
+        ctx.setShadow(offset: .zero, blur: 14, color: UIColor(red: accentR, green: accentG, blue: accentB, alpha: 1).cgColor)
+        ctx.fillEllipse(in: CGRect(x: cx - eyeSpacing2 - 3, y: eyeY2 - 3, width: 6, height: 6))
+        ctx.fillEllipse(in: CGRect(x: cx + eyeSpacing2 - 3, y: eyeY2 - 3, width: 6, height: 6))
         ctx.restoreGState()
     }
 
@@ -408,59 +433,65 @@ class VisualizerUIView: UIView {
     /// iris glow, expression particles, landmark lights, ghost trails, and energy aura
     /// all work even without Vision landmarks.
     private func synthesizeContourGroups(cx: CGFloat, cy: CGFloat, w: CGFloat, h: CGFloat, state: JammermanState) -> ContourGroups {
-        let faceW = w * 0.22
-        let faceH = h * 0.17
+        // Match the larger face proportions from drawApproximateFace
+        let faceRx = w * 0.19  // half-width of face oval
+        let faceRy = h * 0.14  // half-height of face oval
 
         // Generate face oval as a smooth ellipse (32 points)
         var oval: [CGPoint] = []
         for i in 0..<32 {
             let angle = CGFloat(i) / 32.0 * .pi * 2
-            oval.append(CGPoint(x: cx + cos(angle) * faceW, y: cy + sin(angle) * faceH))
+            oval.append(CGPoint(x: cx + cos(angle) * faceRx, y: cy + sin(angle) * faceRy))
         }
 
-        // Eye positions
-        let eyeY = cy - faceH * 0.15
-        let leftEyeCenter = CGPoint(x: cx - faceW * 0.42, y: eyeY)
-        let rightEyeCenter = CGPoint(x: cx + faceW * 0.42, y: eyeY)
+        // Eye positions — match drawApproximateFace
+        let eyeY = cy - faceRy * 0.43
+        let eyeSpacing = faceRx * 0.58
+        let leftEyeCenter = CGPoint(x: cx - eyeSpacing, y: eyeY)
+        let rightEyeCenter = CGPoint(x: cx + eyeSpacing, y: eyeY)
 
-        // Eye contours (small ellipses)
-        let eyeW = faceW * 0.32
-        let eyeH = faceH * 0.1 + CGFloat(state.eyeOpenness) * faceH * 0.05
+        // Eye contours
+        let eyeW = faceRx * 0.29
+        let eyeH = faceRy * 0.06 + CGFloat(state.eyeOpenness) * faceRy * 0.04
         var leftEye: [CGPoint] = []
         var rightEye: [CGPoint] = []
         for i in 0..<12 {
             let a = CGFloat(i) / 12.0 * .pi * 2
-            leftEye.append(CGPoint(x: leftEyeCenter.x + cos(a) * eyeW / 2, y: leftEyeCenter.y + sin(a) * eyeH / 2))
-            rightEye.append(CGPoint(x: rightEyeCenter.x + cos(a) * eyeW / 2, y: rightEyeCenter.y + sin(a) * eyeH / 2))
+            leftEye.append(CGPoint(x: leftEyeCenter.x + cos(a) * eyeW, y: leftEyeCenter.y + sin(a) * eyeH))
+            rightEye.append(CGPoint(x: rightEyeCenter.x + cos(a) * eyeW, y: rightEyeCenter.y + sin(a) * eyeH))
         }
 
         // Mouth
-        let lipW = faceW * 0.35
-        let lipY = cy + faceH * 0.32
+        let lipW = faceRx * 0.58
+        let lipY = cy + faceRy * 0.54
         let mouthCenter = CGPoint(x: cx, y: lipY)
         var outerLips: [CGPoint] = []
-        for i in 0..<12 {
-            let a = CGFloat(i) / 12.0 * .pi * 2
-            outerLips.append(CGPoint(x: cx + cos(a) * lipW, y: lipY + sin(a) * lipW * 0.4))
+        let mouthOpen = CGFloat(state.mouthOpenness) * faceRy * 0.15
+        for i in 0..<16 {
+            let a = CGFloat(i) / 16.0 * .pi * 2
+            let lx = cx + cos(a) * lipW
+            let ly = lipY + sin(a) * (lipW * 0.3 + mouthOpen * 0.5)
+            outerLips.append(CGPoint(x: lx, y: ly))
         }
 
         // Brows
-        let browY = eyeY - faceH * 0.17 - CGFloat(state.browHeight) * 6
+        let browY = eyeY - faceRy * 0.18 - CGFloat(state.browHeight) * 10
+        let browSpread = faceRx * 0.74
         let leftBrow = [
-            CGPoint(x: cx - faceW * 0.5, y: browY + 2),
-            CGPoint(x: cx - faceW * 0.32, y: browY),
-            CGPoint(x: cx - faceW * 0.12, y: browY + 2)
+            CGPoint(x: cx - browSpread, y: browY + 3),
+            CGPoint(x: cx - browSpread * 0.5, y: browY),
+            CGPoint(x: cx - browSpread * 0.15, y: browY + 3)
         ]
         let rightBrow = [
-            CGPoint(x: cx + faceW * 0.12, y: browY + 2),
-            CGPoint(x: cx + faceW * 0.32, y: browY),
-            CGPoint(x: cx + faceW * 0.5, y: browY + 2)
+            CGPoint(x: cx + browSpread * 0.15, y: browY + 3),
+            CGPoint(x: cx + browSpread * 0.5, y: browY),
+            CGPoint(x: cx + browSpread, y: browY + 3)
         ]
 
         // Nose
-        let noseTip = CGPoint(x: cx, y: cy + faceH * 0.12)
+        let noseTip = CGPoint(x: cx, y: cy + faceRy * 0.2)
         let noseBridge = [
-            CGPoint(x: cx, y: cy - faceH * 0.05),
+            CGPoint(x: cx, y: cy - faceRy * 0.05),
             noseTip
         ]
 
@@ -702,38 +733,48 @@ class VisualizerUIView: UIView {
             ctx.restoreGState()
         }
 
-        // ---- PASS 1: Outer glow (wide, faint) ----
-        let glowIntensify: CGFloat = beatPulse > 0.3 ? 2.0 : 1.0
+        // ---- PASS 0: Ultra-wide bloom (barely visible, atmospheric) ----
         ctx.saveGState()
+        ctx.setBlendMode(.plusLighter)
         buildRingPath()
-        ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0.06 * glowIntensify).cgColor)
-        ctx.setLineWidth(12)
+        ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0.02 + beatPulse * 0.02).cgColor)
+        ctx.setLineWidth(28)
         ctx.strokePath()
         ctx.restoreGState()
 
-        // ---- PASS 2: Core ring (medium) ----
+        // ---- PASS 1: Outer glow (wide) ----
+        let glowIntensify: CGFloat = beatPulse > 0.3 ? 2.5 : 1.0
         ctx.saveGState()
         buildRingPath()
-        ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: min(1, 0.35 + energy * 0.4 + beatPulse * 0.25)).cgColor)
-        ctx.setLineWidth(2)
+        ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0.08 * glowIntensify).cgColor)
+        ctx.setLineWidth(14)
+        ctx.strokePath()
+        ctx.restoreGState()
+
+        // ---- PASS 2: Core ring (medium, accent colored) ----
+        ctx.saveGState()
+        buildRingPath()
+        ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: min(1, 0.45 + energy * 0.4 + beatPulse * 0.3)).cgColor)
+        ctx.setLineWidth(2.5)
         ctx.strokePath()
         ctx.restoreGState()
 
         // ---- PASS 3: Hot core (thin, white) ----
         ctx.saveGState()
         buildRingPath()
-        ctx.setStrokeColor(UIColor(white: 1, alpha: min(1, 0.5 + energy * 0.5 + beatPulse * 0.3)).cgColor)
-        ctx.setLineWidth(0.5)
+        ctx.setStrokeColor(UIColor(white: 1, alpha: min(1, 0.6 + energy * 0.4 + beatPulse * 0.3)).cgColor)
+        ctx.setLineWidth(0.8)
         ctx.strokePath()
         ctx.restoreGState()
 
-        // ---- Beat glow bloom ----
-        if beatPulse > 0.05 {
-            let glowRadius = radius + beatPulse * 40
-            let glowAlpha = beatPulse * 0.2
+        // ---- Beat glow bloom (expands dramatically on kick) ----
+        if beatPulse > 0.03 {
+            let glowRadius = radius + beatPulse * 50
+            let glowAlpha = beatPulse * 0.3
             ctx.saveGState()
+            ctx.setBlendMode(.plusLighter)
             ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: glowAlpha).cgColor)
-            ctx.setLineWidth(20 + beatPulse * 30)
+            ctx.setLineWidth(25 + beatPulse * 40)
             ctx.strokeEllipse(in: CGRect(x: cx - glowRadius, y: cy - glowRadius, width: glowRadius * 2, height: glowRadius * 2))
             ctx.restoreGState()
         }
@@ -746,38 +787,42 @@ class VisualizerUIView: UIView {
         ctx.restoreGState()
     }
 
-    // MARK: - 2. Beat Halo (dramatic pulsing around head)
+    // MARK: - 2. Beat Halo (positioned ABOVE head like a real halo)
 
     private func drawBeatHalo(ctx: CGContext, w: CGFloat, h: CGFloat, bass: CGFloat, energy: CGFloat) {
-        let headR = min(w, h) * 0.42
+        // Halo sits ABOVE the head, like a religious/angelic halo
+        let haloRadius = min(w, h) * 0.16  // size of the halo ring itself
         let cx = faceCx
-        let cy = faceCy - headR * 0.25
+        // Position above the top of the head — face center is at faceCy, head top is ~faceH/2 above
+        let headTopY = faceCy - h * 0.14  // top of head
+        let cy = headTopY - haloRadius * 0.3  // halo floats just above
+
         let bp = beatPulse
         let bloom = beatBloomRadius
 
-        haloGlow += (energy * 0.6 + bp * 0.8 - haloGlow) * 0.12
-        if bp > 0.8 { haloFlash = 1.0 }
-        haloFlash *= 0.85
+        haloGlow += (energy * 0.8 + bp * 1.0 - haloGlow) * 0.15
+        if bp > 0.7 { haloFlash = 1.0 }
+        haloFlash *= 0.82
 
-        // Spawn rays on beat
-        if bp > 0.9 && haloRays.count < 24 {
-            let count = 8 + Int(bass * 8)
+        // Spawn rays on beat — radiate from halo
+        if bp > 0.85 && haloRays.count < 30 {
+            let count = 10 + Int(bass * 10)
             for i in 0..<count {
-                let angle = CGFloat(i) / CGFloat(count) * .pi * 2 + CGFloat.random(in: -0.15...0.15)
+                let angle = CGFloat(i) / CGFloat(count) * .pi * 2 + CGFloat.random(in: -0.2...0.2)
                 haloRays.append(HaloRay(
                     angle: angle,
-                    length: headR + 20 + CGFloat.random(in: 0...80) + bass * 100,
-                    width: 1.5 + CGFloat.random(in: 0...3),
+                    length: haloRadius + 15 + CGFloat.random(in: 0...60) + bass * 80,
+                    width: 1.5 + CGFloat.random(in: 0...4),
                     life: 1.0,
-                    decay: 0.015 + CGFloat.random(in: 0...0.015),
-                    speed: 2 + CGFloat.random(in: 0...4)
+                    decay: 0.012 + CGFloat.random(in: 0...0.012),
+                    speed: 2.5 + CGFloat.random(in: 0...5)
                 ))
             }
         }
 
         // Spawn expanding rings on beat
-        if bp > 0.85 && haloRings.count < 6 {
-            haloRings.append(HaloRing(radius: headR + 5, alpha: 0.6 + bass * 0.3, speed: 3 + bass * 5, width: 2 + bass * 3))
+        if bp > 0.8 && haloRings.count < 6 {
+            haloRings.append(HaloRing(radius: haloRadius + 5, alpha: 0.7 + bass * 0.3, speed: 3.5 + bass * 6, width: 2 + bass * 4))
         }
 
         let glow = haloGlow
@@ -787,54 +832,58 @@ class VisualizerUIView: UIView {
         ctx.setBlendMode(.plusLighter)
         let flash = haloFlash
 
-        // === PASS 1: Outer glow ===
-        let outerR = headR + 80 + glow * 200 + bloom * 60
+        // === PASS 1: Soft ambient glow behind halo (large, diffuse) ===
+        let ambientR = haloRadius * 3.5 + glow * 120 + bloom * 40
         if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
             colors: [
-                UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0).cgColor,
-                UIColor(red: accentR, green: accentG, blue: accentB, alpha: min(1, glow * 0.3 + flash * 0.2)).cgColor,
-                UIColor(red: accentR, green: accentG, blue: accentB, alpha: min(1, glow * 0.12)).cgColor,
+                UIColor(red: accentR, green: accentG, blue: accentB, alpha: min(0.4, glow * 0.35 + flash * 0.15)).cgColor,
+                UIColor(red: accentR, green: accentG, blue: accentB, alpha: min(0.2, glow * 0.15)).cgColor,
                 UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0).cgColor
             ] as CFArray,
-            locations: [0, 0.02, 0.4, 1]) {
-            ctx.drawRadialGradient(gradient, startCenter: CGPoint(x: cx, y: cy), startRadius: headR,
-                                   endCenter: CGPoint(x: cx, y: cy), endRadius: outerR, options: [])
+            locations: [0, 0.4, 1]) {
+            ctx.drawRadialGradient(gradient, startCenter: CGPoint(x: cx, y: cy), startRadius: 0,
+                                   endCenter: CGPoint(x: cx, y: cy), endRadius: ambientR, options: [])
         }
 
-        // === PASS 2: Bright rim at head edge ===
-        let rimR = headR + 25 + glow * 40 + bp * 20
-        let cR = min(1.0, accentR + flash * 0.6)
-        let cG = min(1.0, accentG + flash * 0.6)
-        let cB = min(1.0, accentB + flash * 0.6)
-        if let rimGrad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-            colors: [
-                UIColor(red: cR, green: cG, blue: cB, alpha: 0).cgColor,
-                UIColor(red: cR, green: cG, blue: cB, alpha: min(1, 0.2 + glow * 0.3 + flash * 0.4)).cgColor,
-                UIColor(red: accentR, green: accentG, blue: accentB, alpha: min(1, glow * 0.1)).cgColor,
-                UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0).cgColor
-            ] as CFArray,
-            locations: [0, 0.02, 0.5, 1]) {
-            ctx.drawRadialGradient(rimGrad, startCenter: CGPoint(x: cx, y: cy), startRadius: headR - 2,
-                                   endCenter: CGPoint(x: cx, y: cy), endRadius: rimR, options: [])
-        }
+        // === PASS 2: Halo ring — the actual visible ring/ellipse ===
+        let haloW = haloRadius * (1.0 + glow * 0.15 + bp * 0.1)
+        let haloH = haloRadius * 0.35  // flatten for 3D perspective
+        let ringAlpha = min(1.0, 0.3 + glow * 0.5 + flash * 0.4)
 
-        // === PASS 3: White-hot flash ring ===
-        if flash > 0.05 {
-            let flashR = headR + 50 + flash * 50
+        // Wide glow ring
+        ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: ringAlpha * 0.3).cgColor)
+        ctx.setLineWidth(12 + glow * 8 + bp * 6)
+        ctx.strokeEllipse(in: CGRect(x: cx - haloW, y: cy - haloH, width: haloW * 2, height: haloH * 2))
+
+        // Core ring
+        let cR = min(1.0, accentR + flash * 0.5)
+        let cG = min(1.0, accentG + flash * 0.5)
+        let cB = min(1.0, accentB + flash * 0.5)
+        ctx.setStrokeColor(UIColor(red: cR, green: cG, blue: cB, alpha: ringAlpha * 0.7).cgColor)
+        ctx.setLineWidth(3 + glow * 2 + bp * 2)
+        ctx.strokeEllipse(in: CGRect(x: cx - haloW, y: cy - haloH, width: haloW * 2, height: haloH * 2))
+
+        // Hot white inner ring
+        ctx.setStrokeColor(UIColor(white: 1, alpha: ringAlpha * 0.4 + flash * 0.3).cgColor)
+        ctx.setLineWidth(1.0 + bp * 1.5)
+        ctx.strokeEllipse(in: CGRect(x: cx - haloW, y: cy - haloH, width: haloW * 2, height: haloH * 2))
+
+        // === PASS 3: White-hot flash burst on strong beats ===
+        if flash > 0.1 {
+            let burstR = haloRadius * 2.5 + flash * 60
             if let flashGrad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
                 colors: [
-                    UIColor(white: 1, alpha: 0).cgColor,
-                    UIColor(white: 1, alpha: min(1, flash * 0.4)).cgColor,
-                    UIColor(white: 1, alpha: min(1, flash * 0.1)).cgColor,
+                    UIColor(white: 1, alpha: flash * 0.35).cgColor,
+                    UIColor(red: accentR, green: accentG, blue: accentB, alpha: flash * 0.2).cgColor,
                     UIColor(white: 1, alpha: 0).cgColor
                 ] as CFArray,
-                locations: [0, 0.02, 0.4, 1]) {
-                ctx.drawRadialGradient(flashGrad, startCenter: CGPoint(x: cx, y: cy), startRadius: headR,
-                                       endCenter: CGPoint(x: cx, y: cy), endRadius: flashR, options: [])
+                locations: [0, 0.3, 1]) {
+                ctx.drawRadialGradient(flashGrad, startCenter: CGPoint(x: cx, y: cy), startRadius: 0,
+                                       endCenter: CGPoint(x: cx, y: cy), endRadius: burstR, options: [])
             }
         }
 
-        // === PASS 4: Light rays ===
+        // === PASS 4: Light rays emanating from halo ===
         var rayIdx = haloRays.count - 1
         while rayIdx >= 0 {
             haloRays[rayIdx].length += haloRays[rayIdx].speed
@@ -846,28 +895,19 @@ class VisualizerUIView: UIView {
             }
             let ray = haloRays[rayIdx]
             let a = ray.life * ray.life
-            let x1 = cx + cos(ray.angle) * headR
-            let y1 = cy + sin(ray.angle) * headR
+            let x1 = cx + cos(ray.angle) * haloW
+            let y1 = cy + sin(ray.angle) * haloH
             let x2 = cx + cos(ray.angle) * ray.length
-            let y2 = cy + sin(ray.angle) * ray.length
+            let y2 = cy + sin(ray.angle) * ray.length * 0.6  // flatten ray endpoints too
 
-            // Linear gradient along ray
-            if let rayGrad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                colors: [
-                    UIColor(red: accentR, green: accentG, blue: accentB, alpha: a * 0.4).cgColor,
-                    UIColor(red: accentR, green: accentG, blue: accentB, alpha: a * 0.15).cgColor,
-                    UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0).cgColor
-                ] as CFArray,
-                locations: [0, 0.3, 1]) {
-                // Draw as a thick line with gradient (approximate with solid color since CG doesn't support gradient stroke easily)
-                ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: a * 0.4).cgColor)
-                ctx.setLineWidth(ray.width * ray.life)
-                ctx.setLineCap(.round)
-                ctx.beginPath()
-                ctx.move(to: CGPoint(x: x1, y: y1))
-                ctx.addLine(to: CGPoint(x: x2, y: y2))
-                ctx.strokePath()
-            }
+            ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: a * 0.5).cgColor)
+            ctx.setLineWidth(ray.width * ray.life)
+            ctx.setLineCap(.round)
+            ctx.beginPath()
+            ctx.move(to: CGPoint(x: x1, y: y1))
+            ctx.addLine(to: CGPoint(x: x2, y: y2))
+            ctx.strokePath()
+
             rayIdx -= 1
         }
 
@@ -875,16 +915,18 @@ class VisualizerUIView: UIView {
         var ringIdx = haloRings.count - 1
         while ringIdx >= 0 {
             haloRings[ringIdx].radius += haloRings[ringIdx].speed
-            haloRings[ringIdx].alpha *= 0.96
+            haloRings[ringIdx].alpha *= 0.95
             if haloRings[ringIdx].alpha < 0.01 {
                 haloRings.remove(at: ringIdx)
                 ringIdx -= 1
                 continue
             }
             let ring = haloRings[ringIdx]
+            let ringW = ring.radius
+            let ringH = ring.radius * 0.35  // flatten for 3D perspective
             ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: ring.alpha).cgColor)
             ctx.setLineWidth(ring.width)
-            ctx.strokeEllipse(in: CGRect(x: cx - ring.radius, y: cy - ring.radius, width: ring.radius * 2, height: ring.radius * 2))
+            ctx.strokeEllipse(in: CGRect(x: cx - ringW, y: cy - ringH, width: ringW * 2, height: ringH * 2))
             ringIdx -= 1
         }
 
@@ -1163,7 +1205,7 @@ class VisualizerUIView: UIView {
     // MARK: - 5. Particles
 
     private func updateParticles(energy: CGFloat, cx: CGFloat, cy: CGFloat, radius: CGFloat) {
-        let spawnCount = energy > 0.03 ? min(3, Int(energy * 8)) : 0
+        let spawnCount = energy > 0.02 ? min(5, Int(energy * 12 + beatPulse * 4)) : 0
         for _ in 0..<spawnCount {
             guard particles.count < maxParticles else { break }
             let angle = CGFloat.random(in: 0...(.pi * 2))
@@ -1190,12 +1232,29 @@ class VisualizerUIView: UIView {
     }
 
     private func drawParticles(ctx: CGContext) {
+        ctx.saveGState()
+        ctx.setBlendMode(.plusLighter)
         for p in particles {
-            let alpha = min(1, p.life * p.life * 0.4)
+            let alpha = min(1, p.life * p.life * 0.5)
             guard alpha > 0.01 else { continue }
+
+            // Outer glow
+            let glowSize = p.size * 3
+            ctx.setFillColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: alpha * 0.15).cgColor)
+            ctx.fillEllipse(in: CGRect(x: p.x - glowSize, y: p.y - glowSize, width: glowSize * 2, height: glowSize * 2))
+
+            // Core
             ctx.setFillColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: alpha).cgColor)
             ctx.fillEllipse(in: CGRect(x: p.x - p.size, y: p.y - p.size, width: p.size * 2, height: p.size * 2))
+
+            // Hot center
+            if p.life > 0.6 {
+                let coreSize = p.size * 0.4
+                ctx.setFillColor(UIColor(white: 1, alpha: alpha * 0.5).cgColor)
+                ctx.fillEllipse(in: CGRect(x: p.x - coreSize, y: p.y - coreSize, width: coreSize * 2, height: coreSize * 2))
+            }
         }
+        ctx.restoreGState()
     }
 
     // MARK: - 6. Face Mesh: Contour Glow (3-pass neon, the "signature Tron look")
@@ -1205,11 +1264,12 @@ class VisualizerUIView: UIView {
         ctx.setLineCap(.round)
         ctx.setLineJoin(.round)
 
-        // 3-pass neon glow: wide dim -> medium -> thin bright core
+        // 4-pass neon glow: ultra bloom -> wide dim -> medium -> thin bright core
         let passes: [(width: CGFloat, alpha: CGFloat)] = [
-            (8, 0.06),
-            (4, 0.12),
-            (1.5, 0.3),
+            (16, 0.03 + energy * 0.02),
+            (8, 0.08 + energy * 0.04),
+            (3.5, 0.18 + energy * 0.08),
+            (1.2, 0.4 + energy * 0.2),
         ]
 
         for pass in passes {
@@ -1237,9 +1297,9 @@ class VisualizerUIView: UIView {
         ctx.saveGState()
         ctx.setBlendMode(.plusLighter)
 
-        let pulseScale = 1.0 + energy * 0.8 + beatPulse * 1.2
-        let baseRadius = 6 * pulseScale
-        let baseAlpha = min(1, 0.2 + energy * 0.4 + beatPulse * 0.3)
+        let pulseScale = 1.0 + energy * 1.2 + beatPulse * 1.8
+        let baseRadius = 10 * pulseScale
+        let baseAlpha = min(1, 0.35 + energy * 0.5 + beatPulse * 0.4)
 
         let irisPoints = [groups.leftEyeCenter, groups.rightEyeCenter]
 
@@ -1247,28 +1307,30 @@ class VisualizerUIView: UIView {
             guard iris != .zero else { continue }
             let r = baseRadius
 
-            // Outer soft glow
+            // Outer soft glow — big and atmospheric
             if let outerGrad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
                 colors: [
-                    UIColor(red: accentR, green: accentG, blue: accentB, alpha: baseAlpha * 0.6).cgColor,
-                    UIColor(red: accentR, green: accentG, blue: accentB, alpha: baseAlpha * 0.25).cgColor,
+                    UIColor(red: accentR, green: accentG, blue: accentB, alpha: baseAlpha * 0.7).cgColor,
+                    UIColor(red: accentR, green: accentG, blue: accentB, alpha: baseAlpha * 0.35).cgColor,
+                    UIColor(red: accentR, green: accentG, blue: accentB, alpha: baseAlpha * 0.1).cgColor,
                     UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0).cgColor
                 ] as CFArray,
-                locations: [0, 0.3, 1]) {
+                locations: [0, 0.15, 0.5, 1]) {
                 ctx.drawRadialGradient(outerGrad, startCenter: iris, startRadius: 0,
-                                       endCenter: iris, endRadius: r * 3, options: [])
+                                       endCenter: iris, endRadius: r * 4, options: [])
             }
 
-            // Inner bright core (white center fading to accent)
+            // Inner bright core (white-hot center fading to accent)
             if let coreGrad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
                 colors: [
-                    UIColor(white: 1, alpha: baseAlpha * 0.7).cgColor,
+                    UIColor(white: 1, alpha: baseAlpha * 0.85).cgColor,
+                    UIColor(white: 1, alpha: baseAlpha * 0.4).cgColor,
                     UIColor(red: accentR, green: accentG, blue: accentB, alpha: baseAlpha * 0.5).cgColor,
                     UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0).cgColor
                 ] as CFArray,
-                locations: [0, 0.4, 1]) {
+                locations: [0, 0.2, 0.5, 1]) {
                 ctx.drawRadialGradient(coreGrad, startCenter: iris, startRadius: 0,
-                                       endCenter: iris, endRadius: r, options: [])
+                                       endCenter: iris, endRadius: r * 1.5, options: [])
             }
         }
 
@@ -1296,9 +1358,9 @@ class VisualizerUIView: UIView {
         }
 
         for pt in keyPoints {
-            let baseR: CGFloat = 3
-            let r = baseR + energy * 8 + beatPulse * 12
-            let alpha = min(1, 0.15 + energy * 0.3 + beatPulse * 0.4)
+            let baseR: CGFloat = 5
+            let r = baseR + energy * 14 + beatPulse * 18
+            let alpha = min(1, 0.25 + energy * 0.4 + beatPulse * 0.5)
 
             if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
                 colors: [
@@ -1323,16 +1385,17 @@ class VisualizerUIView: UIView {
 
         let fcx = groups.faceCenter.x
         let fcy = groups.faceCenter.y
-        let expand = 15 + beatPulse * 10
-        let auraAlpha = 0.03 + energy * 0.06 + beatPulse * 0.05
+        let expand = 20 + beatPulse * 18
+        let auraAlpha = 0.05 + energy * 0.1 + beatPulse * 0.08
 
         ctx.saveGState()
         ctx.setLineCap(.round)
         ctx.setLineJoin(.round)
 
         let auraPasses: [(width: CGFloat, alpha: CGFloat)] = [
-            (30, auraAlpha * 0.4),
-            (15, auraAlpha * 0.7),
+            (40, auraAlpha * 0.3),
+            (22, auraAlpha * 0.5),
+            (10, auraAlpha * 0.8),
         ]
 
         for pass in auraPasses {
