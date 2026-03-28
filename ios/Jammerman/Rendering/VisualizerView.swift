@@ -109,6 +109,10 @@ class VisualizerUIView: UIView {
     private var accentG: CGFloat = 0.83
     private var accentB: CGFloat = 0.93
     private var cachedMode: String = ""
+    private var cachedModeIdx: Int = 2
+
+    // ---- Cached color space (avoid per-frame allocation) ----
+    private let colorSpace = CGColorSpaceCreateDeviceRGB()
 
     // ---- Person segmentation mask (for behind-head effects) ----
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
@@ -143,6 +147,7 @@ class VisualizerUIView: UIView {
         if state.currentModeName != cachedMode {
             cachedMode = state.currentModeName
             updateAccentColor(mode: cachedMode)
+            cachedModeIdx = getModeIndex()
         }
 
         // Compute energy (simplified — no raw waveform on iOS yet)
@@ -315,7 +320,7 @@ class VisualizerUIView: UIView {
         let cy = h / 2
         let maxR = sqrt(cx * cx + cy * cy)
 
-        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+        if let gradient = CGGradient(colorsSpace: colorSpace,
             colors: [
                 UIColor(white: 0, alpha: 0).cgColor,
                 UIColor(white: 0, alpha: 0).cgColor,
@@ -335,7 +340,7 @@ class VisualizerUIView: UIView {
 
     private func updateSegmentationMasks(w: CGFloat, h: CGFloat, state: JammermanState) {
         maskFrameCount += 1
-        guard maskFrameCount % 3 == 0 else { return }  // update every 3rd frame for perf
+        guard maskFrameCount % 5 == 0 else { return }  // update every 5th frame for perf
         guard let segBuffer = state.segmentationBuffer else { return }
 
         // ARKit segmentation buffer is in landscape (.right) orientation for front camera
@@ -755,21 +760,21 @@ class VisualizerUIView: UIView {
 
         // ---- Shockwave rings ----
         ctx.saveGState()
-        var i = shockwaves.count - 1
-        while i >= 0 {
+        var i = 0
+        while i < shockwaves.count {
             shockwaves[i].radius += shockwaves[i].speed
             shockwaves[i].alpha *= 0.94
             shockwaves[i].speed *= 0.98
             if shockwaves[i].alpha < 0.005 {
-                shockwaves.remove(at: i)
-                i -= 1
+                shockwaves.swapAt(i, shockwaves.count - 1)
+                shockwaves.removeLast()
                 continue
             }
             let shockR = radius + shockwaves[i].radius
             ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: shockwaves[i].alpha).cgColor)
             ctx.setLineWidth(2 * shockwaves[i].alpha + 0.5)
             ctx.strokeEllipse(in: CGRect(x: cx - shockR, y: cy - shockR, width: shockR * 2, height: shockR * 2))
-            i -= 1
+            i += 1
         }
         ctx.restoreGState()
 
@@ -780,14 +785,14 @@ class VisualizerUIView: UIView {
             ctx.saveGState()
             buildRingPath()
             ctx.clip()
-            let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            guard let gradient = CGGradient(colorsSpace: colorSpace,
                 colors: [
                     UIColor(red: accentR, green: accentG, blue: accentB, alpha: fillAlpha * 0.7).cgColor,
                     UIColor(red: accentR, green: accentG, blue: accentB, alpha: fillAlpha * 0.3).cgColor,
                     UIColor(red: accentR, green: accentG, blue: accentB, alpha: fillAlpha * 0.6).cgColor,
                     UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0).cgColor
                 ] as CFArray,
-                locations: [0, 0.5, 0.85, 1])!
+                locations: [0, 0.5, 0.85, 1]) else { ctx.restoreGState(); return }
             ctx.drawRadialGradient(gradient, startCenter: CGPoint(x: cx, y: cy), startRadius: 0,
                                    endCenter: CGPoint(x: cx, y: cy), endRadius: radius, options: [])
             ctx.restoreGState()
@@ -894,7 +899,7 @@ class VisualizerUIView: UIView {
 
         // === PASS 1: Soft ambient glow behind halo (large, diffuse) ===
         let ambientR = haloRadius * 3.5 + glow * 120 + bloom * 40
-        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+        if let gradient = CGGradient(colorsSpace: colorSpace,
             colors: [
                 UIColor(red: accentR, green: accentG, blue: accentB, alpha: min(0.4, glow * 0.35 + flash * 0.15)).cgColor,
                 UIColor(red: accentR, green: accentG, blue: accentB, alpha: min(0.2, glow * 0.15)).cgColor,
@@ -931,7 +936,7 @@ class VisualizerUIView: UIView {
         // === PASS 3: White-hot flash burst on strong beats ===
         if flash > 0.1 {
             let burstR = haloRadius * 2.5 + flash * 60
-            if let flashGrad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            if let flashGrad = CGGradient(colorsSpace: colorSpace,
                 colors: [
                     UIColor(white: 1, alpha: flash * 0.35).cgColor,
                     UIColor(red: accentR, green: accentG, blue: accentB, alpha: flash * 0.2).cgColor,
@@ -944,13 +949,13 @@ class VisualizerUIView: UIView {
         }
 
         // === PASS 4: Light rays emanating from halo ===
-        var rayIdx = haloRays.count - 1
-        while rayIdx >= 0 {
+        var rayIdx = 0
+        while rayIdx < haloRays.count {
             haloRays[rayIdx].length += haloRays[rayIdx].speed
             haloRays[rayIdx].life -= haloRays[rayIdx].decay
             if haloRays[rayIdx].life <= 0 {
-                haloRays.remove(at: rayIdx)
-                rayIdx -= 1
+                haloRays.swapAt(rayIdx, haloRays.count - 1)
+                haloRays.removeLast()
                 continue
             }
             let ray = haloRays[rayIdx]
@@ -968,17 +973,17 @@ class VisualizerUIView: UIView {
             ctx.addLine(to: CGPoint(x: x2, y: y2))
             ctx.strokePath()
 
-            rayIdx -= 1
+            rayIdx += 1
         }
 
         // === PASS 5: Expanding halo rings ===
-        var ringIdx = haloRings.count - 1
-        while ringIdx >= 0 {
+        var ringIdx = 0
+        while ringIdx < haloRings.count {
             haloRings[ringIdx].radius += haloRings[ringIdx].speed
             haloRings[ringIdx].alpha *= 0.95
             if haloRings[ringIdx].alpha < 0.01 {
-                haloRings.remove(at: ringIdx)
-                ringIdx -= 1
+                haloRings.swapAt(ringIdx, haloRings.count - 1)
+                haloRings.removeLast()
                 continue
             }
             let ring = haloRings[ringIdx]
@@ -987,7 +992,7 @@ class VisualizerUIView: UIView {
             ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: ring.alpha).cgColor)
             ctx.setLineWidth(ring.width)
             ctx.strokeEllipse(in: CGRect(x: cx - ringW, y: cy - ringH, width: ringW * 2, height: ringH * 2))
-            ringIdx -= 1
+            ringIdx += 1
         }
 
         ctx.restoreGState()
@@ -1001,7 +1006,7 @@ class VisualizerUIView: UIView {
 
         let cx = w / 2
         let cy = h * 0.38
-        let modeIdx = getModeIndex()
+        let modeIdx = cachedModeIdx
 
         ctx.saveGState()
         ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: alpha).cgColor)
@@ -1193,14 +1198,16 @@ class VisualizerUIView: UIView {
         if state.melodyNote == nil { lastMelodyNote = nil }
 
         // Decay
-        var i = constellationNotes.count - 1
-        while i >= 0 {
+        var i = 0
+        while i < constellationNotes.count {
             constellationNotes[i].life -= constellationNotes[i].decay
             constellationNotes[i].brightness *= 0.997
             if constellationNotes[i].life <= 0 {
-                constellationNotes.remove(at: i)
+                constellationNotes.swapAt(i, constellationNotes.count - 1)
+                constellationNotes.removeLast()
+            } else {
+                i += 1
             }
-            i -= 1
         }
     }
 
@@ -1280,14 +1287,18 @@ class VisualizerUIView: UIView {
             ))
         }
 
-        var i = particles.count - 1
-        while i >= 0 {
+        var i = 0
+        while i < particles.count {
             particles[i].x += particles[i].vx
             particles[i].y += particles[i].vy
             particles[i].vy -= 0.01
             particles[i].life -= particles[i].decay
-            if particles[i].life <= 0 { particles.remove(at: i) }
-            i -= 1
+            if particles[i].life <= 0 {
+                particles.swapAt(i, particles.count - 1)
+                particles.removeLast()
+            } else {
+                i += 1
+            }
         }
     }
 
@@ -1368,7 +1379,7 @@ class VisualizerUIView: UIView {
             let r = baseRadius
 
             // Outer soft glow — big and atmospheric
-            if let outerGrad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            if let outerGrad = CGGradient(colorsSpace: colorSpace,
                 colors: [
                     UIColor(red: accentR, green: accentG, blue: accentB, alpha: baseAlpha * 0.7).cgColor,
                     UIColor(red: accentR, green: accentG, blue: accentB, alpha: baseAlpha * 0.35).cgColor,
@@ -1381,7 +1392,7 @@ class VisualizerUIView: UIView {
             }
 
             // Inner bright core (white-hot center fading to accent)
-            if let coreGrad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            if let coreGrad = CGGradient(colorsSpace: colorSpace,
                 colors: [
                     UIColor(white: 1, alpha: baseAlpha * 0.85).cgColor,
                     UIColor(white: 1, alpha: baseAlpha * 0.4).cgColor,
@@ -1422,7 +1433,7 @@ class VisualizerUIView: UIView {
             let r = baseR + energy * 14 + beatPulse * 18
             let alpha = min(1, 0.25 + energy * 0.4 + beatPulse * 0.5)
 
-            if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            if let grad = CGGradient(colorsSpace: colorSpace,
                 colors: [
                     UIColor(red: accentR, green: accentG, blue: accentB, alpha: alpha).cgColor,
                     UIColor(red: accentR, green: accentG, blue: accentB, alpha: alpha * 0.4).cgColor,
@@ -1499,13 +1510,15 @@ class VisualizerUIView: UIView {
             }
         }
 
-        var i = contourSnapshots.count - 1
-        while i >= 0 {
+        var i = 0
+        while i < contourSnapshots.count {
             contourSnapshots[i].opacity *= 0.88
             if contourSnapshots[i].opacity < 0.01 {
-                contourSnapshots.remove(at: i)
+                contourSnapshots.swapAt(i, contourSnapshots.count - 1)
+                contourSnapshots.removeLast()
+            } else {
+                i += 1
             }
-            i -= 1
         }
     }
 
@@ -1591,16 +1604,20 @@ class VisualizerUIView: UIView {
         }
 
         // Update all face particles
-        var i = faceParticles.count - 1
-        while i >= 0 {
+        var i = 0
+        while i < faceParticles.count {
             faceParticles[i].x += faceParticles[i].vx
             faceParticles[i].y += faceParticles[i].vy
             if faceParticles[i].type == 1 { faceParticles[i].vy -= 0.03 } // mouth: drift up
             faceParticles[i].vx *= 0.98
             faceParticles[i].vy *= 0.98
             faceParticles[i].life -= faceParticles[i].decay
-            if faceParticles[i].life <= 0 { faceParticles.remove(at: i) }
-            i -= 1
+            if faceParticles[i].life <= 0 {
+                faceParticles.swapAt(i, faceParticles.count - 1)
+                faceParticles.removeLast()
+            } else {
+                i += 1
+            }
         }
     }
 
@@ -1639,7 +1656,6 @@ class VisualizerUIView: UIView {
         // Recreate trail context if size changed
         if trailW != iw || trailH != ih {
             trailW = iw; trailH = ih
-            let colorSpace = CGColorSpaceCreateDeviceRGB()
             trailContext = CGContext(data: nil, width: iw, height: ih,
                                     bitsPerComponent: 8, bytesPerRow: iw * 4,
                                     space: colorSpace,
@@ -1861,26 +1877,32 @@ class VisualizerUIView: UIView {
     }
 
     private func updateBurstParticles() {
-        var i = burstParticles.count - 1
-        while i >= 0 {
+        var i = 0
+        while i < burstParticles.count {
             burstParticles[i].x += burstParticles[i].vx
             burstParticles[i].y += burstParticles[i].vy
             burstParticles[i].vy += burstParticles[i].gravity
             burstParticles[i].vx *= 0.97
             burstParticles[i].vy *= 0.97
             burstParticles[i].life -= burstParticles[i].decay
-            if burstParticles[i].life <= 0 { burstParticles.remove(at: i) }
-            i -= 1
+            if burstParticles[i].life <= 0 {
+                burstParticles.swapAt(i, burstParticles.count - 1)
+                burstParticles.removeLast()
+            } else {
+                i += 1
+            }
         }
 
-        i = burstRings.count - 1
-        while i >= 0 {
+        i = 0
+        while i < burstRings.count {
             burstRings[i].radius += burstRings[i].speed
             burstRings[i].alpha *= 0.94
             if burstRings[i].alpha < 0.01 || burstRings[i].radius > burstRings[i].maxRadius {
-                burstRings.remove(at: i)
+                burstRings.swapAt(i, burstRings.count - 1)
+                burstRings.removeLast()
+            } else {
+                i += 1
             }
-            i -= 1
         }
     }
 
@@ -2065,7 +2087,7 @@ class VisualizerUIView: UIView {
                 let glowSize = 10 + flash * 16 + energy * 6
 
                 // Outer glow
-                if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                if let grad = CGGradient(colorsSpace: colorSpace,
                     colors: [
                         UIColor(red: r, green: g, blue: b, alpha: 0.8 + flash * 0.2).cgColor,
                         UIColor(red: r, green: g, blue: b, alpha: 0.25 + flash * 0.3).cgColor,
@@ -2104,22 +2126,22 @@ class VisualizerUIView: UIView {
         }
 
         // Update and draw sparks
-        var si = sparks.count - 1
-        while si >= 0 {
+        var si = 0
+        while si < sparks.count {
             sparks[si].x += sparks[si].vx
             sparks[si].y += sparks[si].vy
             sparks[si].vx *= 0.95
             sparks[si].vy *= 0.95
             sparks[si].life -= sparks[si].decay
             if sparks[si].life <= 0 {
-                sparks.remove(at: si)
-                si -= 1
+                sparks.swapAt(si, sparks.count - 1)
+                sparks.removeLast()
                 continue
             }
             let s = sparks[si]
             ctx.setFillColor(UIColor(red: s.r, green: s.g, blue: s.b, alpha: s.life * s.life).cgColor)
             ctx.fillEllipse(in: CGRect(x: s.x - 1.5 * s.life, y: s.y - 1.5 * s.life, width: 3 * s.life, height: 3 * s.life))
-            si -= 1
+            si += 1
         }
         if sparks.count > 60 { sparks.removeAll(keepingCapacity: true) }
     }
@@ -2133,7 +2155,7 @@ class VisualizerUIView: UIView {
             if explosionGlowLife > 0 {
                 let glowRadius = min(w, h) * 0.4
                 let glowAlpha = explosionGlowLife * explosionGlowLife * 0.15
-                if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                if let grad = CGGradient(colorsSpace: colorSpace,
                     colors: [
                         UIColor(red: accentR, green: accentG, blue: accentB, alpha: glowAlpha).cgColor,
                         UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0).cgColor
@@ -2147,8 +2169,8 @@ class VisualizerUIView: UIView {
         }
 
         // Particles
-        var i = explosionParticles.count - 1
-        while i >= 0 {
+        var i = 0
+        while i < explosionParticles.count {
             explosionParticles[i].x += explosionParticles[i].vx
             explosionParticles[i].y += explosionParticles[i].vy
             explosionParticles[i].vx *= explosionParticles[i].drag
@@ -2157,8 +2179,8 @@ class VisualizerUIView: UIView {
             explosionParticles[i].life -= explosionParticles[i].decay
 
             if explosionParticles[i].life <= 0 {
-                explosionParticles.remove(at: i)
-                i -= 1
+                explosionParticles.swapAt(i, explosionParticles.count - 1)
+                explosionParticles.removeLast()
                 continue
             }
 
@@ -2167,7 +2189,7 @@ class VisualizerUIView: UIView {
             ctx.setFillColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: alpha * 0.7).cgColor)
             let sz = p.size * p.life
             ctx.fillEllipse(in: CGRect(x: p.x - sz, y: p.y - sz, width: sz * 2, height: sz * 2))
-            i -= 1
+            i += 1
         }
     }
 
