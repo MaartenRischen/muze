@@ -132,26 +132,27 @@ class AudioEngine: ObservableObject {
     @Published var soloChannel: String? = nil
 
     // Channel volumes (dB)
+    // Matches web mixer.js defaults
     var channelVolumes: [String: Float] = [
-        "pad": -14, "arp": -8, "arp2": -10, "melody": -6,
-        "kick": -6, "snare": -10, "hat": -16, "binaural": -20
+        "pad": -10, "arp": -12, "arp2": -14, "melody": -8,
+        "kick": -6, "snare": -10, "hat": -16, "binaural": -24
     ]
 
-    // Per-channel pan (-1 to +1)
+    // Per-channel pan (-1 to +1) — matches web mixer.js defaults
     var channelPans: [String: Float] = [
-        "pad": 0, "arp": 0, "arp2": 0, "melody": 0,
-        "kick": 0, "snare": 0, "hat": 0, "binaural": 0
+        "pad": 0, "arp": 0.3, "arp2": -0.3, "melody": -0.3,
+        "kick": 0, "snare": 0, "hat": 0.2, "binaural": 0
     ]
 
-    // Per-channel reverb send (0 to 1)
+    // Per-channel reverb send (0 to 1) — matches web mixer.js defaults
     var channelReverbSends: [String: Float] = [
-        "pad": 0.3, "arp": 0.2, "arp2": 0.2, "melody": 0.15,
-        "kick": 0, "snare": 0.05, "hat": 0, "binaural": 0
+        "pad": 0.35, "arp": 0.35, "arp2": 0.30, "melody": 0.30,
+        "kick": 0, "snare": 0.15, "hat": 0.05, "binaural": 0
     ]
 
     // Per-channel delay send (0 to 1)
     var channelDelaySends: [String: Float] = [
-        "pad": 0, "arp": 0.25, "arp2": 0.2, "melody": 0.1,
+        "pad": 0.25, "arp": 0.25, "arp2": 0.20, "melody": 0.20,
         "kick": 0, "snare": 0, "hat": 0, "binaural": 0
     ]
 
@@ -394,12 +395,23 @@ class AudioEngine: ObservableObject {
             engine.connect(ch, to: engine.mainMixerNode, format: format)
         }
 
-        // Reverb/delay sends disabled for now — route effects directly to output
-        // TODO: re-enable once basic audio is working
+        // Reverb send chains: channel mixer → send mixer → reverbNode → output
+        engine.connect(padMixer, to: padReverbSendMixer, format: format)
+        engine.connect(arpMixer, to: arpReverbSendMixer, format: format)
+        engine.connect(arp2Mixer, to: arp2ReverbSendMixer, format: format)
+        engine.connect(melodyMixer, to: melodyReverbSendMixer, format: format)
+        engine.connect(padReverbSendMixer, to: reverbNode, format: format)
+        engine.connect(arpReverbSendMixer, to: reverbNode, format: format)
+        engine.connect(arp2ReverbSendMixer, to: reverbNode, format: format)
+        engine.connect(melodyReverbSendMixer, to: reverbNode, format: format)
         engine.connect(reverbNode, to: engine.mainMixerNode, format: format)
-        engine.connect(delayNode, to: engine.mainMixerNode, format: format)
 
-        // masterMixer and masterEQ not connected — bypassed
+        // Delay send chains: channel mixer → send mixer → delayNode → output
+        engine.connect(arpMixer, to: arpDelaySendMixer, format: format)
+        engine.connect(arp2Mixer, to: arp2DelaySendMixer, format: format)
+        engine.connect(arpDelaySendMixer, to: delayNode, format: format)
+        engine.connect(arp2DelaySendMixer, to: delayNode, format: format)
+        engine.connect(delayNode, to: engine.mainMixerNode, format: format)
 
         applyChannelVolumes()
         applyChannelPans()
@@ -647,6 +659,18 @@ class AudioEngine: ObservableObject {
             soloChannel = nil
         } else {
             soloChannel = channel
+        }
+        // Update all channel volumes based on solo state (mirrors web _updateSoloState)
+        let channels = ["pad", "arp", "arp2", "melody", "kick", "snare", "hat", "binaural"]
+        for ch in channels {
+            let mixer = mixerForChannel(ch)
+            if isMuted(ch) {
+                mixer?.outputVolume = 0
+            } else if soloChannel != nil && soloChannel != ch {
+                mixer?.outputVolume = 0 // mute non-solo'd channels
+            } else {
+                mixer?.outputVolume = dbToGain(channelVolumes[ch] ?? -10)
+            }
         }
     }
 
