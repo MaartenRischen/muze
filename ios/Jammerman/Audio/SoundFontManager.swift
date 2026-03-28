@@ -102,13 +102,20 @@ class SoundFontManager {
         }
     }
 
-    func setupSamplers(mainMixerNode: AVAudioNode, format: AVAudioFormat) {
+    /// Route each sampler through its channel mixer so pan/volume/EQ apply
+    func setupSamplers(
+        padMixer: AVAudioMixerNode,
+        arpMixer: AVAudioMixerNode,
+        arp2Mixer: AVAudioMixerNode,
+        melodyMixer: AVAudioMixerNode,
+        drumMixer: AVAudioMixerNode,
+        format: AVAudioFormat
+    ) {
         guard soundFontURL != nil else {
             print("[SFManager] Cannot setup — SoundFont file not found")
             return
         }
 
-        // Create all samplers
         padSampler = AVAudioUnitSampler()
         leadSampler = AVAudioUnitSampler()
         arpSampler = AVAudioUnitSampler()
@@ -116,23 +123,28 @@ class SoundFontManager {
         drumSampler = AVAudioUnitSampler()
         bassSampler = AVAudioUnitSampler()
 
-        // Attach to engine
+        // Attach all
         let samplers: [AVAudioUnitSampler] = [padSampler!, leadSampler!, arpSampler!, arp2Sampler!, drumSampler!, bassSampler!]
-        for s in samplers {
-            engine.attach(s)
-            engine.connect(s, to: mainMixerNode, format: format)
-        }
+        for s in samplers { engine.attach(s) }
+
+        // Route through channel mixers (inherits pan, volume, EQ, sends)
+        engine.connect(padSampler!, to: padMixer, format: format)
+        engine.connect(leadSampler!, to: melodyMixer, format: format)
+        engine.connect(arpSampler!, to: arpMixer, format: format)
+        engine.connect(arp2Sampler!, to: arp2Mixer, format: format)
+        engine.connect(drumSampler!, to: drumMixer, format: format)
+        engine.connect(bassSampler!, to: padMixer, format: format) // bass through pad mixer for now
 
         // Load default instruments
         loadPadPreset(0)
         loadLeadPreset(0)
         loadArpPreset(0, sampler: arpSampler)
-        loadArpPreset(2, sampler: arp2Sampler) // Music Box for arp2
+        loadArpPreset(2, sampler: arp2Sampler)
         loadDrumPreset(0)
         loadBassPreset(0)
 
-        // Start muted
-        for s in samplers { s.volume = 0 }
+        // Start muted (channel mixer controls actual mute)
+        // Don't set volume to 0 here — let the channel mixer handle it
     }
 
     func loadPadPreset(_ index: Int) {

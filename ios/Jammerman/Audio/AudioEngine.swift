@@ -466,9 +466,16 @@ class AudioEngine: ObservableObject {
         applyReverbSends()
         applyDelaySends()
 
-        // Setup SoundFont samplers (optional, loads MuseScore General)
+        // Setup SoundFont samplers — route through channel mixers for pan/volume
         soundFontManager = SoundFontManager(engine: engine)
-        soundFontManager?.setupSamplers(mainMixerNode: engine.mainMixerNode, format: format)
+        soundFontManager?.setupSamplers(
+            padMixer: padMixer,
+            arpMixer: arpMixer,
+            arp2Mixer: arp2Mixer,
+            melodyMixer: melodyMixer,
+            drumMixer: kickMixer, // drums go through kick mixer (shares beat mute)
+            format: format
+        )
     }
 
     private func applyChannelVolumes() {
@@ -951,34 +958,19 @@ class AudioEngine: ObservableObject {
         default: break
         }
 
-        // Handle SoundFont sampler mute/unmute
+        // Handle SoundFont sampler note-off on mute
         if let sfm = soundFontManager {
             switch channel {
             case "pad":
-                if padMuted {
-                    sfm.stopChord(currentPadMidiNotes, on: sfm.padSampler)
-                    sfm.padSampler?.volume = 0
-                } else {
-                    sfm.padSampler?.volume = 1
-                }
-            case "arp":
-                sfm.arpSampler?.volume = arpMuted ? 0 : 1
-            case "arp2":
-                sfm.arp2Sampler?.volume = arp2Muted ? 0 : 1
+                if padMuted { sfm.stopChord(currentPadMidiNotes, on: sfm.padSampler) }
             case "melody":
-                if melodyMuted {
-                    if let note = currentMelodyMidiNote {
-                        sfm.stopNote(note, on: sfm.leadSampler)
-                        currentMelodyMidiNote = nil
-                    }
-                    sfm.leadSampler?.volume = 0
-                } else {
-                    sfm.leadSampler?.volume = 1
+                if melodyMuted, let note = currentMelodyMidiNote {
+                    sfm.stopNote(note, on: sfm.leadSampler)
+                    currentMelodyMidiNote = nil
                 }
-            case "beat":
-                sfm.drumSampler?.volume = beatMuted ? 0 : 1
             default: break
             }
+            // Volume/mute is handled by the channel mixer that the sampler routes through
         }
     }
 
