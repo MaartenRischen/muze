@@ -316,22 +316,7 @@ struct InstrumentDetailView: View {
     }
 
     private func paramSlider(_ label: String, value: Double, range: ClosedRange<Double>, step: Double, onChange: @escaping (Double) -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(label)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.5))
-                Spacer()
-                Text(String(format: "%.2f", value))
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundStyle(color.opacity(0.7))
-            }
-            Slider(value: Binding(
-                get: { value },
-                set: { onChange($0) }
-            ), in: range, step: step)
-            .tint(color)
-        }
+        LiveParamSlider(label: label, initialValue: value, range: range, step: step, color: color, onChange: onChange)
     }
 }
 
@@ -372,14 +357,78 @@ private struct MixerControls: View {
     }
 
     private func mixerSlider(_ label: String, value: Double, range: ClosedRange<Double>, unit: String, onChange: @escaping (Double) -> Void) -> some View {
+        LiveMixerSlider(label: label, initialValue: value, range: range, unit: unit, color: color, onChange: onChange)
+    }
+}
+
+// MARK: - Live Param Slider (@State-backed for responsive dragging)
+
+private struct LiveParamSlider: View {
+    let label: String
+    let range: ClosedRange<Double>
+    let step: Double
+    let color: Color
+    let onChange: (Double) -> Void
+
+    @State private var current: Double
+
+    init(label: String, initialValue: Double, range: ClosedRange<Double>, step: Double, color: Color, onChange: @escaping (Double) -> Void) {
+        self.label = label
+        self.range = range
+        self.step = step
+        self.color = color
+        self.onChange = onChange
+        _current = State(initialValue: initialValue)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(label)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.5))
+                Spacer()
+                Text(String(format: "%.2f", current))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(color.opacity(0.7))
+            }
+            Slider(value: $current, in: range, step: step)
+                .tint(color)
+                .onChange(of: current) { _, newVal in onChange(newVal) }
+        }
+    }
+}
+
+// MARK: - Live Mixer Slider (@State-backed)
+
+private struct LiveMixerSlider: View {
+    let label: String
+    let range: ClosedRange<Double>
+    let unit: String
+    let color: Color
+    let onChange: (Double) -> Void
+
+    @State private var current: Double
+
+    init(label: String, initialValue: Double, range: ClosedRange<Double>, unit: String, color: Color, onChange: @escaping (Double) -> Void) {
+        self.label = label
+        self.range = range
+        self.unit = unit
+        self.color = color
+        self.onChange = onChange
+        _current = State(initialValue: initialValue)
+    }
+
+    var body: some View {
         HStack(spacing: 8) {
             Text(label)
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.45))
                 .frame(width: 52, alignment: .leading)
-            Slider(value: Binding(get: { value }, set: { onChange($0) }), in: range)
+            Slider(value: $current, in: range)
                 .tint(color)
-            Text("\(Int(value))\(unit)")
+                .onChange(of: current) { _, newVal in onChange(newVal) }
+            Text("\(Int(current))\(unit)")
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
                 .foregroundStyle(color.opacity(0.6))
                 .frame(width: 42, alignment: .trailing)
