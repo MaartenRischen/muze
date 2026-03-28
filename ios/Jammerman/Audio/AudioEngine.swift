@@ -193,52 +193,39 @@ class AudioEngine: ObservableObject {
     private func buildGraph() {
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
 
-        // DEBUG: padNode with explicit format, plays constant 440Hz
-        var padTestPhase: Double = 0
-        let sr = sampleRate
-        padNode = AVAudioSourceNode(format: format) { _, _, frameCount, bufferList -> OSStatus in
-            let abl = UnsafeMutableAudioBufferListPointer(bufferList)
-            guard abl.count >= 2 else { return noErr }
-            let L = abl[0].mData!.assumingMemoryBound(to: Float.self)
-            let R = abl[1].mData!.assumingMemoryBound(to: Float.self)
-            for i in 0..<Int(frameCount) {
-                let sample = Float(sin(padTestPhase * 2.0 * .pi)) * 0.5
-                L[i] = sample
-                R[i] = sample
-                padTestPhase += 440.0 / sr
-                if padTestPhase > 1.0 { padTestPhase -= 1.0 }
-            }
-            return noErr
+        padNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
+            guard let self else { return noErr }
+            return self.padOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.padMuted)
         }
-        arpNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        arpNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.arpOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.arpMuted)
         }
-        arp2Node = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        arp2Node = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.arp2Osc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.arp2Muted)
         }
-        melodyNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        melodyNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.melodyOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.melodyMuted)
         }
-        kickNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        kickNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.kickOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.beatMuted)
         }
-        snareNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        snareNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.snareOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.beatMuted)
         }
-        hatNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        hatNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.hatOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.beatMuted)
         }
-        binauralNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        binauralNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.binauralOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: !self.binauralActive)
         }
-        riserNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
+        riserNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
             return self.riserOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: !self.riserActive)
         }
@@ -323,12 +310,8 @@ class AudioEngine: ObservableObject {
         // for eq in channelEQs.values { allNodes.append(eq) }
         for node in allNodes { engine.attach(node) }
 
-        // DEBUG: Connect pad DIRECTLY to output, bypassing everything
-        engine.connect(padNode, to: engine.mainMixerNode, format: format)
-        print("[AUDIO] padNode connected directly to mainMixerNode, format: \(format)")
-
-        // Wire: synths → channel mixers (bypass EQ for now — debugging audio graph)
-        // engine.connect(padNode, to: padMixer, format: format) // DISABLED — pad goes direct
+        // DEBUG: pad → padMixer → mainMixerNode (skip masterMixer + masterEQ)
+        engine.connect(padNode, to: padMixer, format: format)
         engine.connect(arpNode, to: arpMixer, format: format)
         engine.connect(arp2Node, to: arp2Mixer, format: format)
         engine.connect(melodyNode, to: melodyMixer, format: format)
@@ -340,33 +323,18 @@ class AudioEngine: ObservableObject {
         // Riser has no per-channel EQ
         engine.connect(riserNode, to: riserMixer, format: format)
 
-        // Wire: channel mixers → master (dry)
+        // Wire: channel mixers → mainMixerNode directly (bypassing masterMixer + masterEQ)
         let allChannelMixers: [AVAudioMixerNode] = [padMixer, arpMixer, arp2Mixer, melodyMixer, kickMixer, snareMixer, hatMixer, binauralMixer, riserMixer]
         for ch in allChannelMixers {
-            engine.connect(ch, to: masterMixer, format: format)
+            engine.connect(ch, to: engine.mainMixerNode, format: format)
         }
 
-        // Send: reverb sends (pad, arp, arp2, melody → reverb)
-        engine.connect(padMixer, to: padReverbSendMixer, format: format)
-        engine.connect(arpMixer, to: arpReverbSendMixer, format: format)
-        engine.connect(arp2Mixer, to: arp2ReverbSendMixer, format: format)
-        engine.connect(melodyMixer, to: melodyReverbSendMixer, format: format)
-        engine.connect(padReverbSendMixer, to: reverbNode, format: format)
-        engine.connect(arpReverbSendMixer, to: reverbNode, format: format)
-        engine.connect(arp2ReverbSendMixer, to: reverbNode, format: format)
-        engine.connect(melodyReverbSendMixer, to: reverbNode, format: format)
-        engine.connect(reverbNode, to: masterMixer, format: format)
+        // Reverb/delay sends disabled for now — route effects directly to output
+        // TODO: re-enable once basic audio is working
+        engine.connect(reverbNode, to: engine.mainMixerNode, format: format)
+        engine.connect(delayNode, to: engine.mainMixerNode, format: format)
 
-        // Send: delay sends (arp, arp2 → delay)
-        engine.connect(arpMixer, to: arpDelaySendMixer, format: format)
-        engine.connect(arp2Mixer, to: arp2DelaySendMixer, format: format)
-        engine.connect(arpDelaySendMixer, to: delayNode, format: format)
-        engine.connect(arp2DelaySendMixer, to: delayNode, format: format)
-        engine.connect(delayNode, to: masterMixer, format: format)
-
-        // Master → EQ → output
-        engine.connect(masterMixer, to: masterEQ, format: format)
-        engine.connect(masterEQ, to: engine.mainMixerNode, format: format)
+        // masterMixer and masterEQ not connected — bypassed
 
         applyChannelVolumes()
         applyChannelPans()
@@ -990,7 +958,6 @@ func waveformSample(phase: Double, type: WaveformType) -> Double {
 // MARK: - Pad Oscillator (FM + Sub)
 
 class PadOscillator {
-    var debugSampleCount: Int = 0 // DEBUG: for test tone
     private var phases: [Double] = []
     private var subPhases: [Double] = []
     private var frequencies: [Double] = []
