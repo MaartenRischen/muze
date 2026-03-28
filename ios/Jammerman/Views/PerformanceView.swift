@@ -89,6 +89,37 @@ struct PerformanceView: View {
                         .frame(width: 6, height: 6)
                 }
                 .padding(.horizontal, 12)
+
+                // === VALENCE TUNING SLIDERS ===
+                #if !targetEnvironment(simulator)
+                if ARKitTracker.isSupported {
+                    VStack(spacing: 4) {
+                        tuningSlider("neutral", value: Binding(
+                            get: { Double(coordinator.arKitTracker.valenceNeutral) },
+                            set: { coordinator.arKitTracker.valenceNeutral = Float($0) }
+                        ), range: -0.3...0.3)
+                        tuningSlider("scale", value: Binding(
+                            get: { Double(coordinator.arKitTracker.valenceScale) },
+                            set: { coordinator.arKitTracker.valenceScale = Float($0) }
+                        ), range: 0.5...5.0)
+                        tuningSlider("offset", value: Binding(
+                            get: { Double(coordinator.arKitTracker.valenceOffset) },
+                            set: { coordinator.arKitTracker.valenceOffset = Float($0) }
+                        ), range: 0.0...1.0)
+                        tuningSlider("frown wt", value: Binding(
+                            get: { Double(coordinator.arKitTracker.frownWeight) },
+                            set: { coordinator.arKitTracker.frownWeight = Float($0) }
+                        ), range: 0.5...5.0)
+                        Text("lip: \(String(format: "%.2f", coordinator.state.lipCorner))")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.yellow.opacity(0.7))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .background(.black.opacity(0.6))
+                }
+                #endif
+
                 chordBar
             }
 
@@ -280,6 +311,22 @@ struct PerformanceView: View {
         case "phrygian": return Color(hex: "a78bfa")
         default: return Color(hex: "e8a948")
         }
+    }
+
+    private func tuningSlider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .foregroundStyle(.yellow.opacity(0.5))
+                .frame(width: 55, alignment: .leading)
+            Slider(value: value, in: range)
+                .tint(.yellow)
+            Text(String(format: "%.2f", value.wrappedValue))
+                .font(.system(size: 8, design: .monospaced))
+                .foregroundStyle(.yellow.opacity(0.6))
+                .frame(width: 35)
+        }
+        .frame(height: 20)
     }
 }
 

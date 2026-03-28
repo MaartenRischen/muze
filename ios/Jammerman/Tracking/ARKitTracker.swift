@@ -27,6 +27,12 @@ protocol ARKitTrackerDelegate: AnyObject {
 class ARKitTracker: NSObject {
     weak var delegate: ARKitTrackerDelegate?
 
+    // Tunable valence parameters (exposed for UI calibration)
+    var valenceNeutral: Float = 0.0     // rawValence value that maps to center (Mixolydian)
+    var valenceScale: Float = 2.0       // multiplier for rawValence spread
+    var valenceOffset: Float = 0.5      // added after scaling (shifts whole range up/down)
+    var frownWeight: Float = 2.0        // how much mouthFrown contributes vs mouthSmile
+
     #if !targetEnvironment(simulator)
     private var arSession: ARSession?
     #endif
@@ -113,12 +119,9 @@ class ARKitTracker: NSObject {
         let frownR = (blendShapes[.mouthFrownRight]?.floatValue) ?? 0
         let avgSmile = (smileL + smileR) / 2
         let avgFrown = (frownL + frownR) / 2
-        // Combine: smile pushes positive, frown pushes negative
-        // Resting face: smile~0.05, frown~0.05 → net ~0 → maps to Dorian (0.3)
-        let rawValence = avgSmile - avgFrown * 2.0  // frown weighted more (weaker signal)
-        // Map to 0..1 range that selectScale expects (>0.8=Lydian, >0.6=Ionian, etc)
-        // rawValence range: ~-0.3 (deep frown) to ~0.6 (big smile), neutral ~0
-        let lipCorner = clamp(rawValence * 2.0 + 0.5, lo: -0.1, hi: 1.1)
+        // Combine smile and frown using tunable parameters
+        let rawValence = avgSmile - avgFrown * frownWeight
+        let lipCorner = clamp((rawValence - valenceNeutral) * valenceScale + valenceOffset, lo: -0.1, hi: 1.1)
 
         // Brow height: browInnerUp 0..1
         let browInnerUp = (blendShapes[.browInnerUp]?.floatValue) ?? 0
