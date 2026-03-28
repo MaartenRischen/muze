@@ -264,18 +264,22 @@ extension ARKitTracker: ARSessionDelegate {
         let features = extractFaceFeatures(from: faceAnchor)
 
         // Extract 3D vertices from face geometry
-        var vertices: [simd_float3]? = nil
-        var triangleIndices: [Int16]? = nil
-
-        if let geometry = faceAnchor.geometry {
-            let vertexCount = geometry.vertices.count
-            vertices = Array(UnsafeBufferPointer(start: geometry.vertices.baseAddress, count: vertexCount))
-
-            let indexCount = geometry.triangleIndices.count
-            triangleIndices = Array(UnsafeBufferPointer(start: geometry.triangleIndices.baseAddress, count: indexCount))
+        let geometry = faceAnchor.geometry
+        let vertexCount = geometry.vertices.count
+        var vertices: [simd_float3] = []
+        vertices.reserveCapacity(vertexCount)
+        for i in 0..<vertexCount {
+            vertices.append(geometry.vertices[i])
         }
 
-        delegate?.arKitTracker(self, didUpdateFace: features, vertices: vertices, triangleIndices: triangleIndices)
+        let indexCount = geometry.triangleCount * 3
+        var triangleIndices: [Int16] = []
+        triangleIndices.reserveCapacity(indexCount)
+        for i in 0..<indexCount {
+            triangleIndices.append(geometry.triangleIndices[i])
+        }
+
+        delegate?.arKitTracker(self, didUpdateFace: features, vertices: vertices.isEmpty ? nil : vertices, triangleIndices: triangleIndices.isEmpty ? nil : triangleIndices)
     }
 
     func session(_ session: ARSession, didRemove anchors: [ARAnchor]) {
