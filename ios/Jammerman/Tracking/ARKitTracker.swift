@@ -133,15 +133,15 @@ class ARKitTracker: NSObject {
         // Roll: rotation around Z axis — atan2 of column 0 and 1 Y components
         let roll = atan2(transform.columns.0.y, transform.columns.1.y)
 
-        // Face center from transform translation (in camera/AR coordinates)
-        // ARKit provides position in meters relative to camera
-        // Convert to normalized 0..1 screen coordinates
+        // Face center from transform translation
+        // ARKit face anchor: X=right, Y=up, Z=towards camera, in meters from camera
+        // Front camera is mirrored, so negate X
         let tx = transform.columns.3.x
         let ty = transform.columns.3.y
-        // ARKit X: left=-,right=+ ; Y: down=-,up=+
-        // Map to normalized: center is 0.5, typical range ~-0.15..0.15 meters
-        let faceCenterX = clamp01(0.5 + tx * 2.5) // scale meters to 0..1
-        let faceCenterY = clamp01(0.5 - ty * 2.5) // flip Y, scale
+        // Typical face is ~0.4m from camera, tx/ty range ~±0.15m
+        // Map to 0..1 normalized screen coords
+        let faceCenterX = clamp01(0.5 - tx * 3.0) // negate + scale (mirrored front cam)
+        let faceCenterY = clamp01(0.4 - ty * 3.0) // Y up → screen Y down, offset for typical face position
 
         return FaceFeatures(
             mouthOpenness: mouthOpenness,

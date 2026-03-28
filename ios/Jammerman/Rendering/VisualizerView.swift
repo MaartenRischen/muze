@@ -281,15 +281,13 @@ class VisualizerUIView: UIView {
         let cx = faceCenterX * w
         let cy = faceCenterY * h
 
-        // Scale factor: ARKit face vertices are in meters, face is ~0.15m wide
-        // We want the mesh to be about 40% of the screen width
-        let scale = w * 2.8
+        // Scale: ARKit vertices in meters (~0.15m face width → ~35% of screen)
+        let scale = w * 3.5
 
-        // Project each vertex to 2D
         let projected: [CGPoint] = vertices.map { v in
-            // Simple orthographic projection (face is close to camera, perspective minimal)
-            let px = cx + CGFloat(v.x) * scale
-            let py = cy - CGFloat(v.y) * scale // flip Y
+            // Orthographic projection — mirror X for front camera
+            let px = cx - CGFloat(v.x) * scale  // negate X (front camera mirror)
+            let py = cy - CGFloat(v.y) * scale   // negate Y (screen Y is down)
             return CGPoint(x: px, y: py)
         }
 
