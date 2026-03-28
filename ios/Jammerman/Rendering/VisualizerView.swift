@@ -228,15 +228,7 @@ class VisualizerUIView: UIView {
 
         // 9. Face mesh AR effects
         if state.faceDetected {
-            if let vertices = state.faceVertices, let indices = state.faceTriangleIndices, state.usingARKit {
-                // ARKit mode: draw 3D wireframe mesh projected to 2D
-                drawARKitFaceMesh(ctx: ctx, vertices: vertices, indices: indices,
-                                  faceCenterX: CGFloat(state.faceCenterX),
-                                  faceCenterY: CGFloat(state.faceCenterY),
-                                  w: w, h: h, energy: energy)
-            }
-
-            // Vision mode OR ARKit mode: draw contour effects if Vision landmarks available
+            // Draw face contours — Vision landmarks if available, otherwise approximate from face center
             if let landmarks = state.rawLandmarks {
                 let bb = state.faceBoundingBox
                 let groups = extractContourGroups(landmarks: landmarks, bb: bb, w: w, h: h)
@@ -260,11 +252,87 @@ class VisualizerUIView: UIView {
                 // 9f. Expression particles (mouth + eye sparkles)
                 updateFaceParticles(groups: groups, state: state, energy: energy)
                 drawFaceParticles(ctx: ctx)
+            } else {
+                // No Vision landmarks (ARKit mode) — draw approximate face using tracked center
+                drawApproximateFace(ctx: ctx, cx: faceCx, cy: faceCy, w: w, h: h, state: state, energy: energy)
             }
         }
 
         // 10. Explosion particles
         updateAndDrawExplosion(ctx: ctx, w: w, h: h)
+    }
+
+    // MARK: - Approximate Face (when no Vision landmarks — ARKit mode)
+
+    private func drawApproximateFace(ctx: CGContext, cx: CGFloat, cy: CGFloat,
+                                     w: CGFloat, h: CGFloat, state: JammermanState, energy: CGFloat) {
+        let faceW = w * 0.22
+        let faceH = h * 0.17
+        let alpha = 0.3 + energy * 0.25
+
+        // 3-pass neon glow
+        let passes: [(CGFloat, CGFloat)] = [(6, 0.06), (3, 0.15), (1.2, alpha)]
+
+        for (lineW, a) in passes {
+            ctx.saveGState()
+            ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: a).cgColor)
+            ctx.setLineWidth(lineW)
+            ctx.setLineCap(.round)
+            ctx.setLineJoin(.round)
+
+            // Face oval
+            ctx.strokeEllipse(in: CGRect(x: cx - faceW, y: cy - faceH, width: faceW * 2, height: faceH * 2))
+
+            // Eyes
+            let eyeW = faceW * 0.32
+            let eyeH = faceH * 0.1 + CGFloat(state.eyeOpenness) * faceH * 0.05
+            let eyeY = cy - faceH * 0.15
+            ctx.strokeEllipse(in: CGRect(x: cx - faceW * 0.42 - eyeW/2, y: eyeY - eyeH/2, width: eyeW, height: eyeH))
+            ctx.strokeEllipse(in: CGRect(x: cx + faceW * 0.42 - eyeW/2, y: eyeY - eyeH/2, width: eyeW, height: eyeH))
+
+            // Eyebrows
+            let browY = eyeY - faceH * 0.17 - CGFloat(state.browHeight) * 6
+            ctx.beginPath()
+            ctx.move(to: CGPoint(x: cx - faceW * 0.5, y: browY + 2))
+            ctx.addQuadCurve(to: CGPoint(x: cx - faceW * 0.12, y: browY + 2), control: CGPoint(x: cx - faceW * 0.32, y: browY))
+            ctx.strokePath()
+            ctx.beginPath()
+            ctx.move(to: CGPoint(x: cx + faceW * 0.12, y: browY + 2))
+            ctx.addQuadCurve(to: CGPoint(x: cx + faceW * 0.5, y: browY + 2), control: CGPoint(x: cx + faceW * 0.32, y: browY))
+            ctx.strokePath()
+
+            // Nose
+            ctx.beginPath()
+            ctx.move(to: CGPoint(x: cx, y: cy - faceH * 0.05))
+            ctx.addLine(to: CGPoint(x: cx, y: cy + faceH * 0.12))
+            ctx.strokePath()
+
+            // Mouth
+            let lipW = faceW * 0.35
+            let lipY = cy + faceH * 0.32
+            let mouthOpen = CGFloat(state.mouthOpenness) * 8
+            ctx.beginPath()
+            ctx.move(to: CGPoint(x: cx - lipW, y: lipY))
+            ctx.addQuadCurve(to: CGPoint(x: cx + lipW, y: lipY), control: CGPoint(x: cx, y: lipY - 3))
+            ctx.strokePath()
+            if mouthOpen > 1 {
+                ctx.beginPath()
+                ctx.move(to: CGPoint(x: cx - lipW * 0.8, y: lipY))
+                ctx.addQuadCurve(to: CGPoint(x: cx + lipW * 0.8, y: lipY), control: CGPoint(x: cx, y: lipY + mouthOpen))
+                ctx.strokePath()
+            }
+
+            ctx.restoreGState()
+        }
+
+        // Iris glow dots
+        let eyeY = cy - faceH * 0.15
+        ctx.saveGState()
+        ctx.setFillColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0.6 + beatPulse * 0.3).cgColor)
+        ctx.setShadow(offset: .zero, blur: 8, color: UIColor(red: accentR, green: accentG, blue: accentB, alpha: 1).cgColor)
+        ctx.fillEllipse(in: CGRect(x: cx - faceW * 0.42 - 2, y: eyeY - 2, width: 4, height: 4))
+        ctx.fillEllipse(in: CGRect(x: cx + faceW * 0.42 - 2, y: eyeY - 2, width: 4, height: 4))
+        ctx.restoreGState()
     }
 
     // MARK: - ARKit 3D Face Mesh Wireframe
