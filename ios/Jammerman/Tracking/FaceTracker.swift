@@ -91,7 +91,7 @@ class FaceTracker {
         let leftLift = Float(leftCorner.y) - lipCenter
         let rightLift = Float(rightCorner.y) - lipCenter
         let avgLift = (leftLift + rightLift) / 2
-        let lipCorner = clamp(remap(avgLift, min: -0.03, max: 0.03), lo: -1, hi: 1)
+        let lipCorner = clamp(remap(avgLift, min: -0.045, max: 0.045), lo: -1, hi: 1)
 
         // Brow height: distance from eyebrow to eye top
         let leftBrowPts = leftEyebrow.normalizedPoints
