@@ -152,25 +152,13 @@ class ARKitTracker: NSObject {
         // Roll: rotation around Z axis — atan2 of column 0 and 1 Y components
         let roll = atan2(transform.columns.0.y, transform.columns.1.y)
 
-        // Face center: use ARFrame camera to project 3D nose position to screen
-        var faceCenterX: Float = 0.5
-        var faceCenterY: Float = 0.4
-        #if !targetEnvironment(simulator)
-        if let frame = arSession?.currentFrame {
-            // Get the 3D world position of the face (nose tip = origin of face anchor)
-            let worldPos = simd_float3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
-            // Project to 2D using ARCamera
-            let screenSize = UIScreen.main.bounds.size
-            let projected = frame.camera.projectPoint(
-                simd_float3(worldPos.x, worldPos.y, worldPos.z),
-                orientation: .portrait,
-                viewportSize: screenSize
-            )
-            // Convert to normalized 0..1
-            faceCenterX = Float(projected.x / screenSize.width)
-            faceCenterY = Float(projected.y / screenSize.height)
-        }
-        #endif
+        // Face center: estimate from anchor transform without accessing currentFrame
+        // (accessing arSession.currentFrame retains the ARFrame, causing retention warnings)
+        // Use yaw to estimate horizontal position: yaw ~= -0.5..0.5 for normal head turns
+        // Center at 0.5, shift based on yaw (negative yaw = face turned right = moves left in selfie)
+        let faceCenterX = 0.5 + Float(yaw) * 0.4
+        // Vertical: pitch affects Y, slight offset for typical phone angle
+        let faceCenterY = 0.38 - Float(pitch) * 0.2
 
         return FaceFeatures(
             mouthOpenness: mouthOpenness,
@@ -371,39 +359,45 @@ class ARKitTracker: NSObject {
 #if !targetEnvironment(simulator)
 extension ARKitTracker: ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        // Hand detection — runs async with copied pixel buffer to avoid retaining ARFrame
-        detectHand(in: frame)
+        // Autoreleasepool ensures all Obj-C temporaries from ARFrame are released immediately
+        autoreleasepool {
+            // Hand detection — runs async with copied pixel buffer
+            detectHand(in: frame)
 
-        // Forward segmentation buffer if available
-        if let segBuffer = frame.segmentationBuffer {
-            delegate?.arKitTracker(self, didUpdateSegmentation: segBuffer)
+            // Forward segmentation buffer if available
+            if let segBuffer = frame.segmentationBuffer {
+                delegate?.arKitTracker(self, didUpdateSegmentation: segBuffer)
+            }
         }
+        // frame reference released here — no ARFrame data escapes this scope
     }
 
     func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
-        guard let faceAnchor = anchors.compactMap({ $0 as? ARFaceAnchor }).first else {
-            return
+        autoreleasepool {
+            guard let faceAnchor = anchors.compactMap({ $0 as? ARFaceAnchor }).first else {
+                return
+            }
+
+            let features = extractFaceFeatures(from: faceAnchor)
+
+            // Extract 3D vertices from face geometry — copy to value types
+            let geometry = faceAnchor.geometry
+            let vertexCount = geometry.vertices.count
+            var vertices: [simd_float3] = []
+            vertices.reserveCapacity(vertexCount)
+            for i in 0..<vertexCount {
+                vertices.append(geometry.vertices[i])
+            }
+
+            let indexCount = geometry.triangleCount * 3
+            var triangleIndices: [Int16] = []
+            triangleIndices.reserveCapacity(indexCount)
+            for i in 0..<indexCount {
+                triangleIndices.append(geometry.triangleIndices[i])
+            }
+
+            delegate?.arKitTracker(self, didUpdateFace: features, vertices: vertices.isEmpty ? nil : vertices, triangleIndices: triangleIndices.isEmpty ? nil : triangleIndices)
         }
-
-        let features = extractFaceFeatures(from: faceAnchor)
-
-        // Extract 3D vertices from face geometry
-        let geometry = faceAnchor.geometry
-        let vertexCount = geometry.vertices.count
-        var vertices: [simd_float3] = []
-        vertices.reserveCapacity(vertexCount)
-        for i in 0..<vertexCount {
-            vertices.append(geometry.vertices[i])
-        }
-
-        let indexCount = geometry.triangleCount * 3
-        var triangleIndices: [Int16] = []
-        triangleIndices.reserveCapacity(indexCount)
-        for i in 0..<indexCount {
-            triangleIndices.append(geometry.triangleIndices[i])
-        }
-
-        delegate?.arKitTracker(self, didUpdateFace: features, vertices: vertices.isEmpty ? nil : vertices, triangleIndices: triangleIndices.isEmpty ? nil : triangleIndices)
     }
 
     func session(_ session: ARSession, didRemove anchors: [ARAnchor]) {
