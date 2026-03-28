@@ -44,41 +44,18 @@ struct PerformanceView: View {
                 .padding(.trailing, 8)
             }
 
-            // === VOLUME SLIDER (vertical, next to toggle) ===
-            if let ch = volumeChannel {
+            // === VOLUME INDICATOR (shown during long-press drag) ===
+            if volumeChannel != nil {
                 HStack {
                     Spacer()
-                    VStack(spacing: 4) {
-                        Text("\(Int(volumeSliderValue)) dB")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white)
-                        // Vertical slider
-                        GeometryReader { geo in
-                            let range: ClosedRange<Float> = -60...6
-                            let pct = CGFloat((volumeSliderValue - range.lowerBound) / (range.upperBound - range.lowerBound))
-                            ZStack(alignment: .bottom) {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(.white.opacity(0.15))
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(accentColor.opacity(0.6))
-                                    .frame(height: geo.size.height * pct)
-                            }
-                            .gesture(DragGesture(minimumDistance: 0).onChanged { v in
-                                let pct = 1 - Float(v.location.y / geo.size.height)
-                                volumeSliderValue = range.lowerBound + max(0, min(1, pct)) * (range.upperBound - range.lowerBound)
-                                coordinator.audioEngine.setChannelVolume(ch, db: volumeSliderValue)
-                            }.onEnded { _ in
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                                    volumeChannel = nil
-                                }
-                            })
-                        }
-                        .frame(width: 36, height: 150)
-                    }
-                    .padding(8)
-                    .background(.black.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .padding(.trailing, 72)
+                    Text("\(Int(volumeSliderValue)) dB")
+                        .font(.system(size: 14, weight: .black, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.black.opacity(0.8))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .padding(.trailing, 72)
                 }
             }
 
@@ -86,7 +63,7 @@ struct PerformanceView: View {
             VStack {
                 Spacer()
                 HStack {
-                    Text("v3.6.5")
+                    Text("v3.6.6")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .foregroundStyle(.red.opacity(0.8))
                     Spacer()
@@ -237,27 +214,13 @@ struct PerformanceView: View {
     // MARK: - Instrument Toggles
 
     private func instToggle(_ label: String, icon: String, channel: String, color: Color) -> some View {
-        let active = !coordinator.audioEngine.isMuted(channel)
-        return Button {
-            coordinator.toggleMute(channel)
-        } label: {
-            VStack(spacing: 3) {
-                Text(icon).font(.system(size: 18))
-                Text(label).font(.system(size: 9, weight: .bold, design: .monospaced))
-            }
-            .frame(width: 56, height: 56)
-            .background(active ? color.opacity(0.25) : .white.opacity(0.06))
-            .foregroundStyle(active ? color : .white.opacity(0.35))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(active ? color.opacity(0.5) : .white.opacity(0.08), lineWidth: 1))
-        }
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.35).onEnded { _ in
-                volumeSliderValue = coordinator.audioEngine.channelVolumes[channel] ?? -10
-                volumeChannel = channel
-            }
-        )
+        InstToggleButton(label: label, icon: icon, channel: channel, color: color, coordinator: coordinator,
+                         volumeChannel: $volumeChannel, volumeSliderValue: $volumeSliderValue)
     }
+
+    // MARK: - Volume Slider Overlay (shown during long-press drag)
+
+    // Volume popup removed — now inline in InstToggleButton
 
     // MARK: - Chord Bar
 
@@ -304,6 +267,76 @@ struct PerformanceView: View {
 }
 
 // MARK: - Color Hex Extension
+
+// MARK: - Instrument Toggle with long-press-drag volume control
+
+struct InstToggleButton: View {
+    let label: String
+    let icon: String
+    let channel: String
+    let color: Color
+    @ObservedObject var coordinator: TrackingCoordinator
+    @Binding var volumeChannel: String?
+    @Binding var volumeSliderValue: Float
+
+    @State private var isVolumeMode = false
+    @State private var dragStartY: CGFloat = 0
+    @State private var dragStartVolume: Float = 0
+    @GestureState private var isLongPressing = false
+
+    var body: some View {
+        let active = !coordinator.audioEngine.isMuted(channel)
+
+        VStack(spacing: 3) {
+            Text(icon).font(.system(size: 18))
+            Text(label).font(.system(size: 9, weight: .bold, design: .monospaced))
+        }
+        .frame(width: 56, height: 56)
+        .background(active ? color.opacity(isVolumeMode ? 0.5 : 0.25) : .white.opacity(0.06))
+        .foregroundStyle(active ? color : .white.opacity(0.35))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(
+            isVolumeMode ? color : active ? color.opacity(0.5) : .white.opacity(0.08), lineWidth: isVolumeMode ? 2 : 1))
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { v in
+                    if !isVolumeMode {
+                        // Check if this is a long press (held > 0.3s without much movement)
+                        let distance = sqrt(v.translation.width * v.translation.width + v.translation.height * v.translation.height)
+                        if distance > 15 {
+                            // User is dragging — activate volume mode
+                            isVolumeMode = true
+                            dragStartY = v.startLocation.y
+                            dragStartVolume = coordinator.audioEngine.channelVolumes[channel] ?? -10
+                            volumeChannel = channel
+                            volumeSliderValue = dragStartVolume
+                        }
+                    }
+
+                    if isVolumeMode {
+                        // Drag up = louder, drag down = quieter
+                        // 200pt vertical = full range (-60 to +6 = 66dB)
+                        let deltaY = dragStartY - v.location.y // positive = up = louder
+                        let deltadB = Float(deltaY) * 66.0 / 200.0
+                        let newVol = max(-60, min(6, dragStartVolume + deltadB))
+                        volumeSliderValue = newVol
+                        coordinator.audioEngine.setChannelVolume(channel, db: newVol)
+                    }
+                }
+                .onEnded { v in
+                    if !isVolumeMode {
+                        // Short tap — toggle mute
+                        coordinator.toggleMute(channel)
+                    }
+                    isVolumeMode = false
+                    // Hide dB indicator after a moment
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        if volumeChannel == channel { volumeChannel = nil }
+                    }
+                }
+        )
+    }
+}
 
 extension Color {
     init(hex: String) {
