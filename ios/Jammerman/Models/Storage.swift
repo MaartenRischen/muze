@@ -48,6 +48,12 @@ enum JammermanStorage {
         dict["melVibrato"] = "\(engine.melodyOsc.vibratoAmount)"
         dict["portamento"] = engine.melodyOsc.portamentoEnabled ? "1" : "0"
 
+        // Mixer: pan, sends, EQ
+        dict["pans"] = engine.channelPans.map { "\($0.key):\($0.value)" }.joined(separator: ",")
+        dict["reverbSends"] = engine.channelReverbSends.map { "\($0.key):\($0.value)" }.joined(separator: ",")
+        dict["delaySends"] = engine.channelDelaySends.map { "\($0.key):\($0.value)" }.joined(separator: ",")
+        dict["eqGains"] = engine.channelEQGains.map { "\($0.key):\($0.value.map { String($0) }.joined(separator: "/"))" }.joined(separator: ",")
+
         // Drum pattern as semicolon-separated rows of comma-separated values
         dict["drumPattern"] = engine.drumPattern.map { $0.map(String.init).joined(separator: ",") }.joined(separator: ";")
 
@@ -59,7 +65,7 @@ enum JammermanStorage {
         UserDefaults.standard.removeObject(forKey: "jammerman-settings-v1")
         UserDefaults.standard.removeObject(forKey: "jammerman-settings-v3")
         // Force fresh start every time version changes
-        let ver = "v3.6.3"
+        let ver = "v3.6.4"
         if UserDefaults.standard.string(forKey: "jammerman-ver") != ver {
             UserDefaults.standard.removeObject(forKey: key)
             UserDefaults.standard.set(ver, forKey: "jammerman-ver")
@@ -111,6 +117,44 @@ enum JammermanStorage {
         if let v = dict["melRelease"], let n = Float(v) { engine.melodyOsc.releaseTime = n }
         if let v = dict["melVibrato"], let n = Float(v) { engine.melodyOsc.vibratoAmount = n }
         if let v = dict["portamento"] { engine.melodyOsc.portamentoEnabled = v == "1" }
+
+        // Mixer: pan, sends, EQ
+        if let v = dict["pans"] {
+            for pair in v.split(separator: ",") {
+                let parts = pair.split(separator: ":")
+                if parts.count == 2, let val = Float(parts[1]) {
+                    engine.setChannelPan(String(parts[0]), pan: val)
+                }
+            }
+        }
+        if let v = dict["reverbSends"] {
+            for pair in v.split(separator: ",") {
+                let parts = pair.split(separator: ":")
+                if parts.count == 2, let val = Float(parts[1]) {
+                    engine.setChannelReverbSend(String(parts[0]), amount: val)
+                }
+            }
+        }
+        if let v = dict["delaySends"] {
+            for pair in v.split(separator: ",") {
+                let parts = pair.split(separator: ":")
+                if parts.count == 2, let val = Float(parts[1]) {
+                    engine.setChannelDelaySend(String(parts[0]), amount: val)
+                }
+            }
+        }
+        if let v = dict["eqGains"] {
+            for pair in v.split(separator: ",") {
+                let parts = pair.split(separator: ":")
+                if parts.count == 2 {
+                    let ch = String(parts[0])
+                    let bandValues = parts[1].split(separator: "/").compactMap { Float($0) }
+                    for (band, gain) in bandValues.enumerated() {
+                        engine.setChannelEQ(ch, band: band, gain: gain)
+                    }
+                }
+            }
+        }
 
         if let v = dict["drumPattern"] {
             let rows = v.split(separator: ";").map { $0.split(separator: ",").compactMap { Int($0) } }
