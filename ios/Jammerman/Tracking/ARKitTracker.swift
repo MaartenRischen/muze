@@ -103,14 +103,22 @@ class ARKitTracker: NSObject {
         let jawOpen = (blendShapes[.jawOpen]?.floatValue) ?? 0
         let mouthOpenness = clamp01(jawOpen)
 
-        // Lip corner (smile): average of left+right smile blend shapes
-        // ARKit mouthSmile: 0 = neutral/frown, ~0.3 = slight smile, ~0.8 = big smile
+        // Lip corner (smile): ARKit mouthSmile blend shapes
+        // ARKit: 0 = neutral/resting, 0.3+ = smiling, 0.6+ = big smile
+        // There's no negative — frowning barely changes mouthSmile
+        // Also use mouthFrownLeft/Right for the negative side
         let smileL = (blendShapes[.mouthSmileLeft]?.floatValue) ?? 0
         let smileR = (blendShapes[.mouthSmileRight]?.floatValue) ?? 0
+        let frownL = (blendShapes[.mouthFrownLeft]?.floatValue) ?? 0
+        let frownR = (blendShapes[.mouthFrownRight]?.floatValue) ?? 0
         let avgSmile = (smileL + smileR) / 2
-        // Simple linear remap: 0 = frown (-1), 0.2 = neutral (0), 0.6 = big smile (+1)
-        // This gives equal sensitivity on both sides of neutral
-        let lipCorner = clamp((avgSmile - 0.2) / 0.4 * 2.0, lo: -1, hi: 1)
+        let avgFrown = (frownL + frownR) / 2
+        // Combine: smile pushes positive, frown pushes negative
+        // Resting face: smile~0.05, frown~0.05 → net ~0 → maps to Dorian (0.3)
+        let rawValence = avgSmile - avgFrown * 2.0  // frown weighted more (weaker signal)
+        // Map to 0..1 range that selectScale expects (>0.8=Lydian, >0.6=Ionian, etc)
+        // rawValence range: ~-0.3 (deep frown) to ~0.6 (big smile), neutral ~0
+        let lipCorner = clamp(rawValence * 2.0 + 0.5, lo: -0.1, hi: 1.1)
 
         // Brow height: browInnerUp 0..1
         let browInnerUp = (blendShapes[.browInnerUp]?.floatValue) ?? 0
