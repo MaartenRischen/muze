@@ -739,8 +739,9 @@ class AudioEngine: ObservableObject {
         if useSoundFont, let sfm = soundFontManager {
             sfm.stopChord(currentPadMidiNotes, on: sfm.padSampler)
             currentPadMidiNotes = midiNotes.map { UInt8($0) }
-            sfm.playChord(currentPadMidiNotes, velocity: 90, on: sfm.padSampler)
-            padOsc.release() // silence the synth oscillator
+            if !padMuted {
+                sfm.playChord(currentPadMidiNotes, velocity: 90, on: sfm.padSampler)
+            }
         } else {
             padOsc.triggerNotes(midiNotes)
         }
@@ -764,8 +765,10 @@ class AudioEngine: ObservableObject {
     func startMelody(_ note: Int) {
         if useSoundFont, let sfm = soundFontManager {
             if let prev = currentMelodyMidiNote { sfm.stopNote(prev, on: sfm.leadSampler) }
-            currentMelodyMidiNote = UInt8(note)
-            sfm.playNote(UInt8(note), velocity: 100, on: sfm.leadSampler)
+            if !melodyMuted {
+                currentMelodyMidiNote = UInt8(note)
+                sfm.playNote(UInt8(note), velocity: 100, on: sfm.leadSampler)
+            }
         } else {
             melodyOsc.triggerNote(note)
         }
@@ -774,8 +777,10 @@ class AudioEngine: ObservableObject {
     func updateMelody(_ note: Int) {
         if useSoundFont, let sfm = soundFontManager {
             if let prev = currentMelodyMidiNote { sfm.stopNote(prev, on: sfm.leadSampler) }
-            currentMelodyMidiNote = UInt8(note)
-            sfm.playNote(UInt8(note), velocity: 90, on: sfm.leadSampler)
+            if !melodyMuted {
+                currentMelodyMidiNote = UInt8(note)
+                sfm.playNote(UInt8(note), velocity: 90, on: sfm.leadSampler)
+            }
         } else {
             melodyOsc.glideToNote(note)
         }
