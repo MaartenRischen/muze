@@ -172,8 +172,9 @@ class AudioEngine: ObservableObject {
 
     // SoundFont sampler
     var soundFontManager: SoundFontManager?
-    @Published var useSoundFont = false // toggle between synth oscillators and SF2 samples
+    @Published var useSoundFont = true // default to sampled instruments
     private var currentPadMidiNotes: [UInt8] = []
+    private var currentMelodyMidiNote: UInt8? = nil
 
     // Master filter cutoff (face-driven)
     private var masterFilterFreq: Float = 10000
@@ -751,13 +752,43 @@ class AudioEngine: ObservableObject {
         }
     }
 
-    func releasePad() { padOsc.release() }
+    func releasePad() {
+        padOsc.release()
+        if let sfm = soundFontManager {
+            sfm.stopChord(currentPadMidiNotes, on: sfm.padSampler)
+        }
+    }
 
     // MARK: - Melody
 
-    func startMelody(_ note: Int) { melodyOsc.triggerNote(note) }
-    func updateMelody(_ note: Int) { melodyOsc.glideToNote(note) }
-    func stopMelody() { melodyOsc.release() }
+    func startMelody(_ note: Int) {
+        if useSoundFont, let sfm = soundFontManager {
+            if let prev = currentMelodyMidiNote { sfm.stopNote(prev, on: sfm.leadSampler) }
+            currentMelodyMidiNote = UInt8(note)
+            sfm.playNote(UInt8(note), velocity: 100, on: sfm.leadSampler)
+        } else {
+            melodyOsc.triggerNote(note)
+        }
+    }
+
+    func updateMelody(_ note: Int) {
+        if useSoundFont, let sfm = soundFontManager {
+            if let prev = currentMelodyMidiNote { sfm.stopNote(prev, on: sfm.leadSampler) }
+            currentMelodyMidiNote = UInt8(note)
+            sfm.playNote(UInt8(note), velocity: 90, on: sfm.leadSampler)
+        } else {
+            melodyOsc.glideToNote(note)
+        }
+    }
+
+    func stopMelody() {
+        melodyOsc.release()
+        if let sfm = soundFontManager, let note = currentMelodyMidiNote {
+            sfm.stopNote(note, on: sfm.leadSampler)
+            currentMelodyMidiNote = nil
+        }
+    }
+
     func setPortamento(_ on: Bool) { melodyOsc.portamentoEnabled = on }
 
     // MARK: - Arp 1
@@ -896,7 +927,23 @@ class AudioEngine: ObservableObject {
         case "binaural": binauralActive.toggle()
         default: break
         }
-        print("[TOGGLE] \(channel) → muted=\(isMuted(channel))")
+
+        // Handle SoundFont sampler mute/unmute
+        if useSoundFont, let sfm = soundFontManager {
+            switch channel {
+            case "pad":
+                if padMuted {
+                    sfm.stopChord(currentPadMidiNotes, on: sfm.padSampler)
+                }
+                // If unmuting, triggerPad will be called from note seeding
+            case "melody":
+                if melodyMuted, let note = currentMelodyMidiNote {
+                    sfm.stopNote(note, on: sfm.leadSampler)
+                    currentMelodyMidiNote = nil
+                }
+            default: break
+            }
+        }
     }
 
     func isMuted(_ channel: String) -> Bool {
