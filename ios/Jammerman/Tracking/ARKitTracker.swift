@@ -307,11 +307,8 @@ extension ARKitTracker: ARSessionDelegate {
         // Hand detection on every frame (internally staggered)
         detectHand(in: frame)
 
-        // Vision face landmarks for precise contour rendering (every 3rd frame)
-        visionFrameCount += 1
-        if visionFrameCount % 3 == 0 {
-            detectVisionFace(in: frame)
-        }
+        // Vision face detection DISABLED — retains ARFrames causing memory issues
+        // Use approximate face drawing from blend shapes instead
 
         // Forward segmentation buffer if available
         if let segBuffer = frame.segmentationBuffer {
