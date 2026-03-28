@@ -102,9 +102,9 @@ class SoundFontManager {
         loadBassPreset(0)
 
         // Set initial volumes
-        padSampler?.masterGain = -6 // dB
-        leadSampler?.masterGain = -3
-        bassSampler?.masterGain = -6
+        padSampler?.masterGain = 0 // full volume for testing
+        leadSampler?.masterGain = 0
+        bassSampler?.masterGain = 0
     }
 
     func loadPadPreset(_ index: Int) {
@@ -154,8 +154,10 @@ class SoundFontManager {
 
     // Play chord (multiple notes)
     func playChord(_ midiNotes: [UInt8], velocity: UInt8 = 80, on sampler: AVAudioUnitSampler?) {
+        guard let s = sampler else { print("[SFManager] playChord: sampler is nil"); return }
+        print("[SFManager] playChord: \(midiNotes) vel=\(velocity)")
         for note in midiNotes {
-            sampler?.startNote(note, withVelocity: velocity, onChannel: 0)
+            s.startNote(note, withVelocity: velocity, onChannel: 0)
         }
     }
 

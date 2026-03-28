@@ -737,12 +737,9 @@ class AudioEngine: ObservableObject {
 
         // Also trigger SoundFont sampler if enabled
         if useSoundFont, let sfm = soundFontManager {
-            // Stop previous chord
             sfm.stopChord(currentPadMidiNotes, on: sfm.padSampler)
             currentPadMidiNotes = midiNotes.map { UInt8($0) }
-            if !padMuted {
-                sfm.playChord(currentPadMidiNotes, velocity: 70, on: sfm.padSampler)
-            }
+            sfm.playChord(currentPadMidiNotes, velocity: 90, on: sfm.padSampler)
         }
         // Update binaural if following chord
         if binauralFollowChord, let first = midiNotes.first {
