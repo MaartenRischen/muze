@@ -36,6 +36,11 @@ class ARKitTracker: NSObject {
     private var handFrameCount = 0
     private var lastHandOpen: Bool?
 
+    #if !targetEnvironment(simulator)
+    // Store latest frame for 3D→2D projection
+    private var latestFrame: ARFrame?
+    #endif
+
     /// Whether ARKit face tracking is available on this device
     static var isSupported: Bool {
         #if !targetEnvironment(simulator)
@@ -133,17 +138,25 @@ class ARKitTracker: NSObject {
         // Roll: rotation around Z axis — atan2 of column 0 and 1 Y components
         let roll = atan2(transform.columns.0.y, transform.columns.1.y)
 
-        // Face center from ARKit transform
-        // ARKit: X=right, Y=up, Z=towards camera (negative = in front of camera)
-        // Front camera is mirrored in the ARSCNView display
-        let tx = transform.columns.3.x
-        let ty = transform.columns.3.y
-        let tz = abs(transform.columns.3.z)
-        // Perspective: project 3D to 2D using approximate focal length
-        // iPhone front camera ~30mm equiv, sensor ~4mm → focal ~7 in normalized coords
-        let fov: Float = 4.0  // tunable: higher = face center moves more with head
-        let faceCenterX = clamp01(0.5 + (tx / max(tz, 0.2)) * fov)  // no negate — ARSCNView mirrors
-        let faceCenterY = clamp01(0.45 - (ty / max(tz, 0.2)) * fov) // Y up → screen down, slight upward offset
+        // Face center: use ARFrame camera to project 3D nose position to screen
+        var faceCenterX: Float = 0.5
+        var faceCenterY: Float = 0.4
+        #if !targetEnvironment(simulator)
+        if let frame = latestFrame {
+            // Get the 3D world position of the face (nose tip = origin of face anchor)
+            let worldPos = simd_float3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+            // Project to 2D using ARCamera
+            let screenSize = UIScreen.main.bounds.size
+            let projected = frame.camera.projectPoint(
+                simd_float3(worldPos.x, worldPos.y, worldPos.z),
+                orientation: .portrait,
+                viewportSize: screenSize
+            )
+            // Convert to normalized 0..1
+            faceCenterX = Float(projected.x / screenSize.width)
+            faceCenterY = Float(projected.y / screenSize.height)
+        }
+        #endif
 
         return FaceFeatures(
             mouthOpenness: mouthOpenness,
@@ -253,6 +266,7 @@ class ARKitTracker: NSObject {
 #if !targetEnvironment(simulator)
 extension ARKitTracker: ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        latestFrame = frame
         // Hand detection on every frame (internally staggered)
         detectHand(in: frame)
 
