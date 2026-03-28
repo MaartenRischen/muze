@@ -3,6 +3,7 @@
 
 import SwiftUI
 import Vision
+import simd
 
 @Observable
 class JammermanState {
@@ -59,6 +60,16 @@ class JammermanState {
     // Preset
     var presetIdx: Int = 0
     var latencyMode: String = "balanced"
+
+    // ARKit face mesh (3D vertices for visualizer)
+    var faceVertices: [simd_float3]?
+    var faceTriangleIndices: [Int16]?
+
+    // ARKit segmentation
+    var segmentationBuffer: CVPixelBuffer?
+
+    // Whether using ARKit (true) or Vision fallback (false)
+    var usingARKit: Bool = false
 
     // Computed
     var effectiveRoot: Int { JammermanConfig.rootNote + rootOffset }

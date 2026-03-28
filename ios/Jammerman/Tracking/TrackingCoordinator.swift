@@ -5,11 +5,13 @@
 import Foundation
 import Combine
 import CoreMedia
+import simd
 
 class TrackingCoordinator: ObservableObject {
     let camera = CameraManager()
     let faceTracker = FaceTracker()
     let handTracker = HandTracker()
+    let arKitTracker = ARKitTracker()
 
     @Published var state = JammermanState()
     let audioEngine = AudioEngine()
@@ -42,6 +44,7 @@ class TrackingCoordinator: ObservableObject {
         setupCamera()
         setupDefaultDrumPattern()
         loopRecorder.audioEngine = audioEngine
+        arKitTracker.delegate = self
 
         // Forward child objectWillChange to self so SwiftUI re-renders
         audioEngineCancellable = audioEngine.objectWillChange.sink { [weak self] _ in
@@ -90,7 +93,18 @@ class TrackingCoordinator: ObservableObject {
     func start() {
         // Load saved settings
         JammermanStorage.load(state: state, engine: audioEngine)
-        camera.start()
+
+        // Use ARKit if supported, otherwise fall back to Vision-based tracking
+        if ARKitTracker.isSupported {
+            state.usingARKit = true
+            arKitTracker.start()
+            print("[ARKit] Face tracking started")
+        } else {
+            state.usingARKit = false
+            camera.start()
+            print("[Vision] Fallback face tracking started")
+        }
+
         audioEngine.start()
         // Auto-save every 2 seconds
         saveTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
@@ -102,7 +116,11 @@ class TrackingCoordinator: ObservableObject {
     func stop() {
         JammermanStorage.save(state: state, engine: audioEngine)
         saveTimer?.invalidate()
-        camera.stop()
+        if state.usingARKit {
+            arKitTracker.stop()
+        } else {
+            camera.stop()
+        }
         audioEngine.stop()
         gyroscopeManager.deactivate()
         loopRecorder.clearAll()
@@ -291,6 +309,77 @@ class TrackingCoordinator: ObservableObject {
             audioEngine.updateArp2Notes(notes)
         default:
             break
+        }
+    }
+}
+
+// MARK: - ARKitTrackerDelegate
+
+extension TrackingCoordinator: ARKitTrackerDelegate {
+    func arKitTracker(_ tracker: ARKitTracker, didUpdateFace features: FaceFeatures,
+                      vertices: [simd_float3]?, triangleIndices: [Int16]?) {
+        let now = Date()
+        let timestamp = now.timeIntervalSince1970 * 1000
+
+        faceLostTime = nil
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.state.mouthOpenness = Float(self.filters["mouth"]!.filter(Double(features.mouthOpenness), timestamp: timestamp))
+            self.state.lipCorner = Float(self.filters["lip"]!.filter(Double(features.lipCorner), timestamp: timestamp))
+            self.state.browHeight = Float(self.filters["brow"]!.filter(Double(features.browHeight), timestamp: timestamp))
+            self.state.eyeOpenness = Float(self.filters["eye"]!.filter(Double(features.eyeOpenness), timestamp: timestamp))
+            self.state.mouthWidth = Float(self.filters["mouthW"]!.filter(Double(features.mouthWidth), timestamp: timestamp))
+            self.state.headPitch = features.headPitch
+            self.state.headYaw = features.headYaw
+            self.state.headRoll = features.headRoll
+            self.state.faceCenterX = features.faceCenterX
+            self.state.faceCenterY = features.faceCenterY
+            self.state.faceDetected = true
+
+            // Store ARKit face mesh data for visualizer
+            self.state.faceVertices = vertices
+            self.state.faceTriangleIndices = triangleIndices
+
+            // Clear Vision landmarks (not used in ARKit mode)
+            self.state.rawLandmarks = nil
+
+            self.updateAudio()
+        }
+    }
+
+    func arKitTracker(_ tracker: ARKitTracker, didUpdateHand hand: HandFeatures) {
+        let timestamp = Date().timeIntervalSince1970 * 1000
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.state.handPresent = hand.handPresent
+            if hand.handPresent {
+                self.state.handX = Float(self.filters["handX"]!.filter(Double(hand.handX), timestamp: timestamp))
+                self.state.handY = Float(self.filters["handY"]!.filter(Double(hand.handY), timestamp: timestamp))
+                self.state.handOpen = hand.handOpen
+            } else {
+                self.state.handPresent = false
+            }
+            self.updateMelody()
+        }
+    }
+
+    func arKitTracker(_ tracker: ARKitTracker, didLoseFace: Bool) {
+        let now = Date()
+        if faceLostTime == nil { faceLostTime = now }
+        if let lost = faceLostTime, now.timeIntervalSince(lost) > faceLostGraceMs {
+            DispatchQueue.main.async { [weak self] in
+                self?.state.faceDetected = false
+                self?.state.faceVertices = nil
+                self?.state.faceTriangleIndices = nil
+            }
+        }
+    }
+
+    func arKitTracker(_ tracker: ARKitTracker, didUpdateSegmentation buffer: CVPixelBuffer?) {
+        DispatchQueue.main.async { [weak self] in
+            self?.state.segmentationBuffer = buffer
         }
     }
 }

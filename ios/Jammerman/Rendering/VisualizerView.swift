@@ -8,6 +8,7 @@
 import SwiftUI
 import UIKit
 import Vision
+import simd
 
 // MARK: - SwiftUI Wrapper
 
@@ -225,34 +226,124 @@ class VisualizerUIView: UIView {
         updateBurstParticles()
         drawBurstParticles(ctx: ctx)
 
-        // 9. Face mesh AR effects (if face detected with raw landmarks)
-        if state.faceDetected, let landmarks = state.rawLandmarks {
-            let bb = state.faceBoundingBox
-            let groups = extractContourGroups(landmarks: landmarks, bb: bb, w: w, h: h)
+        // 9. Face mesh AR effects
+        if state.faceDetected {
+            if let vertices = state.faceVertices, let indices = state.faceTriangleIndices, state.usingARKit {
+                // ARKit mode: draw 3D wireframe mesh projected to 2D
+                drawARKitFaceMesh(ctx: ctx, vertices: vertices, indices: indices,
+                                  faceCenterX: CGFloat(state.faceCenterX),
+                                  faceCenterY: CGFloat(state.faceCenterY),
+                                  w: w, h: h, energy: energy)
+            }
 
-            // 9a. Ghost trails (drawn first, behind everything)
-            updateContourSnapshots(groups: groups, state: state)
-            drawContourTrails(ctx: ctx)
+            // Vision mode OR ARKit mode: draw contour effects if Vision landmarks available
+            if let landmarks = state.rawLandmarks {
+                let bb = state.faceBoundingBox
+                let groups = extractContourGroups(landmarks: landmarks, bb: bb, w: w, h: h)
 
-            // 9b. Energy aura
-            drawEnergyAura(ctx: ctx, groups: groups, energy: energy)
+                // 9a. Ghost trails (drawn first, behind everything)
+                updateContourSnapshots(groups: groups, state: state)
+                drawContourTrails(ctx: ctx)
 
-            // 9c. Glowing face contour (the signature Tron look — 3-pass neon glow)
-            drawContourGlow(ctx: ctx, groups: groups, energy: energy)
+                // 9b. Energy aura
+                drawEnergyAura(ctx: ctx, groups: groups, energy: energy)
 
-            // 9d. Iris glow (pulsing with audio)
-            drawIrisGlow(ctx: ctx, groups: groups, energy: energy)
+                // 9c. Glowing face contour (the signature Tron look — 3-pass neon glow)
+                drawContourGlow(ctx: ctx, groups: groups, energy: energy)
 
-            // 9e. Landmark light points
-            drawLandmarkLights(ctx: ctx, groups: groups, energy: energy)
+                // 9d. Iris glow (pulsing with audio)
+                drawIrisGlow(ctx: ctx, groups: groups, energy: energy)
 
-            // 9f. Expression particles (mouth + eye sparkles)
-            updateFaceParticles(groups: groups, state: state, energy: energy)
-            drawFaceParticles(ctx: ctx)
+                // 9e. Landmark light points
+                drawLandmarkLights(ctx: ctx, groups: groups, energy: energy)
+
+                // 9f. Expression particles (mouth + eye sparkles)
+                updateFaceParticles(groups: groups, state: state, energy: energy)
+                drawFaceParticles(ctx: ctx)
+            }
         }
 
         // 10. Explosion particles
         updateAndDrawExplosion(ctx: ctx, w: w, h: h)
+    }
+
+    // MARK: - ARKit 3D Face Mesh Wireframe
+
+    /// Projects ARKit 3D face vertices to 2D screen coordinates and draws a wireframe mesh
+    private func drawARKitFaceMesh(ctx: CGContext, vertices: [simd_float3], indices: [Int16],
+                                   faceCenterX: CGFloat, faceCenterY: CGFloat,
+                                   w: CGFloat, h: CGFloat, energy: CGFloat) {
+        guard !vertices.isEmpty, indices.count >= 3 else { return }
+
+        // Project 3D vertices (ARKit face-local coords, in meters) to 2D screen points
+        // ARKit face vertices: X = right, Y = up, Z = towards camera
+        // Face center in screen coords
+        let cx = faceCenterX * w
+        let cy = faceCenterY * h
+
+        // Scale factor: ARKit face vertices are in meters, face is ~0.15m wide
+        // We want the mesh to be about 40% of the screen width
+        let scale = w * 2.8
+
+        // Project each vertex to 2D
+        let projected: [CGPoint] = vertices.map { v in
+            // Simple orthographic projection (face is close to camera, perspective minimal)
+            let px = cx + CGFloat(v.x) * scale
+            let py = cy - CGFloat(v.y) * scale // flip Y
+            return CGPoint(x: px, y: py)
+        }
+
+        // Draw wireframe triangles with neon glow
+        let alpha = 0.15 + energy * 0.15
+        let color = UIColor(red: accentR, green: accentG, blue: accentB, alpha: alpha)
+        ctx.setStrokeColor(color.cgColor)
+        ctx.setLineWidth(0.5)
+
+        // Draw every 3rd triangle to keep it lightweight (1220 vertices = ~2300 triangles)
+        let triCount = indices.count / 3
+        for t in stride(from: 0, to: triCount, by: 3) {
+            let i0 = Int(indices[t * 3])
+            let i1 = Int(indices[t * 3 + 1])
+            let i2 = Int(indices[t * 3 + 2])
+
+            guard i0 < projected.count, i1 < projected.count, i2 < projected.count else { continue }
+
+            let p0 = projected[i0]
+            let p1 = projected[i1]
+            let p2 = projected[i2]
+
+            ctx.beginPath()
+            ctx.move(to: p0)
+            ctx.addLine(to: p1)
+            ctx.addLine(to: p2)
+            ctx.closePath()
+            ctx.strokePath()
+        }
+
+        // Outer glow pass (wider, dimmer) for neon effect
+        let glowAlpha = 0.06 + energy * 0.06
+        let glowColor = UIColor(red: accentR, green: accentG, blue: accentB, alpha: glowAlpha)
+        ctx.setStrokeColor(glowColor.cgColor)
+        ctx.setLineWidth(2.0)
+
+        for t in stride(from: 0, to: triCount, by: 9) {
+            let i0 = Int(indices[t * 3])
+            let i1 = Int(indices[t * 3 + 1])
+            let i2 = Int(indices[t * 3 + 2])
+
+            guard i0 < projected.count, i1 < projected.count, i2 < projected.count else { continue }
+
+            let p0 = projected[i0]
+            let p1 = projected[i1]
+            let p2 = projected[i2]
+
+            ctx.beginPath()
+            ctx.move(to: p0)
+            ctx.addLine(to: p1)
+            ctx.addLine(to: p2)
+            ctx.closePath()
+            ctx.strokePath()
+        }
     }
 
     // MARK: - Face Contour Extraction (Vision landmarks -> screen points)

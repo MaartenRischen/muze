@@ -22,6 +22,11 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+    dependencies:
+      - sdk: ARKit.framework
+        weak: true
+      - sdk: SceneKit.framework
+        weak: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jammerman.app
