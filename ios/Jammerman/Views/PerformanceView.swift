@@ -301,7 +301,8 @@ struct InstToggleButton: View {
     @State private var isVolumeMode = false
     @State private var dragStartY: CGFloat = 0
     @State private var dragStartVolume: Float = 0
-    @GestureState private var isLongPressing = false
+    @State private var showDetail = false
+    @State private var pressStart: Date?
 
     var body: some View {
         let active = !coordinator.audioEngine.isMuted(channel)
@@ -319,11 +320,12 @@ struct InstToggleButton: View {
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { v in
+                    if pressStart == nil { pressStart = Date() }
+
                     if !isVolumeMode {
-                        // Check if this is a long press (held > 0.3s without much movement)
                         let distance = sqrt(v.translation.width * v.translation.width + v.translation.height * v.translation.height)
                         if distance > 15 {
-                            // User is dragging — activate volume mode
+                            // Dragging — activate volume mode
                             isVolumeMode = true
                             dragStartY = v.startLocation.y
                             dragStartVolume = coordinator.audioEngine.channelVolumes[channel] ?? -10
@@ -333,9 +335,7 @@ struct InstToggleButton: View {
                     }
 
                     if isVolumeMode {
-                        // Drag up = louder, drag down = quieter
-                        // 200pt vertical = full range (-60 to +6 = 66dB)
-                        let deltaY = dragStartY - v.location.y // positive = up = louder
+                        let deltaY = dragStartY - v.location.y
                         let deltadB = Float(deltaY) * 66.0 / 200.0
                         let newVol = max(-60, min(6, dragStartVolume + deltadB))
                         volumeSliderValue = newVol
@@ -343,17 +343,27 @@ struct InstToggleButton: View {
                     }
                 }
                 .onEnded { v in
-                    if !isVolumeMode {
+                    let holdDuration = Date().timeIntervalSince(pressStart ?? Date())
+                    let distance = sqrt(v.translation.width * v.translation.width + v.translation.height * v.translation.height)
+
+                    if !isVolumeMode && holdDuration > 0.4 && distance < 15 {
+                        // Long press without dragging — open detail panel
+                        showDetail = true
+                    } else if !isVolumeMode {
                         // Short tap — toggle mute
                         coordinator.toggleMute(channel)
                     }
+
                     isVolumeMode = false
-                    // Hide dB indicator after a moment
+                    pressStart = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         if volumeChannel == channel { volumeChannel = nil }
                     }
                 }
         )
+        .fullScreenCover(isPresented: $showDetail) {
+            InstrumentDetailView(channel: channel, color: color, coordinator: coordinator, isPresented: $showDetail)
+        }
     }
 }
 

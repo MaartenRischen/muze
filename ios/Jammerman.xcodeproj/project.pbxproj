@@ -26,6 +26,8 @@
 		74AF2B4F9584CF76556A396A /* FeatureExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 595A81D709627AD351FAC005 /* FeatureExtraction.swift */; };
 		7A9521C0D5D1A6AA2C972357 /* JammermanConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 632721E18A98DF36C69420B7 /* JammermanConfig.swift */; };
 		7E1FA72994FBB1C68B03ECEC /* SynthPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB61258A32E116A9BDF327E7 /* SynthPanelView.swift */; };
+		EBF77AFF631250FDE4EE9045 /* InstrumentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DED267F1F06ED55A83467EA /* InstrumentDetailView.swift */; };
+		4DED267F1F06ED55A83467EA /* InstrumentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstrumentDetailView.swift; sourceTree = "<group>"; };
 		817E7349BCE702460A8D4B5F /* BackgroundBlurView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DFF4B1608551EA8D58C80A9 /* BackgroundBlurView.swift */; };
 		847CB1108468B8E2E21B763F /* PerformanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C218E26F294C2AE0DC8DAD4 /* PerformanceView.swift */; };
 		94D529ACAA5EFC49CD4F8CBC /* AUv3Host.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0F45595AC9AB89600C9D02 /* AUv3Host.swift */; };
@@ -204,6 +206,7 @@
 				2C218E26F294C2AE0DC8DAD4 /* PerformanceView.swift */,
 				7952C6405DD06507C3238E5A /* SplashView.swift */,
 				BB61258A32E116A9BDF327E7 /* SynthPanelView.swift */,
+				4DED267F1F06ED55A83467EA /* InstrumentDetailView.swift */,
 				BFFC794AEAB27CD65E320C2E /* TutorialView.swift */,
 			);
 			path = Views;
@@ -306,6 +309,7 @@
 				950E3089208686751B040702 /* SplashView.swift in Sources */,
 				E86DD060D915E14DFA60A6D1 /* Storage.swift in Sources */,
 				7E1FA72994FBB1C68B03ECEC /* SynthPanelView.swift in Sources */,
+				EBF77AFF631250FDE4EE9045 /* InstrumentDetailView.swift in Sources */,
 				F6CDAD16A5988A17A6837B94 /* TrackingCoordinator.swift in Sources */,
 				0ECA988981E3647DF27370C0 /* TutorialView.swift in Sources */,
 				DB28DF3003B195FAED723574 /* VisualizerView.swift in Sources */,
