@@ -16,6 +16,7 @@
 		2B8B2879D61927E84DFF23E7 /* MusicTheory.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEFE69880F0A48B2ED3F15AA /* MusicTheory.swift */; };
 		45BEFE934D3AB2A72CE9174C /* JammermanApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C6C42861FFD12A4B35640F /* JammermanApp.swift */; };
 		47CD8C42718983435D903BB4 /* CameraPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = C62BB724F810BD730BEDA99B /* CameraPreview.swift */; };
+		488369993C27A758F8A5E3EC /* SoundFontManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD2D342CC441E7794DA51557 /* SoundFontManager.swift */; };
 		5DDF104D0B5185744F655C98 /* LoopRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FD1D5F5640DA2F5583FF502 /* LoopRecorder.swift */; };
 		5E8907EC3B761A8F3D24D576 /* AudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFC22A67B861D0C0D3E7A75D /* AudioEngine.swift */; };
 		692348B1625186E9D27D3EA1 /* SceneManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F2DFE4736F44D4E2CC9A98B /* SceneManager.swift */; };
@@ -28,6 +29,7 @@
 		950E3089208686751B040702 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7952C6405DD06507C3238E5A /* SplashView.swift */; };
 		A3502D9B826F06CBFCFCB15F /* JammermanState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52285CAB12D6522C3FC53462 /* JammermanState.swift */; };
 		B480A17FE30CF111580A2C47 /* FaceTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C23C27CB0A0F05060A0CFEE /* FaceTracker.swift */; };
+		C948A7FF3E522334B99AF611 /* MuseScore_General.sf2 in Resources */ = {isa = PBXBuildFile; fileRef = 42C9C6866FE85E8D4082E163 /* MuseScore_General.sf2 */; };
 		DB28DF3003B195FAED723574 /* VisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57943F33B859022E2441B2B /* VisualizerView.swift */; };
 		E86DD060D915E14DFA60A6D1 /* Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10631F86D4D4125290AA1567 /* Storage.swift */; };
 		F6CDAD16A5988A17A6837B94 /* TrackingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888293D9F6D5BA45BD6E3F66 /* TrackingCoordinator.swift */; };
@@ -39,6 +41,7 @@
 		10631F86D4D4125290AA1567 /* Storage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Storage.swift; sourceTree = "<group>"; };
 		1F2DFE4736F44D4E2CC9A98B /* SceneManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneManager.swift; sourceTree = "<group>"; };
 		2C218E26F294C2AE0DC8DAD4 /* PerformanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceView.swift; sourceTree = "<group>"; };
+		42C9C6866FE85E8D4082E163 /* MuseScore_General.sf2 */ = {isa = PBXFileReference; path = MuseScore_General.sf2; sourceTree = "<group>"; };
 		52285CAB12D6522C3FC53462 /* JammermanState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JammermanState.swift; sourceTree = "<group>"; };
 		595A81D709627AD351FAC005 /* FeatureExtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureExtraction.swift; sourceTree = "<group>"; };
 		632721E18A98DF36C69420B7 /* JammermanConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JammermanConfig.swift; sourceTree = "<group>"; };
@@ -51,6 +54,7 @@
 		888293D9F6D5BA45BD6E3F66 /* TrackingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingCoordinator.swift; sourceTree = "<group>"; };
 		88C6C42861FFD12A4B35640F /* JammermanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JammermanApp.swift; sourceTree = "<group>"; };
 		A5A841FB2B3C2FEE67C951ED /* GyroscopeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroscopeManager.swift; sourceTree = "<group>"; };
+		AD2D342CC441E7794DA51557 /* SoundFontManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundFontManager.swift; sourceTree = "<group>"; };
 		AEA43053DB003F240045AA7E /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
 		BB61258A32E116A9BDF327E7 /* SynthPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SynthPanelView.swift; sourceTree = "<group>"; };
 		BFFC794AEAB27CD65E320C2E /* TutorialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialView.swift; sourceTree = "<group>"; };
@@ -82,6 +86,14 @@
 				B755C1C9C748C107F0512117 /* Jammerman */,
 				83DD8DCE6DE37796E69DCB0E /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		4BC12526DF49C631A8EE25F5 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				42C9C6866FE85E8D4082E163 /* MuseScore_General.sf2 */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		4F0EC3E08828280D2E278405 /* Rendering */ = {
@@ -120,6 +132,7 @@
 				3722F0A56B8718CDDCC20E9C /* Features */,
 				EA04B4E7F259B13C41FF4072 /* Models */,
 				4F0EC3E08828280D2E278405 /* Rendering */,
+				4BC12526DF49C631A8EE25F5 /* Resources */,
 				8811018B6F0CBDD76245C467 /* Tracking */,
 				F153BEB2DFE5EE1C27745E79 /* Views */,
 			);
@@ -131,6 +144,7 @@
 			children = (
 				EFC22A67B861D0C0D3E7A75D /* AudioEngine.swift */,
 				7E0F45595AC9AB89600C9D02 /* AUv3Host.swift */,
+				AD2D342CC441E7794DA51557 /* SoundFontManager.swift */,
 			);
 			path = Audio;
 			sourceTree = "<group>";
@@ -170,6 +184,7 @@
 			buildConfigurationList = 9333C5CEFA386119FFBC2901 /* Build configuration list for PBXNativeTarget "Jammerman" */;
 			buildPhases = (
 				C7EC4FA1FC0BF3BB8319EF28 /* Sources */,
+				7926B71D44A60A0FD234F658 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -216,6 +231,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		7926B71D44A60A0FD234F658 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C948A7FF3E522334B99AF611 /* MuseScore_General.sf2 in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		C7EC4FA1FC0BF3BB8319EF28 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -240,6 +266,7 @@
 				F7906A15EC5FC4DA95C55F5C /* Presets.swift in Sources */,
 				09A1B6AE2F8E3A716FF9068D /* RecordingManager.swift in Sources */,
 				692348B1625186E9D27D3EA1 /* SceneManager.swift in Sources */,
+				488369993C27A758F8A5E3EC /* SoundFontManager.swift in Sources */,
 				950E3089208686751B040702 /* SplashView.swift in Sources */,
 				E86DD060D915E14DFA60A6D1 /* Storage.swift in Sources */,
 				7E1FA72994FBB1C68B03ECEC /* SynthPanelView.swift in Sources */,

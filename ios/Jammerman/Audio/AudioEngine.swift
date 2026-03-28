@@ -170,6 +170,11 @@ class AudioEngine: ObservableObject {
     @Published var binauralBeatHz: Float = 2.5
     @Published var binauralFollowChord = true
 
+    // SoundFont sampler
+    var soundFontManager: SoundFontManager?
+    @Published var useSoundFont = false // toggle between synth oscillators and SF2 samples
+    private var currentPadMidiNotes: [UInt8] = []
+
     // Master filter cutoff (face-driven)
     private var masterFilterFreq: Float = 10000
 
@@ -441,6 +446,10 @@ class AudioEngine: ObservableObject {
         applyChannelPans()
         applyReverbSends()
         applyDelaySends()
+
+        // Setup SoundFont samplers (optional, loads MuseScore General)
+        soundFontManager = SoundFontManager(engine: engine)
+        soundFontManager?.setupSamplers(mainMixerNode: engine.mainMixerNode, format: format)
     }
 
     private func applyChannelVolumes() {
@@ -724,8 +733,17 @@ class AudioEngine: ObservableObject {
 
     func triggerPad(notes: [String]) {
         let midiNotes = notes.compactMap { noteNameToMidi($0) }
-        print("[PAD] triggerPad: \(notes) → MIDI \(midiNotes), padMuted=\(padMuted), freqCount=\(midiNotes.count)")
         padOsc.triggerNotes(midiNotes)
+
+        // Also trigger SoundFont sampler if enabled
+        if useSoundFont, let sfm = soundFontManager {
+            // Stop previous chord
+            sfm.stopChord(currentPadMidiNotes, on: sfm.padSampler)
+            currentPadMidiNotes = midiNotes.map { UInt8($0) }
+            if !padMuted {
+                sfm.playChord(currentPadMidiNotes, velocity: 70, on: sfm.padSampler)
+            }
+        }
         // Update binaural if following chord
         if binauralFollowChord, let first = midiNotes.first {
             // Divide by 2 to keep binaural in low range (~A2 = 110Hz), matching web
