@@ -47,7 +47,8 @@ class HandTracker {
         guard wrist.confidence > 0.3, middleMCP.confidence > 0.3 else { return nil }
 
         // Hand position (center between wrist and middle MCP)
-        let handX = 1 - Float((wrist.location.x + middleMCP.location.x) / 2) // mirrored
+        // Camera preview already mirrors — no extra flip needed
+        let handX = Float((wrist.location.x + middleMCP.location.x) / 2)
         let handY = Float((wrist.location.y + middleMCP.location.y) / 2)
 
         // Palm size

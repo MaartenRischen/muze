@@ -169,11 +169,12 @@ class VisualizerUIView: UIView {
         geoPhase += 0.003
 
         // Face position from tracking (normalized 0..1 -> screen coords)
+        // Fast tracking (0.5 alpha) so visuals follow face tightly
         if state.faceDetected {
             let targetX = CGFloat(state.faceCenterX) * w
             let targetY = CGFloat(state.faceCenterY) * h
-            faceCx += (targetX - faceCx) * 0.2
-            faceCy += (targetY - faceCy) * 0.2
+            faceCx += (targetX - faceCx) * 0.5
+            faceCy += (targetY - faceCy) * 0.5
         } else if faceCx == 0 {
             faceCx = w / 2
             faceCy = h * 0.35
