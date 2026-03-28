@@ -257,17 +257,30 @@ class ARKitTracker: NSObject {
         )
     }
     // Vision face detection on ARFrame for precise contour landmarks
+    private var isDetectingVisionFace = false
+    private let visionQueue = DispatchQueue(label: "com.jammerman.visionface", qos: .userInitiated)
+
     private func detectVisionFace(in frame: ARFrame) {
+        guard !isDetectingVisionFace else { return }
+        isDetectingVisionFace = true
+
+        // Copy pixel buffer to avoid retaining ARFrame
         let pixelBuffer = frame.capturedImage
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right)
-        let faceRequest = VNDetectFaceLandmarksRequest()
-        try? handler.perform([faceRequest])
 
-        guard let faceObs = faceRequest.results?.first,
-              let landmarks = faceObs.landmarks else { return }
+        visionQueue.async { [weak self] in
+            guard let self else { return }
+            defer { self.isDetectingVisionFace = false }
 
-        let bb = faceObs.boundingBox
-        delegate?.arKitTracker(self, didUpdateVisionLandmarks: landmarks, boundingBox: bb)
+            let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right)
+            let faceRequest = VNDetectFaceLandmarksRequest()
+            try? handler.perform([faceRequest])
+
+            guard let faceObs = faceRequest.results?.first,
+                  let landmarks = faceObs.landmarks else { return }
+
+            let bb = faceObs.boundingBox
+            self.delegate?.arKitTracker(self, didUpdateVisionLandmarks: landmarks, boundingBox: bb)
+        }
     }
     #endif
 
