@@ -625,11 +625,7 @@ class AudioEngine: ObservableObject {
 
     func triggerPad(notes: [String]) {
         let midiNotes = notes.compactMap { noteNameToMidi($0) }
-        if midiNotes.isEmpty {
-            print("[PAD] triggerPad called with EMPTY notes from: \(notes)")
-        } else {
-            print("[PAD] triggerPad: \(notes) → MIDI \(midiNotes), padMuted=\(padMuted)")
-        }
+        print("[PAD] triggerPad: \(notes) → MIDI \(midiNotes), padMuted=\(padMuted), freqCount=\(midiNotes.count)")
         padOsc.triggerNotes(midiNotes)
         // Update binaural if following chord
         if binauralFollowChord, let first = midiNotes.first {
@@ -673,8 +669,13 @@ class AudioEngine: ObservableObject {
         }
     }
 
+    private var arpDebugCount = 0
     private func advanceArp() {
-        guard !arpNotes.isEmpty, !arpMuted else { return }
+        guard !arpNotes.isEmpty, !arpMuted else {
+            arpDebugCount += 1
+            if arpDebugCount % 100 == 1 { print("[ARP1] skip: notes=\(arpNotes.count), muted=\(arpMuted)") }
+            return
+        }
         let note = getNextArpNote(notes: arpNotes, index: &arpIndex, direction: &arpDirection, pattern: arpPattern)
         arpOsc.triggerNote(note)
     }
@@ -862,6 +863,7 @@ class AudioEngine: ObservableObject {
         case "binaural": binauralActive.toggle()
         default: break
         }
+        print("[TOGGLE] \(channel) → muted=\(isMuted(channel))")
     }
 
     func isMuted(_ channel: String) -> Bool {
