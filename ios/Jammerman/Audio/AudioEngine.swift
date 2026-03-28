@@ -939,7 +939,21 @@ class AudioEngine: ObservableObject {
     }
 }
 
-// MARK: - Waveform Helper
+// MARK: - PolyBLEP Anti-Aliased Waveforms
+// Eliminates digital harshness from naive waveforms
+
+@inline(__always)
+func polyBLEP(_ t: Double, _ dt: Double) -> Double {
+    // t = phase (0..1), dt = freq/sampleRate (phase increment)
+    if t < dt {
+        let x = t / dt
+        return x + x - x * x - 1.0
+    } else if t > 1.0 - dt {
+        let x = (t - 1.0) / dt
+        return x * x + x + x + 1.0
+    }
+    return 0
+}
 
 func waveformSample(phase: Double, type: WaveformType) -> Double {
     switch type {
@@ -955,11 +969,54 @@ func waveformSample(phase: Double, type: WaveformType) -> Double {
     }
 }
 
+// Band-limited sawtooth (polyBLEP)
+@inline(__always)
+func sawBLEP(phase: Double, dt: Double) -> Double {
+    var saw = 2.0 * phase - 1.0
+    saw -= polyBLEP(phase, dt)
+    return saw
+}
+
+// Band-limited square (polyBLEP)
+@inline(__always)
+func squareBLEP(phase: Double, dt: Double) -> Double {
+    var sq = phase < 0.5 ? 1.0 : -1.0
+    sq += polyBLEP(phase, dt)
+    sq -= polyBLEP(fmod(phase + 0.5, 1.0), dt)
+    return sq
+}
+
+// Resonant 2-pole State Variable Filter (SVF)
+struct SVFilter {
+    var low: Double = 0
+    var band: Double = 0
+    var high: Double = 0
+    var notch: Double = 0
+
+    mutating func process(_ input: Double, cutoff: Double, resonance: Double, sampleRate: Double) -> Double {
+        let f = 2.0 * sin(.pi * min(cutoff, sampleRate * 0.45) / sampleRate)
+        let q = max(0.5, 1.0 - resonance)
+        high = input - low - q * band
+        band += f * high
+        low += f * band
+        notch = high + low
+        return low
+    }
+}
+
+// Soft clipper for analog warmth
+@inline(__always)
+func softClip(_ x: Double, drive: Double = 1.0) -> Double {
+    let d = x * drive
+    return d / (1.0 + abs(d))
+}
+
 // MARK: - Pad Oscillator (FM + Sub)
 
 class PadOscillator {
     private var phases: [Double] = []
     private var subPhases: [Double] = []
+    private var detunePhases: [Double] = [] // stereo detune layer
     private var frequencies: [Double] = []
     private var envelope: Double = 0
     private var targetEnvelope: Double = 0
@@ -968,12 +1025,16 @@ class PadOscillator {
     var harmonicity: Double = 1.5
     var modulationIndex: Double = 2.5
     var waveformType: WaveformType = .sine
+    // Chorus LFO
+    private var chorusPhase: Double = 0
+    private let chorusRate: Double = 1.2
+    private let chorusDepth: Double = 0.003 // ±3ms detune
 
     func triggerNotes(_ midiNotes: [Int]) {
         let newFreqs = midiNotes.map { 440.0 * pow(2.0, Double($0 - 69) / 12.0) }
-        // Ensure phases arrays are large enough
         while phases.count < newFreqs.count { phases.append(Double.random(in: 0...1)) }
         while subPhases.count < newFreqs.count { subPhases.append(0) }
+        while detunePhases.count < newFreqs.count { detunePhases.append(Double.random(in: 0...1)) }
         frequencies = newFreqs
         targetEnvelope = 1.0
     }
@@ -985,7 +1046,6 @@ class PadOscillator {
         let L = abl[0].mData!.assumingMemoryBound(to: Float.self)
         let R = abl[1].mData!.assumingMemoryBound(to: Float.self)
 
-        // Capture current state for this render pass
         let freqs = frequencies
         let numFreqs = min(freqs.count, phases.count)
 
@@ -993,24 +1053,36 @@ class PadOscillator {
             if envelope < targetEnvelope { envelope = min(envelope + attackRate, targetEnvelope) }
             else { envelope = max(envelope - releaseRate, targetEnvelope) }
 
+            // Chorus LFO for stereo width
+            chorusPhase += chorusRate / sampleRate
+            if chorusPhase > 1 { chorusPhase -= 1 }
+            let chorusMod = sin(chorusPhase * 2.0 * .pi) * chorusDepth
+
             var sampleL: Float = 0, sampleR: Float = 0
             if !muted && envelope > 0.001 && numFreqs > 0 {
                 for i in 0..<numFreqs {
                     let freq = freqs[i]
-                    // FM synthesis with selectable carrier waveform
+                    let dt = freq / sampleRate
+                    // FM synthesis
                     let modSignal = sin(phases[i] * harmonicity * 2.0 * .pi) * modulationIndex
                     let carrier = waveformSample(phase: phases[i] + modSignal / (2.0 * .pi), type: waveformType)
-                    // Sub oscillator (one octave down)
-                    let sub = sin(subPhases[i] * 2.0 * .pi) * 0.4
-                    // Slight stereo spread via detuning
-                    let spread = sin(phases[i] * 1.003 * 2.0 * .pi) * 0.05
-                    let amp = Float(envelope) * 0.12
-                    sampleL += Float(carrier + sub - spread) * amp
-                    sampleR += Float(carrier + sub + spread) * amp
-                    phases[i] += freq / sampleRate
-                    subPhases[i] += (freq * 0.5) / sampleRate
+                    // Sub oscillator (one octave down, pure sine)
+                    let sub = sin(subPhases[i] * 2.0 * .pi) * 0.45
+                    // Detuned layer for stereo (±5 cents + chorus)
+                    let detuneL = sin(detunePhases[i] * 0.997 * 2.0 * .pi) * 0.3
+                    let detuneR = sin(detunePhases[i] * 1.003 * 2.0 * .pi) * 0.3
+
+                    let dry = carrier + sub
+                    let amp = Float(softClip(envelope * 0.8, drive: 1.2)) * 0.12
+                    sampleL += Float(dry + detuneL * (1.0 + chorusMod)) * amp
+                    sampleR += Float(dry + detuneR * (1.0 - chorusMod)) * amp
+
+                    phases[i] += dt
+                    subPhases[i] += dt * 0.5
+                    detunePhases[i] += dt
                     if phases[i] > 1 { phases[i] -= 1 }
                     if subPhases[i] > 1 { subPhases[i] -= 1 }
+                    if detunePhases[i] > 1 { detunePhases[i] -= 1 }
                 }
             }
             L[frame] = sampleL; R[frame] = sampleR
@@ -1026,24 +1098,21 @@ class ArpOscillator {
     private var frequency: Double = 440
     private var envelope: Double = 0
     private var filterEnv: Double = 0
-    // Exposed ADSR params
     var attack: Float = 0.005
     var decay: Float = 0.25
     var sustain: Float = 0.15
     var releaseTime: Float = 0.25
     var attackTime: Double = 0.005
     var decayTime: Double = 0.25
-    private var envStage: Int = 0 // 0=off, 1=attack, 2=decay, 3=sustain, 4=release
-    // Simple 1-pole lowpass state
-    private var lpState: Float = 0
-    private var lpCutoff: Float = 0.3
+    private var envStage: Int = 0
+    private var svf = SVFilter()
     var waveformType: WaveformType = .sawtooth
 
     func triggerNote(_ midi: Int) {
         frequency = 440.0 * pow(2.0, Double(midi - 69) / 12.0)
         envelope = 1.0
         filterEnv = 1.0
-        envStage = 2 // skip to decay for pluck character
+        envStage = 2
     }
 
     func render(frameCount: UInt32, bufferList: UnsafeMutablePointer<AudioBufferList>, sampleRate: Double, muted: Bool) -> OSStatus {
@@ -1053,21 +1122,30 @@ class ArpOscillator {
 
         let decayRate = 1.0 - 1.0 / (Double(decay) * sampleRate + 1)
         let filterDecayRate = 1.0 - 1.0 / (Double(decay) * sampleRate * 0.8 + 1)
+        let dt = frequency / sampleRate
 
         for frame in 0..<Int(frameCount) {
             envelope *= decayRate
-            if envelope < Double(sustain) { envelope = Double(sustain) * envelope / max(Double(sustain), 0.001) }
+            let sustainLevel = Double(sustain)
+            if envelope < sustainLevel * 0.5 { envelope *= 0.999 } // slow sustain tail
             filterEnv *= filterDecayRate
 
             var sample: Float = 0
             if !muted && envelope > 0.001 {
-                let raw = Float(waveformSample(phase: phase, type: waveformType))
-                // 1-pole lowpass filter
-                lpCutoff = Float(0.05 + filterEnv * 0.45)
-                lpState += lpCutoff * (raw - lpState)
-                sample = lpState * Float(envelope) * 0.3
+                // Band-limited oscillator
+                let raw: Double
+                switch waveformType {
+                case .sawtooth: raw = sawBLEP(phase: phase, dt: dt)
+                case .square: raw = squareBLEP(phase: phase, dt: dt)
+                default: raw = waveformSample(phase: phase, type: waveformType)
+                }
 
-                phase += frequency / sampleRate
+                // Resonant SVF filter with envelope
+                let cutoff = 200.0 + filterEnv * 4800.0 // 200-5000Hz sweep
+                let filtered = svf.process(raw, cutoff: cutoff, resonance: 0.3, sampleRate: sampleRate)
+                sample = Float(softClip(filtered * envelope, drive: 1.1)) * 0.3
+
+                phase += dt
                 if phase > 1.0 { phase -= 1.0 }
             }
             L[frame] = sample; R[frame] = sample
@@ -1096,7 +1174,7 @@ class MelodyOscillator {
     var releaseTime: Float = 0.40
     // Filter
     private var filterEnv: Double = 0
-    private var lpState: Float = 0
+    private var svf = SVFilter()
     var waveformType: WaveformType = .sawtooth
 
     func triggerNote(_ midi: Int) {
@@ -1130,18 +1208,25 @@ class MelodyOscillator {
 
             var sample: Float = 0
             if !muted && envelope > 0.001 {
-                // Vibrato
                 vibratoPhase += vibratoRate / sampleRate
                 let vibrato = 1.0 + sin(vibratoPhase * 2.0 * .pi) * vibDepth
                 let freq = frequency * vibrato
+                let dt = freq / sampleRate
 
-                let raw = Float(waveformSample(phase: phase, type: waveformType))
-                // Filter
-                let cutoff = Float(0.1 + filterEnv * 0.4)
-                lpState += cutoff * (raw - lpState)
-                sample = lpState * Float(envelope) * 0.35
+                // Band-limited oscillator
+                let raw: Double
+                switch waveformType {
+                case .sawtooth: raw = sawBLEP(phase: phase, dt: dt)
+                case .square: raw = squareBLEP(phase: phase, dt: dt)
+                default: raw = waveformSample(phase: phase, type: waveformType)
+                }
 
-                phase += freq / sampleRate
+                // Resonant SVF filter with envelope
+                let cutoff = 300.0 + filterEnv * 5000.0
+                let filtered = svf.process(raw, cutoff: cutoff, resonance: 0.25, sampleRate: sampleRate)
+                sample = Float(softClip(filtered * envelope, drive: 1.0)) * 0.35
+
+                phase += dt
                 if phase > 1.0 { phase -= 1.0 }
             }
             L[frame] = sample; R[frame] = sample
@@ -1156,16 +1241,22 @@ class DrumOscillator {
     enum DrumType { case kick, snare, hat }
     let type: DrumType
     private var phase: Double = 0
+    private var phase2: Double = 0 // second oscillator for metallic hat
     private var envelope: Double = 0
+    private var clickEnv: Double = 0 // transient click layer
     private var pitchEnv: Double = 0
     private var noiseState: UInt32 = 12345
+    private var hpState: Double = 0 // highpass for hat
+    private var prevSample: Double = 0
 
     init(type: DrumType) { self.type = type }
 
     func trigger(velocity: Float = 0.8) {
         envelope = Double(velocity)
+        clickEnv = Double(velocity) * 1.2
         pitchEnv = 1.0
         phase = 0
+        phase2 = 0
     }
 
     func render(frameCount: UInt32, bufferList: UnsafeMutablePointer<AudioBufferList>, sampleRate: Double, muted: Bool) -> OSStatus {
@@ -1178,24 +1269,50 @@ class DrumOscillator {
             if !muted && envelope > 0.001 {
                 switch type {
                 case .kick:
-                    let freq = 50.0 + pitchEnv * 120.0
-                    sample = Float(sin(phase * 2.0 * .pi) * envelope) * 0.7
+                    // Body: sine with pitch sweep 150→45Hz
+                    let freq = 45.0 + pitchEnv * 105.0
+                    let body = sin(phase * 2.0 * .pi) * envelope
+                    // Sub thump: pure low sine
+                    let sub = sin(phase * 0.5 * 2.0 * .pi) * envelope * 0.5
+                    // Click transient: short noise burst
+                    let click = Double(nextNoise()) * clickEnv * 0.4
+                    sample = Float(softClip(body + sub + click, drive: 1.3)) * 0.65
                     phase += freq / sampleRate
                     if phase > 1.0 { phase -= 1.0 }
-                    envelope *= 0.9992
-                    pitchEnv *= 0.996
+                    envelope *= 0.9991
+                    pitchEnv *= 0.995
+                    clickEnv *= 0.97 // click dies fast
+
                 case .snare:
-                    let noise = nextNoise()
-                    let tone = Float(sin(phase * 2.0 * .pi) * min(envelope * 2, 1)) * 0.25
+                    // Noise through bandpass
+                    let noise = Double(nextNoise())
+                    // Tonal body (~180Hz)
+                    let body = sin(phase * 2.0 * .pi) * min(envelope * 2, 1) * 0.3
                     phase += 180.0 / sampleRate
                     if phase > 1.0 { phase -= 1.0 }
-                    sample = (noise * Float(envelope) * 0.35 + tone) * 0.55
-                    envelope *= 0.9982
+                    // Click snap
+                    let snap = Double(nextNoise()) * clickEnv * 0.3
+                    // Mix: noise dominant, body for punch, snap for attack
+                    sample = Float(softClip((noise * envelope * 0.35 + body + snap) * 0.6, drive: 1.1))
+                    envelope *= 0.9980
+                    clickEnv *= 0.96
+
                 case .hat:
-                    let noise = nextNoise()
-                    // Simulate highpass via differentiation
-                    sample = noise * Float(envelope) * 0.22
-                    envelope *= 0.9975
+                    // Metallic: two detuned square waves for ring
+                    let sq1 = phase < 0.5 ? 1.0 : -1.0
+                    let sq2 = phase2 < 0.5 ? 1.0 : -1.0
+                    let metallic = (sq1 + sq2 * 0.7) * 0.15
+                    // Noise through highpass
+                    let noise = Double(nextNoise())
+                    let hp = noise - prevSample
+                    prevSample = noise * 0.95
+                    // Mix
+                    sample = Float((hp * 0.5 + metallic) * envelope) * 0.25
+                    phase += 587.0 / sampleRate // inharmonic freq 1
+                    phase2 += 843.0 / sampleRate // inharmonic freq 2
+                    if phase > 1.0 { phase -= 1.0 }
+                    if phase2 > 1.0 { phase2 -= 1.0 }
+                    envelope *= 0.9970
                 }
             }
             L[frame] = sample; R[frame] = sample
