@@ -279,13 +279,13 @@ class VisualizerUIView: UIView {
         var groups = ContourGroups()
 
         // Vision normalized points are relative to bounding box, with Y bottom-up
-        // Convert to screen coordinates: x = bb.x + pt.x * bb.w (then mirror), y = 1 - (bb.y + pt.y * bb.h)
+        // Camera preview already mirrors X, so don't mirror again here
         func toScreen(_ points: [CGPoint]) -> [CGPoint] {
             points.map { pt in
                 let nx = bb.origin.x + pt.x * bb.width
                 let ny = bb.origin.y + pt.y * bb.height
-                // Mirror X (front camera) and flip Y to top-left origin
-                return CGPoint(x: (1 - nx) * w, y: (1 - ny) * h)
+                // No X mirror (camera preview handles it), flip Y to top-left origin
+                return CGPoint(x: nx * w, y: (1 - ny) * h)
             }
         }
 
