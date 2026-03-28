@@ -55,13 +55,14 @@ enum JammermanStorage {
     }
 
     static func load(state: JammermanState, engine: AudioEngine) {
-        // Remove stale data that causes issues
+        // Clear ALL stale storage from any version
         UserDefaults.standard.removeObject(forKey: "jammerman-settings-v1")
-        // Also clear v2 on first run to prevent bad state from dev builds
-        // TODO: remove this line once app is stable
-        if UserDefaults.standard.bool(forKey: "jammerman-v2-clean") == false {
+        UserDefaults.standard.removeObject(forKey: "jammerman-settings-v3")
+        // Force fresh start every time version changes
+        let ver = "v3.3.0"
+        if UserDefaults.standard.string(forKey: "jammerman-ver") != ver {
             UserDefaults.standard.removeObject(forKey: key)
-            UserDefaults.standard.set(true, forKey: "jammerman-v2-clean")
+            UserDefaults.standard.set(ver, forKey: "jammerman-ver")
             return
         }
         guard let dict = UserDefaults.standard.dictionary(forKey: key) as? [String: String] else { return }

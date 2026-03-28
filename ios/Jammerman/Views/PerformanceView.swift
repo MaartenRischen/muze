@@ -82,9 +82,19 @@ struct PerformanceView: View {
                 }
             }
 
-            // === CHORD BAR (bottom) ===
+            // === VERSION + CHORD BAR (bottom) ===
             VStack {
                 Spacer()
+                HStack {
+                    Text("v3.3.0")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.red.opacity(0.8))
+                    Spacer()
+                    Circle()
+                        .fill(coordinator.state.faceDetected ? .green : .red.opacity(0.5))
+                        .frame(width: 6, height: 6)
+                }
+                .padding(.horizontal, 12)
                 chordBar
             }
 
