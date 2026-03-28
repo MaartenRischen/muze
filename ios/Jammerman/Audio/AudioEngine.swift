@@ -328,28 +328,19 @@ class AudioEngine: ObservableObject {
             padReverbSendMixer, arpReverbSendMixer, arp2ReverbSendMixer, melodyReverbSendMixer,
             arpDelaySendMixer, arp2DelaySendMixer
         ]
-        for eq in channelEQs.values { allNodes.append(eq) }
+        // EQs bypassed for debugging — don't attach them
+        // for eq in channelEQs.values { allNodes.append(eq) }
         for node in allNodes { engine.attach(node) }
 
-        // Wire: synths → channel EQs → channel mixers
-        let sourceToMixer: [(AVAudioSourceNode, String, AVAudioMixerNode)] = [
-            (padNode, "pad", padMixer),
-            (arpNode, "arp", arpMixer),
-            (arp2Node, "arp2", arp2Mixer),
-            (melodyNode, "melody", melodyMixer),
-            (kickNode, "kick", kickMixer),
-            (snareNode, "snare", snareMixer),
-            (hatNode, "hat", hatMixer),
-            (binauralNode, "binaural", binauralMixer),
-        ]
-        for (src, name, mixer) in sourceToMixer {
-            if let eq = channelEQs[name] {
-                engine.connect(src, to: eq, format: format)
-                engine.connect(eq, to: mixer, format: format)
-            } else {
-                engine.connect(src, to: mixer, format: format)
-            }
-        }
+        // Wire: synths → channel mixers (bypass EQ for now — debugging audio graph)
+        engine.connect(padNode, to: padMixer, format: format)
+        engine.connect(arpNode, to: arpMixer, format: format)
+        engine.connect(arp2Node, to: arp2Mixer, format: format)
+        engine.connect(melodyNode, to: melodyMixer, format: format)
+        engine.connect(kickNode, to: kickMixer, format: format)
+        engine.connect(snareNode, to: snareMixer, format: format)
+        engine.connect(hatNode, to: hatMixer, format: format)
+        engine.connect(binauralNode, to: binauralMixer, format: format)
 
         // Riser has no per-channel EQ
         engine.connect(riserNode, to: riserMixer, format: format)
