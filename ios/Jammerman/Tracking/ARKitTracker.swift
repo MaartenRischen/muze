@@ -52,7 +52,10 @@ class ARKitTracker: NSObject {
     private var visionFrameCount = 0
     #endif
 
-    // No frame retention — use arSession?.currentFrame when needed
+    // Cached camera for face projection (updated each frame, avoids accessing currentFrame)
+    #if !targetEnvironment(simulator)
+    private var cachedCamera: ARCamera?
+    #endif
 
     /// Whether ARKit face tracking is available on this device
     static var isSupported: Bool {
@@ -152,13 +155,21 @@ class ARKitTracker: NSObject {
         // Roll: rotation around Z axis — atan2 of column 0 and 1 Y components
         let roll = atan2(transform.columns.0.y, transform.columns.1.y)
 
-        // Face center: estimate from anchor transform without accessing currentFrame
-        // (accessing arSession.currentFrame retains the ARFrame, causing retention warnings)
-        // Use yaw to estimate horizontal position: yaw ~= -0.5..0.5 for normal head turns
-        // Center at 0.5, shift based on yaw (negative yaw = face turned right = moves left in selfie)
-        let faceCenterX = 0.5 + Float(yaw) * 0.4
-        // Vertical: pitch affects Y, slight offset for typical phone angle
-        let faceCenterY = 0.38 - Float(pitch) * 0.2
+        // Face center: project 3D nose position to screen using cached camera
+        // (cachedCamera is updated each frame in didUpdate, avoids accessing currentFrame)
+        var faceCenterX: Float = 0.5
+        var faceCenterY: Float = 0.4
+        if let camera = cachedCamera {
+            let worldPos = simd_float3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+            let screenSize = UIScreen.main.bounds.size
+            let projected = camera.projectPoint(
+                worldPos,
+                orientation: .portrait,
+                viewportSize: screenSize
+            )
+            faceCenterX = Float(projected.x / screenSize.width)
+            faceCenterY = Float(projected.y / screenSize.height)
+        }
 
         return FaceFeatures(
             mouthOpenness: mouthOpenness,
@@ -359,8 +370,10 @@ class ARKitTracker: NSObject {
 #if !targetEnvironment(simulator)
 extension ARKitTracker: ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        // Autoreleasepool ensures all Obj-C temporaries from ARFrame are released immediately
         autoreleasepool {
+            // Cache camera for face projection (lightweight value, no ARFrame retention)
+            cachedCamera = frame.camera
+
             // Hand detection — runs async with copied pixel buffer
             detectHand(in: frame)
 
@@ -369,7 +382,6 @@ extension ARKitTracker: ARSessionDelegate {
                 delegate?.arKitTracker(self, didUpdateSegmentation: segBuffer)
             }
         }
-        // frame reference released here — no ARFrame data escapes this scope
     }
 
     func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
