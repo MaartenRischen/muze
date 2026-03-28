@@ -32,8 +32,8 @@ struct PerformanceView: View {
                 .ignoresSafeArea()
             #endif
 
-            // === VISUALIZER OVERLAY ===
-            VisualizerOverlay(coordinator: coordinator)
+            // === VISUALIZER OVERLAY (Metal GPU-accelerated) ===
+            MetalVisualizerOverlay(coordinator: coordinator)
                 .ignoresSafeArea()
 
             // === TOP BAR ===

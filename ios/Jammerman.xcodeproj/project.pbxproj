@@ -36,6 +36,9 @@
 		A3502D9B826F06CBFCFCB15F /* JammermanState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52285CAB12D6522C3FC53462 /* JammermanState.swift */; };
 		A67EA5C0A84863AAC9B132B3 /* ARKitTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F104910897B2D0178A341578 /* ARKitTracker.swift */; };
 		B480A17FE30CF111580A2C47 /* FaceTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C23C27CB0A0F05060A0CFEE /* FaceTracker.swift */; };
+		5BC1D837D0F485B974F78D67 /* MetalVisualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69147CED8FD1D6BF4719C155 /* MetalVisualizer.swift */; };
+		DEACECB9626587FA34612E47 /* MetalVisualizerOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 980238EAD327DF27EFEBF741 /* MetalVisualizerOverlay.swift */; };
+		E56F17BD4CAE04EFE37AC55C /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = B4A92B54933DADD649BA6EF2 /* Shaders.metal */; };
 		DB28DF3003B195FAED723574 /* VisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57943F33B859022E2441B2B /* VisualizerView.swift */; };
 		E86DD060D915E14DFA60A6D1 /* Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10631F86D4D4125290AA1567 /* Storage.swift */; };
 		F6CDAD16A5988A17A6837B94 /* TrackingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888293D9F6D5BA45BD6E3F66 /* TrackingCoordinator.swift */; };
@@ -75,6 +78,9 @@
 		EB014D19AD3CE4C128FD5F6A /* ARKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ARKit.framework; path = System/Library/Frameworks/ARKit.framework; sourceTree = SDKROOT; };
 		EFC22A67B861D0C0D3E7A75D /* AudioEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEngine.swift; sourceTree = "<group>"; };
 		F104910897B2D0178A341578 /* ARKitTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARKitTracker.swift; sourceTree = "<group>"; };
+		69147CED8FD1D6BF4719C155 /* MetalVisualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalVisualizer.swift; sourceTree = "<group>"; };
+		980238EAD327DF27EFEBF741 /* MetalVisualizerOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalVisualizerOverlay.swift; sourceTree = "<group>"; };
+		B4A92B54933DADD649BA6EF2 /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
 		F57943F33B859022E2441B2B /* VisualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualizerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -115,6 +121,9 @@
 		4F0EC3E08828280D2E278405 /* Rendering */ = {
 			isa = PBXGroup;
 			children = (
+				69147CED8FD1D6BF4719C155 /* MetalVisualizer.swift */,
+				980238EAD327DF27EFEBF741 /* MetalVisualizerOverlay.swift */,
+				B4A92B54933DADD649BA6EF2 /* Shaders.metal */,
 				F57943F33B859022E2441B2B /* VisualizerView.swift */,
 			);
 			path = Rendering;
@@ -312,6 +321,9 @@
 				EBF77AFF631250FDE4EE9045 /* InstrumentDetailView.swift in Sources */,
 				F6CDAD16A5988A17A6837B94 /* TrackingCoordinator.swift in Sources */,
 				0ECA988981E3647DF27370C0 /* TutorialView.swift in Sources */,
+				5BC1D837D0F485B974F78D67 /* MetalVisualizer.swift in Sources */,
+				DEACECB9626587FA34612E47 /* MetalVisualizerOverlay.swift in Sources */,
+				E56F17BD4CAE04EFE37AC55C /* Shaders.metal in Sources */,
 				DB28DF3003B195FAED723574 /* VisualizerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
