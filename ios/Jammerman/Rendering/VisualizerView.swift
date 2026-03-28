@@ -291,57 +291,45 @@ class VisualizerUIView: UIView {
             return CGPoint(x: px, y: py)
         }
 
-        // Draw wireframe triangles with neon glow
-        let alpha = 0.15 + energy * 0.15
-        let color = UIColor(red: accentR, green: accentG, blue: accentB, alpha: alpha)
-        ctx.setStrokeColor(color.cgColor)
-        ctx.setLineWidth(0.5)
-
-        // Draw every 3rd triangle to keep it lightweight (1220 vertices = ~2300 triangles)
+        // Draw wireframe — batch ALL lines into single path per pass
         let triCount = indices.count / 3
-        for t in stride(from: 0, to: triCount, by: 3) {
+
+        // PASS 1: Wide glow (single batched path)
+        ctx.saveGState()
+        ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0.08 + energy * 0.05).cgColor)
+        ctx.setLineWidth(4.0)
+        ctx.setLineCap(.round)
+        ctx.beginPath()
+        for t in stride(from: 0, to: triCount, by: 6) {
             let i0 = Int(indices[t * 3])
             let i1 = Int(indices[t * 3 + 1])
             let i2 = Int(indices[t * 3 + 2])
-
             guard i0 < projected.count, i1 < projected.count, i2 < projected.count else { continue }
-
-            let p0 = projected[i0]
-            let p1 = projected[i1]
-            let p2 = projected[i2]
-
-            ctx.beginPath()
-            ctx.move(to: p0)
-            ctx.addLine(to: p1)
-            ctx.addLine(to: p2)
-            ctx.closePath()
-            ctx.strokePath()
+            ctx.move(to: projected[i0])
+            ctx.addLine(to: projected[i1])
+            ctx.addLine(to: projected[i2])
+            ctx.addLine(to: projected[i0])
         }
+        ctx.strokePath()
+        ctx.restoreGState()
 
-        // Outer glow pass (wider, dimmer) for neon effect
-        let glowAlpha = 0.06 + energy * 0.06
-        let glowColor = UIColor(red: accentR, green: accentG, blue: accentB, alpha: glowAlpha)
-        ctx.setStrokeColor(glowColor.cgColor)
-        ctx.setLineWidth(2.0)
-
-        for t in stride(from: 0, to: triCount, by: 9) {
+        // PASS 2: Core lines (brighter, thinner, single batched path)
+        ctx.saveGState()
+        ctx.setStrokeColor(UIColor(red: accentR, green: accentG, blue: accentB, alpha: 0.25 + energy * 0.2).cgColor)
+        ctx.setLineWidth(1.2)
+        ctx.beginPath()
+        for t in stride(from: 0, to: triCount, by: 6) {
             let i0 = Int(indices[t * 3])
             let i1 = Int(indices[t * 3 + 1])
             let i2 = Int(indices[t * 3 + 2])
-
             guard i0 < projected.count, i1 < projected.count, i2 < projected.count else { continue }
-
-            let p0 = projected[i0]
-            let p1 = projected[i1]
-            let p2 = projected[i2]
-
-            ctx.beginPath()
-            ctx.move(to: p0)
-            ctx.addLine(to: p1)
-            ctx.addLine(to: p2)
-            ctx.closePath()
-            ctx.strokePath()
+            ctx.move(to: projected[i0])
+            ctx.addLine(to: projected[i1])
+            ctx.addLine(to: projected[i2])
+            ctx.addLine(to: projected[i0])
         }
+        ctx.strokePath()
+        ctx.restoreGState()
     }
 
     // MARK: - Face Contour Extraction (Vision landmarks -> screen points)
