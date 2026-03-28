@@ -119,6 +119,12 @@ class AudioEngine: ObservableObject {
 
     // Chord auto-advance
     @Published var chordAutoAdvance = false
+
+    // Sample-accurate clock
+    private var globalSampleCount: UInt64 = 0
+    private var lastArpStep: Int = -1
+    private var lastArp2Step: Int = -1
+    private var lastDrumStep: Int = -1
     private var chordAdvanceTimer: Timer?
     private var chordAdvanceStep = 0
 
@@ -209,9 +215,68 @@ class AudioEngine: ObservableObject {
             guard let self else { return noErr }
             return self.melodyOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.melodyMuted)
         }
+        // Kick is the MASTER CLOCK — triggers all sequenced events at sample-accurate timing
         kickNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
-            return self.kickOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.beatMuted)
+
+            // Advance clock and trigger sequenced events per-sample
+            let sr = self.sampleRate
+            let currentBpm = self.bpm
+            let samplesPerBeat = sr * 60.0 / currentBpm
+            let samplesPerSixteenth = samplesPerBeat / 4.0
+
+            for i in 0..<Int(frameCount) {
+                let pos = self.globalSampleCount + UInt64(i)
+                let sixteenthStep = Int(Double(pos) / samplesPerSixteenth) % 16
+
+                // Drum sequencer — on new 16th note step
+                if sixteenthStep != self.lastDrumStep {
+                    self.lastDrumStep = sixteenthStep
+                    if !self.beatMuted && self.drumPattern.count >= 3 {
+                        let step = sixteenthStep % self.drumPattern[0].count
+                        if self.drumPattern[0][step] == 1 {
+                            let vel = self.drumVelocity.count > 0 && step < self.drumVelocity[0].count ? self.drumVelocity[0][step] : 0.8
+                            self.kickOsc.trigger(velocity: vel)
+                        }
+                        if self.drumPattern[1][step] == 1 {
+                            let vel = self.drumVelocity.count > 1 && step < self.drumVelocity[1].count ? self.drumVelocity[1][step] : 0.7
+                            self.snareOsc.trigger(velocity: vel)
+                        }
+                        if self.drumPattern[2][step] == 1 {
+                            let vel = self.drumVelocity.count > 2 && step < self.drumVelocity[2].count ? self.drumVelocity[2][step] : 0.5
+                            self.hatOsc.trigger(velocity: vel)
+                        }
+                        DispatchQueue.main.async { self.drumStep = sixteenthStep }
+                    }
+                }
+
+                // Arp 1 sequencer
+                let arpDivisor = self.noteValueDivisor(self.arpNoteValue)
+                let samplesPerArpStep = samplesPerBeat / Double(arpDivisor)
+                let arpStep = Int(Double(pos) / samplesPerArpStep)
+                if arpStep != self.lastArpStep {
+                    self.lastArpStep = arpStep
+                    if !self.arpNotes.isEmpty && !self.arpMuted {
+                        let note = self.getNextArpNote(notes: self.arpNotes, index: &self.arpIndex, direction: &self.arpDirection, pattern: self.arpPattern)
+                        self.arpOsc.triggerNote(note)
+                    }
+                }
+
+                // Arp 2 sequencer
+                let arp2Divisor = self.noteValueDivisor(self.arp2NoteValue)
+                let samplesPerArp2Step = samplesPerBeat / Double(arp2Divisor)
+                let arp2Step = Int(Double(pos) / samplesPerArp2Step)
+                if arp2Step != self.lastArp2Step {
+                    self.lastArp2Step = arp2Step
+                    if !self.arp2Notes.isEmpty && !self.arp2Muted {
+                        let note = self.getNextArpNote(notes: self.arp2Notes, index: &self.arp2Index, direction: &self.arp2Direction, pattern: self.arp2Pattern)
+                        self.arp2Osc.triggerNote(note)
+                    }
+                }
+            }
+            self.globalSampleCount += UInt64(frameCount)
+
+            return self.kickOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: sr, muted: self.beatMuted)
         }
         snareNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
@@ -394,22 +459,32 @@ class AudioEngine: ObservableObject {
         do {
             try engine.start()
             isPlaying = true
-            startArpSequencer()
-            startArp2Sequencer()
-            startDrumSequencer()
+            // Arp/drum sequencing now handled in kick render callback (sample-accurate)
+            // No more Timer-based sequencing
         } catch {
             print("Engine start error: \(error)")
         }
     }
 
     func stop() {
-        arpTimer?.invalidate()
-        arp2Timer?.invalidate()
-        drumTimer?.invalidate()
         chordAdvanceTimer?.invalidate()
         riserTimer?.invalidate()
         engine.stop()
         isPlaying = false
+    }
+
+    // Convert note value string to beat divisor (e.g. "8n" = 2 per beat)
+    private func noteValueDivisor(_ value: String) -> Int {
+        switch value {
+        case "4n": return 1
+        case "8n": return 2
+        case "8n.": return 2 // dotted 8th ≈ treat as 8th for step grid
+        case "16n": return 4
+        case "16n.": return 4
+        case "32n": return 8
+        case "8t": return 3
+        default: return 2
+        }
     }
 
     // MARK: - Riser Synth
@@ -634,27 +709,9 @@ class AudioEngine: ObservableObject {
 
     func setArpNoteValue(_ value: String) {
         arpNoteValue = value
-        if isPlaying { startArpSequencer() }
     }
 
-    private func startArpSequencer() {
-        arpTimer?.invalidate()
-        let interval = noteValueToSeconds(arpNoteValue)
-        arpTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            self?.advanceArp()
-        }
-    }
-
-    private var arpDebugCount = 0
-    private func advanceArp() {
-        guard !arpNotes.isEmpty, !arpMuted else {
-            arpDebugCount += 1
-            if arpDebugCount % 100 == 1 { print("[ARP1] skip: notes=\(arpNotes.count), muted=\(arpMuted)") }
-            return
-        }
-        let note = getNextArpNote(notes: arpNotes, index: &arpIndex, direction: &arpDirection, pattern: arpPattern)
-        arpOsc.triggerNote(note)
-    }
+    // Old Timer-based sequencers removed — now sample-accurate in kick render callback
 
     // MARK: - Arp 2
 
@@ -670,21 +727,6 @@ class AudioEngine: ObservableObject {
 
     func setArp2NoteValue(_ value: String) {
         arp2NoteValue = value
-        if isPlaying { startArp2Sequencer() }
-    }
-
-    private func startArp2Sequencer() {
-        arp2Timer?.invalidate()
-        let interval = noteValueToSeconds(arp2NoteValue)
-        arp2Timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            self?.advanceArp2()
-        }
-    }
-
-    private func advanceArp2() {
-        guard !arp2Notes.isEmpty, !arp2Muted else { return }
-        let note = getNextArpNote(notes: arp2Notes, index: &arp2Index, direction: &arp2Direction, pattern: arp2Pattern)
-        arp2Osc.triggerNote(note)
     }
 
     // MARK: - Shared Arp Logic
@@ -722,11 +764,7 @@ class AudioEngine: ObservableObject {
 
     func setBPM(_ newBPM: Double) {
         bpm = max(40, min(200, newBPM))
-        if isPlaying {
-            startArpSequencer()
-            startArp2Sequencer()
-            startDrumSequencer()
-        }
+        // No Timer restart needed — sample-accurate clock adapts automatically
     }
 
     func setDrumPattern(_ pattern: [[Int]]) {
@@ -743,53 +781,7 @@ class AudioEngine: ObservableObject {
         }
     }
 
-    private func startDrumSequencer() {
-        drumTimer?.invalidate()
-        let interval = noteValueToSeconds("16n")
-        drumTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            self?.advanceDrum()
-        }
-    }
-
-    // Sidechain ducking state
-    private var sidechainGain: Float = 1.0
-
-    private func advanceDrum() {
-        guard !beatMuted, drumPattern.count >= 3 else { return }
-        let step = drumStep % drumPattern[0].count
-
-        if drumPattern[0][step] == 1 {
-            let vel = drumVelocity.count > 0 && step < drumVelocity[0].count ? drumVelocity[0][step] : 0.8
-            kickOsc.trigger(velocity: vel)
-            // Sidechain duck: reduce pad volume on kick
-            if !padMuted {
-                sidechainGain = 0.15
-                padMixer?.outputVolume = dbToGain(channelVolumes["pad"] ?? -14) * sidechainGain
-                // Schedule recovery over ~100ms
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                    self?.sidechainGain = 0.5
-                    self?.padMixer?.outputVolume = (self?.dbToGain(self?.channelVolumes["pad"] ?? -14) ?? 0.2) * 0.5
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                    self?.sidechainGain = 1.0
-                    let vol = self?.channelVolumes["pad"] ?? -14
-                    self?.padMixer?.outputVolume = self?.dbToGain(vol) ?? 0.2
-                }
-            }
-        }
-        if drumPattern[1][step] == 1 {
-            let vel = drumVelocity.count > 1 && step < drumVelocity[1].count ? drumVelocity[1][step] : 0.7
-            snareOsc.trigger(velocity: vel)
-        }
-        if drumPattern[2][step] == 1 {
-            let vel = drumVelocity.count > 2 && step < drumVelocity[2].count ? drumVelocity[2][step] : 0.5
-            hatOsc.trigger(velocity: vel)
-        }
-
-        DispatchQueue.main.async { [weak self] in
-            self?.drumStep += 1
-        }
-    }
+    // Old Timer-based drum sequencer removed — now in kick render callback
 
     // MARK: - Binaural
 
