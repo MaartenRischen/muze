@@ -156,6 +156,34 @@ class AudioEngine: ObservableObject {
         "kick": 0, "snare": 0, "hat": 0, "binaural": 0
     ]
 
+    // Per-channel sidechain amount (0 to 1) — how much this channel ducks on kick
+    var channelSidechainAmounts: [String: Float] = [
+        "pad": 0.7, "arp": 0.3, "arp2": 0.3, "melody": 0,
+        "kick": 0, "snare": 0, "hat": 0, "binaural": 0
+    ]
+
+    // Sidechain compressor parameters
+    @Published var sidechainAttack: Float = 0.5   // ms (fast attack for punchy duck)
+    @Published var sidechainRelease: Float = 100   // ms
+    @Published var sidechainRatio: Float = 8       // compression ratio
+    @Published var sidechainEnabled: Bool = true
+
+    // Sidechain state (per channel, updated in render callback)
+    private var sidechainGainReduction: [String: Float] = [
+        "pad": 1, "arp": 1, "arp2": 1, "melody": 1
+    ]
+    private var kickTriggered: Bool = false
+
+    // Reverb parameters
+    @Published var reverbWetDry: Float = 35        // 0-100%
+    @Published var reverbPreset: Int = 0           // AVAudioUnitReverb preset index
+
+    // Delay parameters
+    @Published var delayTime: Float = 375          // ms
+    @Published var delayFeedback: Float = 30       // 0-100%
+    @Published var delayWetDry: Float = 25         // 0-100%
+    @Published var delayCutoff: Float = 8000       // lowpass Hz
+
     // Per-channel EQ gains (low, mid, high)
     var channelEQGains: [String: [Float]] = [
         "pad": [0, 0, 0], "arp": [0, 0, 0], "arp2": [0, 0, 0], "melody": [0, 0, 0],
@@ -245,6 +273,8 @@ class AudioEngine: ObservableObject {
                             let vel = self.drumVelocity.count > 0 && step < self.drumVelocity[0].count ? self.drumVelocity[0][step] : 0.8
                             self.kickOsc.trigger(velocity: vel)
                             self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmKick, withVelocity: UInt8(vel * 127), onChannel: 9)
+                            // Trigger sidechain
+                            if self.sidechainEnabled { self.kickTriggered = true }
                         }
                         if self.drumPattern[1][step] == 1 {
                             let vel = self.drumVelocity.count > 1 && step < self.drumVelocity[1].count ? self.drumVelocity[1][step] : 0.7
@@ -300,6 +330,34 @@ class AudioEngine: ObservableObject {
                 }
             }
             self.globalSampleCount += UInt64(frameCount)
+
+            // Sidechain compressor — apply gain reduction to ducked channels
+            if self.sidechainEnabled {
+                let attackCoeff = expf(-1.0 / (self.sidechainAttack * 0.001 * Float(sr) + 1))
+                let releaseCoeff = expf(-1.0 / (self.sidechainRelease * 0.001 * Float(sr) + 1))
+
+                for ch in ["pad", "arp", "arp2", "melody"] {
+                    let amount = self.channelSidechainAmounts[ch] ?? 0
+                    guard amount > 0 else { continue }
+
+                    var gr = self.sidechainGainReduction[ch] ?? 1.0
+                    let target: Float = self.kickTriggered ? (1.0 - amount) : 1.0
+
+                    if target < gr {
+                        // Attack (fast duck)
+                        gr = target + attackCoeff * (gr - target)
+                    } else {
+                        // Release (slow recovery)
+                        gr = target + releaseCoeff * (gr - target)
+                    }
+                    self.sidechainGainReduction[ch] = gr
+
+                    // Apply to channel mixer volume
+                    let baseVol = self.dbToGain(self.channelVolumes[ch] ?? -10)
+                    self.mixerForChannel(ch)?.outputVolume = baseVol * gr
+                }
+                self.kickTriggered = false
+            }
 
             return self.kickOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: sr, muted: self.beatMuted)
         }
@@ -709,6 +767,30 @@ class AudioEngine: ObservableObject {
         gains[band] = max(-12, min(12, gain))
         channelEQGains[channel] = gains
         channelEQs[channel]?.bands[band].gain = gains[band]
+    }
+
+    // MARK: - Sidechain Send
+
+    func setChannelSidechainAmount(_ channel: String, amount: Float) {
+        channelSidechainAmounts[channel] = max(0, min(1, amount))
+    }
+
+    // MARK: - FX Parameters
+
+    func setReverbParams(wetDry: Float? = nil, preset: Int? = nil) {
+        if let wd = wetDry { reverbWetDry = wd; reverbNode.wetDryMix = wd }
+        if let p = preset {
+            reverbPreset = p
+            let presets: [AVAudioUnitReverbPreset] = [.mediumHall, .largeHall, .cathedral, .plate, .smallRoom, .mediumRoom, .largeRoom]
+            if p < presets.count { reverbNode.loadFactoryPreset(presets[p]) }
+        }
+    }
+
+    func setDelayParams(time: Float? = nil, feedback: Float? = nil, wetDry: Float? = nil, cutoff: Float? = nil) {
+        if let t = time { delayTime = t; delayNode.delayTime = TimeInterval(t / 1000.0) }
+        if let f = feedback { delayFeedback = f; delayNode.feedback = f }
+        if let wd = wetDry { delayWetDry = wd; delayNode.wetDryMix = wd }
+        if let c = cutoff { delayCutoff = c; delayNode.lowPassCutoff = c }
     }
 
     // MARK: - Solo
