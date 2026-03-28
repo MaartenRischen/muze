@@ -92,8 +92,8 @@ class FaceTracker {
         let rightLift = Float(rightCorner.y) - lipCenter
         let avgLift = (leftLift + rightLift) / 2
         // Frown signal is weaker in Vision — use asymmetric range
-        // Smaller min = easier to reach negative (frown) values
-        let lipCorner = clamp(remap(avgLift, min: -0.02, max: 0.045), lo: -1, hi: 1)
+        // Very small min = easy to reach negative (frown/phrygian)
+        let lipCorner = clamp(remap(avgLift, min: -0.012, max: 0.045), lo: -1, hi: 1)
 
         // Brow height: distance from eyebrow to eye top
         let leftBrowPts = leftEyebrow.normalizedPoints
