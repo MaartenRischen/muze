@@ -264,16 +264,21 @@ class TrackingCoordinator: ObservableObject {
         let root = state.effectiveRoot
         let degree = JammermanConfig.chordDegrees[state.chordIndex % JammermanConfig.chordDegrees.count]
 
+        print("[SEED] Seeding \(channel) with scale=\(scale), root=\(root), degree=\(degree)")
+
         switch channel {
         case "pad":
             let padNotes = MusicTheory.getPadVoicing(root: root, scale: scale, degree: degree)
+            print("[SEED] pad notes: \(padNotes)")
             audioEngine.triggerPad(notes: padNotes)
             currentPadKey = padNotes.joined(separator: ",")
         case "arp":
             let notes = MusicTheory.getArpNotes(scale: scale, root: root, degree: degree, octaveRange: 2)
+            print("[SEED] arp1 notes: \(notes) (\(notes.count) notes)")
             audioEngine.updateArpNotes(notes)
         case "arp2":
             let notes = MusicTheory.getArpNotes(scale: scale, root: root, degree: degree, octaveRange: 2)
+            print("[SEED] arp2 notes: \(notes) (\(notes.count) notes)")
             audioEngine.updateArp2Notes(notes)
         default:
             break

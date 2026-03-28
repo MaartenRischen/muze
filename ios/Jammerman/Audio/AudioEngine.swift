@@ -195,7 +195,29 @@ class AudioEngine: ObservableObject {
 
         padNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
-            return self.padOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.padMuted)
+            // DEBUG: If padOsc produces silence, generate test tone to verify audio graph
+            let result = self.padOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.padMuted)
+            if !self.padMuted {
+                // Check if padOsc produced any non-zero samples
+                let abl = UnsafeMutableAudioBufferListPointer(bufferList)
+                let L = abl[0].mData!.assumingMemoryBound(to: Float.self)
+                var hasSignal = false
+                for i in 0..<min(Int(frameCount), 8) {
+                    if abs(L[i]) > 0.0001 { hasSignal = true; break }
+                }
+                if !hasSignal {
+                    // Pad isn't producing sound — generate test tone at 220Hz
+                    let R = abl[1].mData!.assumingMemoryBound(to: Float.self)
+                    for i in 0..<Int(frameCount) {
+                        let phase = Double(self.padOsc.debugSampleCount + i) / self.sampleRate * 220.0
+                        let sample = Float(sin(phase * 2.0 * .pi)) * 0.3
+                        L[i] = sample
+                        R[i] = sample
+                    }
+                    self.padOsc.debugSampleCount += Int(frameCount)
+                }
+            }
+            return result
         }
         arpNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
@@ -982,6 +1004,7 @@ func waveformSample(phase: Double, type: WaveformType) -> Double {
 // MARK: - Pad Oscillator (FM + Sub)
 
 class PadOscillator {
+    var debugSampleCount: Int = 0 // DEBUG: for test tone
     private var phases: [Double] = []
     private var subPhases: [Double] = []
     private var frequencies: [Double] = []
