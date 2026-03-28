@@ -143,8 +143,29 @@ class SoundFontManager {
         loadDrumPreset(0)
         loadBassPreset(0)
 
-        // Start muted (channel mixer controls actual mute)
-        // Don't set volume to 0 here — let the channel mixer handle it
+        // Warm up all samplers by triggering a silent note — forces SF2 sample
+        // data to be paged into memory so first real note doesn't cause a CPU spike
+        warmUpSamplers()
+    }
+
+    private func warmUpSamplers() {
+        let samplers: [(AVAudioUnitSampler?, UInt8, UInt8)] = [
+            (padSampler, 60, 0),      // C4 on channel 0
+            (leadSampler, 60, 0),
+            (arpSampler, 60, 0),
+            (arp2Sampler, 60, 0),
+            (bassSampler, 36, 0),     // C2
+            (drumSampler, Self.gmKick, 9),
+        ]
+        // Trigger at velocity 1 (barely audible), stop after 50ms
+        for (sampler, note, ch) in samplers {
+            sampler?.startNote(note, withVelocity: 1, onChannel: ch)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            for (sampler, note, ch) in samplers {
+                sampler?.stopNote(note, onChannel: ch)
+            }
+        }
     }
 
     func loadPadPreset(_ index: Int) {

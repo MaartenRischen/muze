@@ -231,7 +231,9 @@ class AudioEngine: ObservableObject {
         do {
             try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
             try session.setPreferredSampleRate(sampleRate)
-            try session.setPreferredIOBufferDuration(0.005)
+            // 12ms buffer — safe for complex graph (27+ nodes + SoundFont samplers + ARKit)
+            // 5ms was causing glitches on startup when CPU is loaded
+            try session.setPreferredIOBufferDuration(0.012)
             try session.setActive(true)
         } catch {
             print("Audio session error: \(error)")
