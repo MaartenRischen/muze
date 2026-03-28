@@ -10,7 +10,16 @@ class SoundFontManager {
     // Samplers for each instrument role
     var padSampler: AVAudioUnitSampler?
     var leadSampler: AVAudioUnitSampler?
+    var arpSampler: AVAudioUnitSampler?
+    var arp2Sampler: AVAudioUnitSampler?
+    var drumSampler: AVAudioUnitSampler?
     var bassSampler: AVAudioUnitSampler?
+
+    // GM percussion note mapping
+    static let gmKick: UInt8 = 36
+    static let gmSnare: UInt8 = 38
+    static let gmClosedHat: UInt8 = 42
+    static let gmOpenHat: UInt8 = 46
 
     // Available instrument presets
     // AVAudioUnitSampler uses GM convention: bankMSB 0x79 (121) for melodic, 0x78 (120) for drums
@@ -41,6 +50,24 @@ class SoundFontManager {
         Preset(name: "FM Piano", program: 5, bankMSB: 0x79, bankLSB: 0),
         Preset(name: "Music Box", program: 10, bankMSB: 0x79, bankLSB: 0),
         Preset(name: "Vibraphone", program: 11, bankMSB: 0x79, bankLSB: 0),
+    ]
+
+    static let arpPresets: [Preset] = [
+        Preset(name: "FM Piano", program: 5, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Vibraphone", program: 11, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Music Box", program: 10, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Tine EP", program: 4, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Celesta", program: 8, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Marimba", program: 12, bankMSB: 0x79, bankLSB: 0),
+    ]
+
+    static let drumPresets: [Preset] = [
+        Preset(name: "Standard Kit", program: 0, bankMSB: 0x78, bankLSB: 0),
+        Preset(name: "Room Kit", program: 8, bankMSB: 0x78, bankLSB: 0),
+        Preset(name: "Power Kit", program: 16, bankMSB: 0x78, bankLSB: 0),
+        Preset(name: "Electronic Kit", program: 24, bankMSB: 0x78, bankLSB: 0),
+        Preset(name: "TR-808 Kit", program: 25, bankMSB: 0x78, bankLSB: 0),
+        Preset(name: "Jazz Kit", program: 32, bankMSB: 0x78, bankLSB: 0),
     ]
 
     static let bassPresets: [Preset] = [
@@ -81,30 +108,31 @@ class SoundFontManager {
             return
         }
 
-        // Create samplers
+        // Create all samplers
         padSampler = AVAudioUnitSampler()
         leadSampler = AVAudioUnitSampler()
+        arpSampler = AVAudioUnitSampler()
+        arp2Sampler = AVAudioUnitSampler()
+        drumSampler = AVAudioUnitSampler()
         bassSampler = AVAudioUnitSampler()
 
         // Attach to engine
-        engine.attach(padSampler!)
-        engine.attach(leadSampler!)
-        engine.attach(bassSampler!)
-
-        // Connect to output
-        engine.connect(padSampler!, to: mainMixerNode, format: format)
-        engine.connect(leadSampler!, to: mainMixerNode, format: format)
-        engine.connect(bassSampler!, to: mainMixerNode, format: format)
+        let samplers: [AVAudioUnitSampler] = [padSampler!, leadSampler!, arpSampler!, arp2Sampler!, drumSampler!, bassSampler!]
+        for s in samplers {
+            engine.attach(s)
+            engine.connect(s, to: mainMixerNode, format: format)
+        }
 
         // Load default instruments
         loadPadPreset(0)
         loadLeadPreset(0)
+        loadArpPreset(0, sampler: arpSampler)
+        loadArpPreset(2, sampler: arp2Sampler) // Music Box for arp2
+        loadDrumPreset(0)
         loadBassPreset(0)
 
-        // Set initial volumes — start muted (volume 0), unmute when user toggles
-        padSampler?.volume = 0
-        leadSampler?.volume = 0
-        bassSampler?.volume = 0
+        // Start muted
+        for s in samplers { s.volume = 0 }
     }
 
     func loadPadPreset(_ index: Int) {
@@ -131,13 +159,37 @@ class SoundFontManager {
         }
     }
 
+    func loadArpPreset(_ index: Int, sampler: AVAudioUnitSampler?) {
+        let presets = Self.arpPresets
+        guard index < presets.count, let sampler = sampler, let url = soundFontURL else { return }
+        let p = presets[index]
+        do {
+            try sampler.loadSoundBankInstrument(at: url, program: p.program, bankMSB: p.bankMSB, bankLSB: p.bankLSB)
+            print("[SFManager] Arp loaded: \(p.name)")
+        } catch {
+            print("[SFManager] Arp load error: \(error)")
+        }
+    }
+
+    func loadDrumPreset(_ index: Int) {
+        let presets = Self.drumPresets
+        guard index < presets.count, let sampler = drumSampler, let url = soundFontURL else { return }
+        let p = presets[index]
+        do {
+            try sampler.loadSoundBankInstrument(at: url, program: p.program, bankMSB: p.bankMSB, bankLSB: p.bankLSB)
+            print("[SFManager] Drums loaded: \(p.name)")
+        } catch {
+            print("[SFManager] Drums load error: \(error)")
+        }
+    }
+
     func loadBassPreset(_ index: Int) {
         let presets = Self.bassPresets
         guard index < presets.count, let sampler = bassSampler, let url = soundFontURL else { return }
         let p = presets[index]
         do {
             try sampler.loadSoundBankInstrument(at: url, program: p.program, bankMSB: p.bankMSB, bankLSB: p.bankLSB)
-            print("[SFManager] Bass loaded: \(p.name) (program \(p.program), bankMSB \(p.bankMSB))")
+            print("[SFManager] Bass loaded: \(p.name)")
         } catch {
             print("[SFManager] Bass load error: \(error)")
         }

@@ -244,14 +244,17 @@ class AudioEngine: ObservableObject {
                         if self.drumPattern[0][step] == 1 {
                             let vel = self.drumVelocity.count > 0 && step < self.drumVelocity[0].count ? self.drumVelocity[0][step] : 0.8
                             self.kickOsc.trigger(velocity: vel)
+                            self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmKick, withVelocity: UInt8(vel * 127), onChannel: 9)
                         }
                         if self.drumPattern[1][step] == 1 {
                             let vel = self.drumVelocity.count > 1 && step < self.drumVelocity[1].count ? self.drumVelocity[1][step] : 0.7
                             self.snareOsc.trigger(velocity: vel)
+                            self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmSnare, withVelocity: UInt8(vel * 127), onChannel: 9)
                         }
                         if self.drumPattern[2][step] == 1 {
                             let vel = self.drumVelocity.count > 2 && step < self.drumVelocity[2].count ? self.drumVelocity[2][step] : 0.5
                             self.hatOsc.trigger(velocity: vel)
+                            self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmClosedHat, withVelocity: UInt8(vel * 127), onChannel: 9)
                         }
                         DispatchQueue.main.async { self.drumStep = sixteenthStep }
                     }
@@ -265,7 +268,15 @@ class AudioEngine: ObservableObject {
                     self.lastArpStep = arpStep
                     if !self.arpNotes.isEmpty && !self.arpMuted {
                         let note = self.getNextArpNote(notes: self.arpNotes, index: &self.arpIndex, direction: &self.arpDirection, pattern: self.arpPattern)
-                        self.arpOsc.triggerNote(note)
+                        if self.useSoundFont {
+                            self.soundFontManager?.arpSampler?.startNote(UInt8(note), withVelocity: 85, onChannel: 0)
+                            // Stop after short duration to avoid overlap
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                self.soundFontManager?.arpSampler?.stopNote(UInt8(note), onChannel: 0)
+                            }
+                        } else {
+                            self.arpOsc.triggerNote(note)
+                        }
                     }
                 }
 
@@ -277,7 +288,14 @@ class AudioEngine: ObservableObject {
                     self.lastArp2Step = arp2Step
                     if !self.arp2Notes.isEmpty && !self.arp2Muted {
                         let note = self.getNextArpNote(notes: self.arp2Notes, index: &self.arp2Index, direction: &self.arp2Direction, pattern: self.arp2Pattern)
-                        self.arp2Osc.triggerNote(note)
+                        if self.useSoundFont {
+                            self.soundFontManager?.arp2Sampler?.startNote(UInt8(note), withVelocity: 80, onChannel: 0)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                self.soundFontManager?.arp2Sampler?.stopNote(UInt8(note), onChannel: 0)
+                            }
+                        } else {
+                            self.arp2Osc.triggerNote(note)
+                        }
                     }
                 }
             }
@@ -934,7 +952,7 @@ class AudioEngine: ObservableObject {
         }
 
         // Handle SoundFont sampler mute/unmute
-        if useSoundFont, let sfm = soundFontManager {
+        if let sfm = soundFontManager {
             switch channel {
             case "pad":
                 if padMuted {
@@ -943,6 +961,10 @@ class AudioEngine: ObservableObject {
                 } else {
                     sfm.padSampler?.volume = 1
                 }
+            case "arp":
+                sfm.arpSampler?.volume = arpMuted ? 0 : 1
+            case "arp2":
+                sfm.arp2Sampler?.volume = arp2Muted ? 0 : 1
             case "melody":
                 if melodyMuted {
                     if let note = currentMelodyMidiNote {
@@ -953,6 +975,8 @@ class AudioEngine: ObservableObject {
                 } else {
                     sfm.leadSampler?.volume = 1
                 }
+            case "beat":
+                sfm.drumSampler?.volume = beatMuted ? 0 : 1
             default: break
             }
         }
