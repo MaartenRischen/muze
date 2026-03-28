@@ -423,13 +423,18 @@ extension TrackingCoordinator: ARKitTrackerDelegate {
             let softenedDark = darkBg.applyingGaussianBlur(sigma: 5).cropped(to: ext)
             let darkenCG = self.segCIContext.createCGImage(softenedDark, from: ext)
 
-            // Cutout mask: person area + blur edges
+            // Cutout mask: person = white (for effects cutout)
             let softenedCut = ciImage.applyingGaussianBlur(sigma: 8).cropped(to: ext)
             let cutoutCG = self.segCIContext.createCGImage(softenedCut, from: ext)
+
+            // Blur mask: background = white (inverted cutout, for blur overlay)
+            let blurMaskCI = softenedCut.applyingFilter("CIColorInvert")
+            let blurCG = self.segCIContext.createCGImage(blurMaskCI, from: ext)
 
             DispatchQueue.main.async { [weak self] in
                 self?.state.segDarkenMask = darkenCG
                 self?.state.segCutoutMask = cutoutCG
+                self?.state.segBlurMask = blurCG
             }
         }
     }

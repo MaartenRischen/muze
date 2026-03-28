@@ -1,10 +1,64 @@
 // Jammerman — Background Blur
-// Uses Vision PersonSegmentationRequest to darken non-person areas
-// Processing on background thread
+// Real-time iOS blur behind the person using UIVisualEffectView + segmentation mask
+// PersonSegmenter kept for non-ARKit fallback
 
 import SwiftUI
 import Vision
 import CoreImage
+import UIKit
+
+// MARK: - Segmented Blur Overlay (UIVisualEffectView masked by person segmentation)
+
+struct SegmentedBlurOverlay: UIViewRepresentable {
+    let blurMask: CGImage?  // pre-computed: background = white, person = black
+
+    func makeUIView(context: Context) -> SegmentedBlurUIView {
+        SegmentedBlurUIView()
+    }
+
+    func updateUIView(_ uiView: SegmentedBlurUIView, context: Context) {
+        uiView.updateMask(blurMask)
+    }
+}
+
+class SegmentedBlurUIView: UIView {
+    private let blurView: UIVisualEffectView
+    private let maskLayer = CALayer()
+
+    override init(frame: CGRect) {
+        blurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
+        super.init(frame: frame)
+
+        blurView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(blurView)
+
+        blurView.layer.mask = maskLayer
+        maskLayer.contentsGravity = .resizeAspectFill
+
+        isUserInteractionEnabled = false
+        backgroundColor = .clear
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        blurView.frame = bounds
+        maskLayer.frame = bounds
+    }
+
+    func updateMask(_ cgImage: CGImage?) {
+        guard let img = cgImage else {
+            maskLayer.contents = nil
+            return
+        }
+        // Mirror horizontally for front camera selfie view
+        maskLayer.transform = CATransform3DMakeScale(-1, 1, 1)
+        maskLayer.contents = img
+    }
+}
+
+// MARK: - Person Segmenter (Vision-based, for non-ARKit fallback)
 
 class PersonSegmenter: ObservableObject {
     private let request = VNGeneratePersonSegmentationRequest()
@@ -29,31 +83,19 @@ class PersonSegmenter: ObservableObject {
             guard let self else { return }
             defer { self.isProcessing = false }
 
-            let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right) // .right for front camera in portrait
+            let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right)
             try? handler.perform([self.request])
 
             guard let result = self.request.results?.first else { return }
             let maskBuffer = result.pixelBuffer
-
-            // Convert mask to UIImage with dark tint for background
             let maskCI = CIImage(cvPixelBuffer: maskBuffer)
-
-            // Invert mask (person = black/transparent, background = white/dark)
             let inverted = maskCI.applyingFilter("CIColorInvert")
-
-            // Tint to dark semi-transparent
             let darkTint = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0.55))
                 .cropped(to: maskCI.extent)
-
-            // Multiply inverted mask with dark tint
             let darkBg = inverted.applyingFilter("CIMultiplyCompositing", parameters: [
                 "inputBackgroundImage": darkTint
             ])
-
-            // Soften edges
-            let softened = darkBg
-                .applyingGaussianBlur(sigma: 3)
-                .cropped(to: maskCI.extent)
+            let softened = darkBg.applyingGaussianBlur(sigma: 3).cropped(to: maskCI.extent)
 
             if let cgImage = self.ciContext.createCGImage(softened, from: maskCI.extent) {
                 let img = UIImage(cgImage: cgImage, scale: 1, orientation: .upMirrored)
