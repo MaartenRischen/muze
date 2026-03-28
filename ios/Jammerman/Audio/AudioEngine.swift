@@ -389,29 +389,53 @@ class AudioEngine: ObservableObject {
         // Riser has no per-channel EQ
         engine.connect(riserNode, to: riserMixer, format: format)
 
-        // Wire: channel mixers → mainMixerNode directly (bypassing masterMixer + masterEQ)
-        let allChannelMixers: [AVAudioMixerNode] = [padMixer, arpMixer, arp2Mixer, melodyMixer, kickMixer, snareMixer, hatMixer, binauralMixer, riserMixer]
-        for ch in allChannelMixers {
-            engine.connect(ch, to: engine.mainMixerNode, format: format)
-        }
+        // Wire: channel mixers → multiple destinations (dry + sends)
+        // AVAudioEngine requires connectionPoints API for fan-out
+        let mainNode = engine.mainMixerNode
 
-        // Reverb send chains: channel mixer → send mixer → reverbNode → output
-        engine.connect(padMixer, to: padReverbSendMixer, format: format)
-        engine.connect(arpMixer, to: arpReverbSendMixer, format: format)
-        engine.connect(arp2Mixer, to: arp2ReverbSendMixer, format: format)
-        engine.connect(melodyMixer, to: melodyReverbSendMixer, format: format)
+        // Pad: dry + reverb send
+        engine.connect(padMixer, to: [
+            AVAudioConnectionPoint(node: mainNode, bus: mainNode.nextAvailableInputBus),
+            AVAudioConnectionPoint(node: padReverbSendMixer, bus: 0)
+        ], fromBus: 0, format: format)
+
+        // Arp: dry + reverb + delay sends
+        engine.connect(arpMixer, to: [
+            AVAudioConnectionPoint(node: mainNode, bus: mainNode.nextAvailableInputBus),
+            AVAudioConnectionPoint(node: arpReverbSendMixer, bus: 0),
+            AVAudioConnectionPoint(node: arpDelaySendMixer, bus: 0)
+        ], fromBus: 0, format: format)
+
+        // Arp2: dry + reverb + delay sends
+        engine.connect(arp2Mixer, to: [
+            AVAudioConnectionPoint(node: mainNode, bus: mainNode.nextAvailableInputBus),
+            AVAudioConnectionPoint(node: arp2ReverbSendMixer, bus: 0),
+            AVAudioConnectionPoint(node: arp2DelaySendMixer, bus: 0)
+        ], fromBus: 0, format: format)
+
+        // Melody: dry + reverb send
+        engine.connect(melodyMixer, to: [
+            AVAudioConnectionPoint(node: mainNode, bus: mainNode.nextAvailableInputBus),
+            AVAudioConnectionPoint(node: melodyReverbSendMixer, bus: 0)
+        ], fromBus: 0, format: format)
+
+        // Drums, binaural, riser: dry only
+        engine.connect(kickMixer, to: mainNode, format: format)
+        engine.connect(snareMixer, to: mainNode, format: format)
+        engine.connect(hatMixer, to: mainNode, format: format)
+        engine.connect(binauralMixer, to: mainNode, format: format)
+        engine.connect(riserMixer, to: mainNode, format: format)
+
+        // Send mixers → effects → output
         engine.connect(padReverbSendMixer, to: reverbNode, format: format)
         engine.connect(arpReverbSendMixer, to: reverbNode, format: format)
         engine.connect(arp2ReverbSendMixer, to: reverbNode, format: format)
         engine.connect(melodyReverbSendMixer, to: reverbNode, format: format)
-        engine.connect(reverbNode, to: engine.mainMixerNode, format: format)
+        engine.connect(reverbNode, to: mainNode, format: format)
 
-        // Delay send chains: channel mixer → send mixer → delayNode → output
-        engine.connect(arpMixer, to: arpDelaySendMixer, format: format)
-        engine.connect(arp2Mixer, to: arp2DelaySendMixer, format: format)
         engine.connect(arpDelaySendMixer, to: delayNode, format: format)
         engine.connect(arp2DelaySendMixer, to: delayNode, format: format)
-        engine.connect(delayNode, to: engine.mainMixerNode, format: format)
+        engine.connect(delayNode, to: mainNode, format: format)
 
         applyChannelVolumes()
         applyChannelPans()
