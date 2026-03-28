@@ -40,6 +40,10 @@ class TrackingCoordinator: ObservableObject {
     private var prevHandOpen = true
     private var currentPadKey = ""
 
+    deinit {
+        saveTimer?.invalidate()
+    }
+
     init() {
         setupFilters()
         setupCamera()
@@ -149,11 +153,11 @@ class TrackingCoordinator: ObservableObject {
 
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                self.state.mouthOpenness = Float(self.filters["mouth"]!.filter(Double(face.mouthOpenness), timestamp: timestamp))
-                self.state.lipCorner = Float(self.filters["lip"]!.filter(Double(face.lipCorner), timestamp: timestamp))
-                self.state.browHeight = Float(self.filters["brow"]!.filter(Double(face.browHeight), timestamp: timestamp))
-                self.state.eyeOpenness = Float(self.filters["eye"]!.filter(Double(face.eyeOpenness), timestamp: timestamp))
-                self.state.mouthWidth = Float(self.filters["mouthW"]!.filter(Double(face.mouthWidth), timestamp: timestamp))
+                if let f = self.filters["mouth"] { self.state.mouthOpenness = Float(f.filter(Double(face.mouthOpenness), timestamp: timestamp)) }
+                if let f = self.filters["lip"] { self.state.lipCorner = Float(f.filter(Double(face.lipCorner), timestamp: timestamp)) }
+                if let f = self.filters["brow"] { self.state.browHeight = Float(f.filter(Double(face.browHeight), timestamp: timestamp)) }
+                if let f = self.filters["eye"] { self.state.eyeOpenness = Float(f.filter(Double(face.eyeOpenness), timestamp: timestamp)) }
+                if let f = self.filters["mouthW"] { self.state.mouthWidth = Float(f.filter(Double(face.mouthWidth), timestamp: timestamp)) }
                 self.state.headPitch = face.headPitch
                 self.state.headYaw = face.headYaw
                 self.state.headRoll = face.headRoll
@@ -181,8 +185,8 @@ class TrackingCoordinator: ObservableObject {
                 guard let self else { return }
                 self.state.handPresent = hand.handPresent
                 if hand.handPresent {
-                    self.state.handX = Float(self.filters["handX"]!.filter(Double(hand.handX), timestamp: timestamp))
-                    self.state.handY = Float(self.filters["handY"]!.filter(Double(hand.handY), timestamp: timestamp))
+                    if let f = self.filters["handX"] { self.state.handX = Float(f.filter(Double(hand.handX), timestamp: timestamp)) }
+                    if let f = self.filters["handY"] { self.state.handY = Float(f.filter(Double(hand.handY), timestamp: timestamp)) }
                     self.state.handOpen = hand.handOpen
                 } else {
                     self.state.handPresent = false
@@ -327,11 +331,11 @@ extension TrackingCoordinator: ARKitTrackerDelegate {
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.state.mouthOpenness = Float(self.filters["mouth"]!.filter(Double(features.mouthOpenness), timestamp: timestamp))
-            self.state.lipCorner = Float(self.filters["lip"]!.filter(Double(features.lipCorner), timestamp: timestamp))
-            self.state.browHeight = Float(self.filters["brow"]!.filter(Double(features.browHeight), timestamp: timestamp))
-            self.state.eyeOpenness = Float(self.filters["eye"]!.filter(Double(features.eyeOpenness), timestamp: timestamp))
-            self.state.mouthWidth = Float(self.filters["mouthW"]!.filter(Double(features.mouthWidth), timestamp: timestamp))
+            if let f = self.filters["mouth"] { self.state.mouthOpenness = Float(f.filter(Double(features.mouthOpenness), timestamp: timestamp)) }
+            if let f = self.filters["lip"] { self.state.lipCorner = Float(f.filter(Double(features.lipCorner), timestamp: timestamp)) }
+            if let f = self.filters["brow"] { self.state.browHeight = Float(f.filter(Double(features.browHeight), timestamp: timestamp)) }
+            if let f = self.filters["eye"] { self.state.eyeOpenness = Float(f.filter(Double(features.eyeOpenness), timestamp: timestamp)) }
+            if let f = self.filters["mouthW"] { self.state.mouthWidth = Float(f.filter(Double(features.mouthWidth), timestamp: timestamp)) }
             self.state.headPitch = features.headPitch
             self.state.headYaw = features.headYaw
             self.state.headRoll = features.headRoll
@@ -354,8 +358,8 @@ extension TrackingCoordinator: ARKitTrackerDelegate {
             guard let self else { return }
             self.state.handPresent = hand.handPresent
             if hand.handPresent {
-                self.state.handX = Float(self.filters["handX"]!.filter(Double(hand.handX), timestamp: timestamp))
-                self.state.handY = Float(self.filters["handY"]!.filter(Double(hand.handY), timestamp: timestamp))
+                if let f = self.filters["handX"] { self.state.handX = Float(f.filter(Double(hand.handX), timestamp: timestamp)) }
+                if let f = self.filters["handY"] { self.state.handY = Float(f.filter(Double(hand.handY), timestamp: timestamp)) }
                 self.state.handOpen = hand.handOpen
             } else {
                 self.state.handPresent = false

@@ -214,8 +214,8 @@ class ARKitTracker: NSObject {
         let srcPlanes = CVPixelBufferGetPlaneCount(srcBuffer)
         if srcPlanes > 0 {
             for plane in 0..<srcPlanes {
-                let srcAddr = CVPixelBufferGetBaseAddressOfPlane(srcBuffer, plane)!
-                let dstAddr = CVPixelBufferGetBaseAddressOfPlane(dstBuffer, plane)!
+                guard let srcAddr = CVPixelBufferGetBaseAddressOfPlane(srcBuffer, plane),
+                      let dstAddr = CVPixelBufferGetBaseAddressOfPlane(dstBuffer, plane) else { continue }
                 let srcRowBytes = CVPixelBufferGetBytesPerRowOfPlane(srcBuffer, plane)
                 let dstRowBytes = CVPixelBufferGetBytesPerRowOfPlane(dstBuffer, plane)
                 let planeHeight = CVPixelBufferGetHeightOfPlane(srcBuffer, plane)
@@ -228,8 +228,13 @@ class ARKitTracker: NSObject {
                 }
             }
         } else {
-            let srcAddr = CVPixelBufferGetBaseAddress(srcBuffer)!
-            let dstAddr = CVPixelBufferGetBaseAddress(dstBuffer)!
+            guard let srcAddr = CVPixelBufferGetBaseAddress(srcBuffer),
+                  let dstAddr = CVPixelBufferGetBaseAddress(dstBuffer) else {
+                CVPixelBufferUnlockBaseAddress(dstBuffer, [])
+                CVPixelBufferUnlockBaseAddress(srcBuffer, .readOnly)
+                isDetectingHand = false
+                return
+            }
             let srcRowBytes = CVPixelBufferGetBytesPerRow(srcBuffer)
             let dstRowBytes = CVPixelBufferGetBytesPerRow(dstBuffer)
             let h = CVPixelBufferGetHeight(srcBuffer)
@@ -252,7 +257,11 @@ class ARKitTracker: NSObject {
             let request = VNDetectHumanHandPoseRequest()
             request.maximumHandCount = 1
             let handler = VNImageRequestHandler(cvPixelBuffer: dstBuffer, orientation: .right)
-            try? handler.perform([request])
+            do {
+                try handler.perform([request])
+            } catch {
+                // Vision request failed silently
+            }
 
             guard let handObs = request.results?.first else {
                 self.delegate?.arKitTracker(self, didUpdateHand: HandFeatures(
@@ -327,7 +336,11 @@ class ARKitTracker: NSObject {
 
             let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right)
             let faceRequest = VNDetectFaceLandmarksRequest()
-            try? handler.perform([faceRequest])
+            do {
+                try handler.perform([faceRequest])
+            } catch {
+                // Vision request failed silently
+            }
 
             guard let faceObs = faceRequest.results?.first,
                   let landmarks = faceObs.landmarks else { return }
