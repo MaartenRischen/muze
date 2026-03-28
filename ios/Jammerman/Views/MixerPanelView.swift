@@ -181,12 +181,31 @@ struct ChannelStripView: View {
 
 extension MixerPanelView {
     func channelDetail(_ id: String) -> some View {
+        ChannelDetailView(id: id, channels: channels, coordinator: coordinator, detailChannel: $detailChannel)
+    }
+}
+
+// Separate view so @State bindings work for responsive sliders
+struct ChannelDetailView: View {
+    let id: String
+    let channels: [(String, String, Color)]
+    @ObservedObject var coordinator: TrackingCoordinator
+    @Binding var detailChannel: String?
+
+    // Local state for responsive sliders
+    @State private var localPan: Float? = nil
+    @State private var localReverbSend: Float? = nil
+    @State private var localDelaySend: Float? = nil
+    @State private var localEqLow: Float? = nil
+    @State private var localEqMid: Float? = nil
+    @State private var localEqHigh: Float? = nil
+
+    var body: some View {
         let name = channels.first(where: { $0.1 == id })?.0 ?? id
         let color = channels.first(where: { $0.1 == id })?.2 ?? .white
-        let eqGains = coordinator.audioEngine.channelEQGains[id] ?? [0, 0, 0]
 
-        return ScrollView(showsIndicators: false) {
-            VStack(spacing: 12) {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 16) {
                 // Header
                 HStack {
                     Text(name)
@@ -209,151 +228,124 @@ extension MixerPanelView {
                     }
                 }
 
-                // EQ section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("E Q U A L I Z E R")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.4))
-                        .tracking(2)
+                // EQ
+                sectionHeader("EQUALIZER")
+                eqRow("LOW", band: 0, local: $localEqLow, color: color)
+                eqRow("MID", band: 1, local: $localEqMid, color: color)
+                eqRow("HIGH", band: 2, local: $localEqHigh, color: color)
 
-                    HStack(spacing: 24) {
-                        eqBandControl("LOW", channel: id, band: 0, value: eqGains[0], color: color)
-                        eqBandControl("MID", channel: id, band: 1, value: eqGains[1], color: color)
-                        eqBandControl("HIGH", channel: id, band: 2, value: eqGains[2], color: color)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-
-                // Sends
                 if id != "master" {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("S E N D S")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.4))
-                            .tracking(2)
+                    // Sends
+                    sectionHeader("SENDS")
+                    sendRow("REVERB", local: $localReverbSend, isReverb: true, color: color)
+                    sendRow("DELAY", local: $localDelaySend, isReverb: false, color: color)
 
-                        sendControl("REVERB", channel: id, color: color, isReverb: true)
-                        sendControl("DELAY", channel: id, color: color, isReverb: false)
-                    }
-                }
-
-                // Pan
-                if id != "master" {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("P A N")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.4))
-                            .tracking(2)
-
-                        let pan = coordinator.audioEngine.channelPans[id] ?? 0
-                        HStack {
-                            Text("L").font(.system(size: 10, design: .monospaced)).foregroundStyle(.white.opacity(0.3))
-                            Slider(value: Binding(
-                                get: { (coordinator.audioEngine.channelPans[id] ?? 0 + 1) / 2 },
-                                set: { coordinator.audioEngine.setChannelPan(id, pan: $0 * 2 - 1) }
-                            ), in: 0...1)
-                            .tint(color)
-                            Text("R").font(.system(size: 10, design: .monospaced)).foregroundStyle(.white.opacity(0.3))
-                            Text(panLabel(pan))
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.4))
-                                .frame(width: 30)
-                        }
-                    }
+                    // Pan
+                    sectionHeader("PAN")
+                    panRow(color: color)
                 }
             }
             .padding(16)
         }
-        .frame(height: 380)
+        .frame(height: 400)
+        .onAppear {
+            // Load current values into local state
+            let eqGains = coordinator.audioEngine.channelEQGains[id] ?? [0, 0, 0]
+            localEqLow = eqGains[0]
+            localEqMid = eqGains[1]
+            localEqHigh = eqGains[2]
+            localPan = coordinator.audioEngine.channelPans[id] ?? 0
+            localReverbSend = coordinator.audioEngine.channelReverbSends[id] ?? 0
+            localDelaySend = coordinator.audioEngine.channelDelaySends[id] ?? 0
+        }
     }
 
-    func panLabel(_ pan: Float) -> String {
+    private func sectionHeader(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
+                .tracking(2)
+            Spacer()
+        }
+    }
+
+    private func eqRow(_ label: String, band: Int, local: Binding<Float?>, color: Color) -> some View {
+        let value = local.wrappedValue ?? 0
+        return HStack {
+            Text(label)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.5))
+                .frame(width: 40, alignment: .leading)
+            Slider(value: Binding(
+                get: { value },
+                set: { new in
+                    local.wrappedValue = new
+                    coordinator.audioEngine.setChannelEQ(id, band: band, gain: new)
+                }
+            ), in: -12...12)
+            .tint(color)
+            Text("\(Int(value)) dB")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
+                .frame(width: 45, alignment: .trailing)
+        }
+    }
+
+    private func sendRow(_ label: String, local: Binding<Float?>, isReverb: Bool, color: Color) -> some View {
+        let value = local.wrappedValue ?? 0
+        return HStack {
+            Text(label)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.5))
+                .frame(width: 55, alignment: .leading)
+            Slider(value: Binding(
+                get: { value },
+                set: { new in
+                    local.wrappedValue = new
+                    if isReverb {
+                        coordinator.audioEngine.setChannelReverbSend(id, amount: new)
+                    } else {
+                        coordinator.audioEngine.setChannelDelaySend(id, amount: new)
+                    }
+                }
+            ), in: 0...1)
+            .tint(color)
+            Text("\(Int(value * 100))%")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
+                .frame(width: 35, alignment: .trailing)
+        }
+    }
+
+    private func panRow(color: Color) -> some View {
+        let value = localPan ?? 0
+        return HStack {
+            Text("L")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.3))
+            Slider(value: Binding(
+                get: { (value + 1) / 2 }, // -1..1 → 0..1
+                set: { new in
+                    let pan = new * 2 - 1 // 0..1 → -1..1
+                    localPan = pan
+                    coordinator.audioEngine.setChannelPan(id, pan: pan)
+                }
+            ), in: 0...1)
+            .tint(color)
+            Text("R")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.3))
+            Text(panLabel(value))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
+                .frame(width: 35, alignment: .trailing)
+        }
+    }
+
+    private func panLabel(_ pan: Float) -> String {
         if abs(pan) < 0.05 { return "C" }
         if pan < 0 { return "L\(Int(abs(pan) * 100))" }
         return "R\(Int(pan * 100))"
-    }
-
-    func eqBandControl(_ label: String, channel: String, band: Int, value: Float, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Text(label)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
-
-            // Vertical slider
-            GeometryReader { geo in
-                let range: ClosedRange<Float> = -12...12
-                let pct = CGFloat((value - range.lowerBound) / (range.upperBound - range.lowerBound))
-                let thumbY = geo.size.height * (1 - pct)
-
-                ZStack {
-                    // Track
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(.white.opacity(0.08))
-                        .frame(width: 8)
-
-                    // Center line
-                    Rectangle()
-                        .fill(.white.opacity(0.2))
-                        .frame(width: 12, height: 1)
-                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
-
-                    // Fill
-                    let fillHeight = abs(pct - 0.5) * geo.size.height
-                    let fillY = pct > 0.5 ? geo.size.height / 2 - fillHeight / 2 : geo.size.height / 2 + fillHeight / 2 - fillHeight / 2
-                    if fillHeight > 0 {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(color.opacity(0.5))
-                            .frame(width: 8, height: fillHeight)
-                            .position(x: geo.size.width / 2, y: pct > 0.5 ? geo.size.height * (1 - pct) + fillHeight / 2 : geo.size.height / 2 + fillHeight / 2)
-                    }
-
-                    // Thumb
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(.white)
-                        .frame(width: 20, height: 6)
-                        .position(x: geo.size.width / 2, y: thumbY)
-                }
-                .gesture(DragGesture(minimumDistance: 0).onChanged { v in
-                    let pctNew = 1 - Float(v.location.y / geo.size.height)
-                    let gain = range.lowerBound + max(0, min(1, pctNew)) * (range.upperBound - range.lowerBound)
-                    coordinator.audioEngine.setChannelEQ(channel, band: band, gain: gain)
-                })
-            }
-            .frame(width: 30, height: 100)
-
-            Text("\(Int(value)) dB")
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.4))
-        }
-    }
-
-    func sendControl(_ label: String, channel: String, color: Color, isReverb: Bool) -> some View {
-        let value: Float = isReverb
-            ? (coordinator.audioEngine.channelReverbSends[channel] ?? 0)
-            : (coordinator.audioEngine.channelDelaySends[channel] ?? 0)
-
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
-            HStack {
-                Circle().fill(color.opacity(0.5)).frame(width: 12, height: 12)
-                Slider(value: Binding(
-                    get: { value },
-                    set: { newVal in
-                        if isReverb {
-                            coordinator.audioEngine.setChannelReverbSend(channel, amount: newVal)
-                        } else {
-                            coordinator.audioEngine.setChannelDelaySend(channel, amount: newVal)
-                        }
-                    }
-                ), in: 0...1)
-                .tint(color)
-                Text("\(Int(value * 100))%")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .frame(width: 35)
-            }
-        }
     }
 }
