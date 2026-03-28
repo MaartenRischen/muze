@@ -86,11 +86,8 @@ class ARKitTracker: NSObject {
         let config = ARFaceTrackingConfiguration()
         config.maximumNumberOfTrackedFaces = 1
 
-        if ARFaceTrackingConfiguration.supportsFrameSemantics(.personSegmentationWithDepth) {
-            config.frameSemantics.insert(.personSegmentationWithDepth)
-        } else if ARFaceTrackingConfiguration.supportsFrameSemantics(.personSegmentation) {
-            config.frameSemantics.insert(.personSegmentation)
-        }
+        // Person segmentation DISABLED — the ML model kills performance
+        // (was causing app to run at <5fps)
 
         session.run(config, options: [.resetTracking, .removeExistingAnchors])
         print("[ARKit] Session started with face tracking")
@@ -376,11 +373,6 @@ extension ARKitTracker: ARSessionDelegate {
 
             // Hand detection — runs async with copied pixel buffer
             detectHand(in: frame)
-
-            // Forward segmentation buffer if available
-            if let segBuffer = frame.segmentationBuffer {
-                delegate?.arKitTracker(self, didUpdateSegmentation: segBuffer)
-            }
         }
     }
 
