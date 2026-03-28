@@ -101,10 +101,10 @@ class SoundFontManager {
         loadLeadPreset(0)
         loadBassPreset(0)
 
-        // Set initial volumes
-        padSampler?.masterGain = 0 // full volume for testing
-        leadSampler?.masterGain = 0
-        bassSampler?.masterGain = 0
+        // Set initial volumes — start muted (volume 0), unmute when user toggles
+        padSampler?.volume = 0
+        leadSampler?.volume = 0
+        bassSampler?.volume = 0
     }
 
     func loadPadPreset(_ index: Int) {

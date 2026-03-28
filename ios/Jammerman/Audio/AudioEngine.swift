@@ -939,12 +939,19 @@ class AudioEngine: ObservableObject {
             case "pad":
                 if padMuted {
                     sfm.stopChord(currentPadMidiNotes, on: sfm.padSampler)
+                    sfm.padSampler?.volume = 0
+                } else {
+                    sfm.padSampler?.volume = 1
                 }
-                // If unmuting, triggerPad will be called from note seeding
             case "melody":
-                if melodyMuted, let note = currentMelodyMidiNote {
-                    sfm.stopNote(note, on: sfm.leadSampler)
-                    currentMelodyMidiNote = nil
+                if melodyMuted {
+                    if let note = currentMelodyMidiNote {
+                        sfm.stopNote(note, on: sfm.leadSampler)
+                        currentMelodyMidiNote = nil
+                    }
+                    sfm.leadSampler?.volume = 0
+                } else {
+                    sfm.leadSampler?.volume = 1
                 }
             default: break
             }
