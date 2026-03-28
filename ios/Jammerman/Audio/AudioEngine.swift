@@ -174,7 +174,14 @@ class AudioEngine: ObservableObject {
     ]
     private var kickTriggered: Bool = false
     private var kickTriggerSample: UInt64 = 0  // when kick last fired
-    private let sidechainHoldSamples: UInt64 = 2205  // ~50ms hold at 44.1kHz
+    private lazy var sidechainHoldSamples: UInt64 = UInt64(0.050 * sampleRate)  // 50ms hold
+
+    // Thread-safe drum step for UI (written from audio thread, read from main)
+    private var _pendingDrumStep: Int = -1
+
+    // Arp note-off tracking (avoid DispatchQueue.main.asyncAfter from audio thread)
+    private var arpPendingNoteOff: UInt8? = nil
+    private var arp2PendingNoteOff: UInt8? = nil
 
     // Reverb parameters
     @Published var reverbWetDry: Float = 35        // 0-100%
@@ -234,7 +241,10 @@ class AudioEngine: ObservableObject {
     // MARK: - Build Audio Graph
 
     private func buildGraph() {
-        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2) else {
+            print("AudioEngine: failed to create AVAudioFormat")
+            return
+        }
 
         padNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
@@ -256,11 +266,39 @@ class AudioEngine: ObservableObject {
         kickNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
 
-            // Advance clock and trigger sequenced events per-sample
+            // --- Snapshot all @Published / main-thread values BEFORE the per-sample loop ---
             let sr = self.sampleRate
             let currentBpm = self.bpm
+            let localBeatMuted = self.beatMuted
+            let localArpMuted = self.arpMuted
+            let localArp2Muted = self.arp2Muted
+            let localPadMuted = self.padMuted
+            let localMelodyMuted = self.melodyMuted
+            let localUseSoundFont = self.useSoundFont
+            let localArpNotes = self.arpNotes       // copy array
+            let localArp2Notes = self.arp2Notes     // copy array
+            let localArpPattern = self.arpPattern
+            let localArp2Pattern = self.arp2Pattern
+            let localArpNoteValue = self.arpNoteValue
+            let localArp2NoteValue = self.arp2NoteValue
+            let localDrumPattern = self.drumPattern // copy array of arrays
+            let localDrumVelocity = self.drumVelocity
+            let localSidechainEnabled = self.sidechainEnabled
+            let localSidechainRelease = self.sidechainRelease
+            let localHoldSamples = self.sidechainHoldSamples
+
             let samplesPerBeat = sr * 60.0 / currentBpm
             let samplesPerSixteenth = samplesPerBeat / 4.0
+
+            // Stop any pending arp note-offs from the previous step
+            if let pendingOff = self.arpPendingNoteOff {
+                self.soundFontManager?.arpSampler?.stopNote(pendingOff, onChannel: 0)
+                self.arpPendingNoteOff = nil
+            }
+            if let pendingOff = self.arp2PendingNoteOff {
+                self.soundFontManager?.arp2Sampler?.stopNote(pendingOff, onChannel: 0)
+                self.arp2PendingNoteOff = nil
+            }
 
             for i in 0..<Int(frameCount) {
                 let pos = self.globalSampleCount + UInt64(i)
@@ -269,46 +307,69 @@ class AudioEngine: ObservableObject {
                 // Drum sequencer — on new 16th note step
                 if sixteenthStep != self.lastDrumStep {
                     self.lastDrumStep = sixteenthStep
-                    if !self.beatMuted && self.drumPattern.count >= 3 {
-                        let step = sixteenthStep % self.drumPattern[0].count
-                        if self.drumPattern[0][step] == 1 {
-                            let vel = self.drumVelocity.count > 0 && step < self.drumVelocity[0].count ? self.drumVelocity[0][step] : 0.8
+                    if !localBeatMuted && localDrumPattern.count >= 3 {
+                        // Bounds-safe step index
+                        guard localDrumPattern[0].count > 0 else { continue }
+                        let step = sixteenthStep % localDrumPattern[0].count
+
+                        // Kick
+                        if step < localDrumPattern[0].count && localDrumPattern[0][step] == 1 {
+                            let vel: Float = (localDrumVelocity.count > 0 && step < localDrumVelocity[0].count) ? localDrumVelocity[0][step] : 0.8
                             self.kickOsc.trigger(velocity: vel)
                             self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmKick, withVelocity: UInt8(vel * 127), onChannel: 9)
                             // Trigger sidechain — mark sample position
-                            if self.sidechainEnabled {
+                            if localSidechainEnabled {
                                 self.kickTriggered = true
                                 self.kickTriggerSample = self.globalSampleCount + UInt64(i)
                             }
                         }
-                        if self.drumPattern[1][step] == 1 {
-                            let vel = self.drumVelocity.count > 1 && step < self.drumVelocity[1].count ? self.drumVelocity[1][step] : 0.7
-                            self.snareOsc.trigger(velocity: vel)
-                            self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmSnare, withVelocity: UInt8(vel * 127), onChannel: 9)
+                        // Snare
+                        if localDrumPattern[1].count > 0 {
+                            let snareStep = step % localDrumPattern[1].count
+                            if localDrumPattern[1][snareStep] == 1 {
+                                let vel: Float = (localDrumVelocity.count > 1 && snareStep < localDrumVelocity[1].count) ? localDrumVelocity[1][snareStep] : 0.7
+                                self.snareOsc.trigger(velocity: vel)
+                                self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmSnare, withVelocity: UInt8(vel * 127), onChannel: 9)
+                            }
                         }
-                        if self.drumPattern[2][step] == 1 {
-                            let vel = self.drumVelocity.count > 2 && step < self.drumVelocity[2].count ? self.drumVelocity[2][step] : 0.5
-                            self.hatOsc.trigger(velocity: vel)
-                            self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmClosedHat, withVelocity: UInt8(vel * 127), onChannel: 9)
+                        // Hat
+                        if localDrumPattern[2].count > 0 {
+                            let hatStep = step % localDrumPattern[2].count
+                            if localDrumPattern[2][hatStep] == 1 {
+                                let vel: Float = (localDrumVelocity.count > 2 && hatStep < localDrumVelocity[2].count) ? localDrumVelocity[2][hatStep] : 0.5
+                                self.hatOsc.trigger(velocity: vel)
+                                self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmClosedHat, withVelocity: UInt8(vel * 127), onChannel: 9)
+                            }
                         }
-                        DispatchQueue.main.async { self.drumStep = sixteenthStep }
+                        // Update UI drum step (weak self, only if changed)
+                        let pendingStep = sixteenthStep
+                        if self._pendingDrumStep != pendingStep {
+                            self._pendingDrumStep = pendingStep
+                            DispatchQueue.main.async { [weak self] in
+                                self?.drumStep = pendingStep
+                            }
+                        }
                     }
                 }
 
                 // Arp 1 sequencer
-                let arpDivisor = self.noteValueDivisor(self.arpNoteValue)
+                let arpDivisor = self.noteValueDivisor(localArpNoteValue)
                 let samplesPerArpStep = samplesPerBeat / Double(arpDivisor)
                 let arpStep = Int(Double(pos) / samplesPerArpStep)
                 if arpStep != self.lastArpStep {
                     self.lastArpStep = arpStep
-                    if !self.arpNotes.isEmpty && !self.arpMuted {
-                        let note = self.getNextArpNote(notes: self.arpNotes, index: &self.arpIndex, direction: &self.arpDirection, pattern: self.arpPattern)
-                        if self.useSoundFont {
-                            self.soundFontManager?.arpSampler?.startNote(UInt8(note), withVelocity: 85, onChannel: 0)
-                            // Stop after short duration to avoid overlap
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                self.soundFontManager?.arpSampler?.stopNote(UInt8(note), onChannel: 0)
-                            }
+                    if !localArpNotes.isEmpty && !localArpMuted {
+                        // Stop previous note before starting new one
+                        if localUseSoundFont, let prevNote = self.arpPendingNoteOff {
+                            self.soundFontManager?.arpSampler?.stopNote(prevNote, onChannel: 0)
+                            self.arpPendingNoteOff = nil
+                        }
+                        let note = self.getNextArpNote(notes: localArpNotes, index: &self.arpIndex, direction: &self.arpDirection, pattern: localArpPattern)
+                        if localUseSoundFont {
+                            let midiNote = UInt8(note)
+                            self.soundFontManager?.arpSampler?.startNote(midiNote, withVelocity: 85, onChannel: 0)
+                            // Track for note-off at next step change
+                            self.arpPendingNoteOff = midiNote
                         } else {
                             self.arpOsc.triggerNote(note)
                         }
@@ -316,18 +377,23 @@ class AudioEngine: ObservableObject {
                 }
 
                 // Arp 2 sequencer
-                let arp2Divisor = self.noteValueDivisor(self.arp2NoteValue)
+                let arp2Divisor = self.noteValueDivisor(localArp2NoteValue)
                 let samplesPerArp2Step = samplesPerBeat / Double(arp2Divisor)
                 let arp2Step = Int(Double(pos) / samplesPerArp2Step)
                 if arp2Step != self.lastArp2Step {
                     self.lastArp2Step = arp2Step
-                    if !self.arp2Notes.isEmpty && !self.arp2Muted {
-                        let note = self.getNextArpNote(notes: self.arp2Notes, index: &self.arp2Index, direction: &self.arp2Direction, pattern: self.arp2Pattern)
-                        if self.useSoundFont {
-                            self.soundFontManager?.arp2Sampler?.startNote(UInt8(note), withVelocity: 80, onChannel: 0)
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                self.soundFontManager?.arp2Sampler?.stopNote(UInt8(note), onChannel: 0)
-                            }
+                    if !localArp2Notes.isEmpty && !localArp2Muted {
+                        // Stop previous note before starting new one
+                        if localUseSoundFont, let prevNote = self.arp2PendingNoteOff {
+                            self.soundFontManager?.arp2Sampler?.stopNote(prevNote, onChannel: 0)
+                            self.arp2PendingNoteOff = nil
+                        }
+                        let note = self.getNextArpNote(notes: localArp2Notes, index: &self.arp2Index, direction: &self.arp2Direction, pattern: localArp2Pattern)
+                        if localUseSoundFont {
+                            let midiNote = UInt8(note)
+                            self.soundFontManager?.arp2Sampler?.startNote(midiNote, withVelocity: 80, onChannel: 0)
+                            // Track for note-off at next step change
+                            self.arp2PendingNoteOff = midiNote
                         } else {
                             self.arp2Osc.triggerNote(note)
                         }
@@ -337,11 +403,11 @@ class AudioEngine: ObservableObject {
             self.globalSampleCount += UInt64(frameCount)
 
             // Sidechain compressor — apply gain reduction to ducked channels
-            if self.sidechainEnabled {
+            if localSidechainEnabled {
                 let currentSample = self.globalSampleCount
                 let samplesSinceKick = currentSample > self.kickTriggerSample ? currentSample - self.kickTriggerSample : UInt64.max
-                let inHold = samplesSinceKick < self.sidechainHoldSamples
-                let releaseProgress = inHold ? Float(0) : min(1, Float(samplesSinceKick - self.sidechainHoldSamples) / (self.sidechainRelease * 0.001 * Float(sr)))
+                let inHold = samplesSinceKick < localHoldSamples
+                let releaseProgress = inHold ? Float(0) : min(1, Float(samplesSinceKick - localHoldSamples) / (localSidechainRelease * 0.001 * Float(sr)))
 
                 var needsUpdate = false
                 for ch in ["pad", "arp", "arp2", "melody"] {
@@ -366,7 +432,7 @@ class AudioEngine: ObservableObject {
                     // Apply on main thread since AVAudioMixerNode properties may not be audio-thread safe
                     let reductions = self.sidechainGainReduction
                     let volumes = self.channelVolumes
-                    let isMuted = (self.padMuted, self.arpMuted, self.arp2Muted, self.melodyMuted)
+                    let isMuted = (localPadMuted, localArpMuted, localArp2Muted, localMelodyMuted)
                     DispatchQueue.main.async { [weak self] in
                         guard let self else { return }
                         for ch in ["pad", "arp", "arp2", "melody"] {
@@ -387,7 +453,7 @@ class AudioEngine: ObservableObject {
                 }
             }
 
-            return self.kickOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: sr, muted: self.beatMuted)
+            return self.kickOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: sr, muted: localBeatMuted)
         }
         snareNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
