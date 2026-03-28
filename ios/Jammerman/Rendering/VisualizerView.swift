@@ -110,6 +110,10 @@ class VisualizerUIView: UIView {
     private var accentB: CGFloat = 0.93
     private var cachedMode: String = ""
 
+    // ---- Person segmentation mask (for behind-head effects) ----
+    private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+    private var maskFrameCount: Int = 0
+
     override func didMoveToWindow() {
         super.didMoveToWindow()
         if window != nil {
@@ -203,111 +207,104 @@ class VisualizerUIView: UIView {
         let bloomExpand = beatBloomRadius * baseRadius * 0.18
         let radius = baseRadius + energy * 80 + beatExpand + bloomExpand
 
-        // === DRAW LAYERS (back to front) ===
+        // =====================================================
+        // LAYER 1: BACKGROUND EFFECTS (drawn BEHIND the person)
+        // =====================================================
 
-        // 1. Mode geometry (very faint background texture)
+        // 1a. Background darken + blur outside person silhouette
+        drawBackgroundDarken(ctx: ctx, w: w, h: h, state: state, energy: energy)
+
+        // 1b. Mode geometry (very faint background texture)
         drawModeGeometry(ctx: ctx, w: w, h: h, energy: energy)
 
-        // 2. Note constellation
+        // 1c. Note constellation
         updateConstellation(state: state, w: w, h: h)
         drawConstellation(ctx: ctx, w: w, h: h)
 
-        // 3. Waveform ring (3-pass: outer glow, core, hot core + radial fill + shockwaves)
+        // 1d. Waveform ring
         drawWaveformRing(ctx: ctx, cx: cx, cy: cy, radius: radius, energy: energy)
 
-        // 4. Beat halo (rays, rings, glow)
+        // 1e. Beat halo (sits above head)
         drawBeatHalo(ctx: ctx, w: w, h: h, bass: bass, energy: energy)
 
-        // 5. Particles
+        // 1f. Arp visualization
+        drawArpViz(ctx: ctx, cx: cx, cy: cy, radius: radius, energy: energy)
+
+        // 1g. Frequency arc
+        drawFrequencyArc(ctx: ctx, w: w, h: h, energy: energy)
+
+        // =====================================================
+        // LAYER 2: PERSON CUTOUT — erase person area so camera shows through
+        // This makes all Layer 1 effects appear BEHIND the person
+        // =====================================================
+        cutoutPerson(ctx: ctx, w: w, h: h, state: state)
+
+        // =====================================================
+        // LAYER 3: FOREGROUND EFFECTS (drawn ON TOP of the person)
+        // =====================================================
+
+        // 3a. Particles (float in front)
         let particleEnergy = energy
         updateParticles(energy: particleEnergy, cx: cx, cy: cy, radius: radius)
         drawParticles(ctx: ctx)
 
-        // 5b. Arp visualization
-        drawArpViz(ctx: ctx, cx: cx, cy: cy, radius: radius, energy: energy)
-
-        // 6. Frequency arc
-        drawFrequencyArc(ctx: ctx, w: w, h: h, energy: energy)
-
-        // 7. Hand light painting trail
+        // 3b. Hand light painting trail
         updateLightPainting(state: state, w: w, h: h)
         drawLightPainting(ctx: ctx, w: w, h: h)
 
-        // 7b. Connection web (hand-to-face)
+        // 3c. Connection web (hand-to-face)
         drawConnectionWeb(ctx: ctx, w: w, h: h, state: state, energy: energy)
 
-        // 8. Note burst particles
+        // 3d. Note burst particles
         updateBurstParticles()
         drawBurstParticles(ctx: ctx)
 
-        // 9. Face mesh AR effects
+        // 3e. Face glow effects (iris, aura, particles — NO ugly geometric face)
         if state.faceDetected {
-            // Draw face contours — Vision landmarks if available, otherwise approximate from face center
+            let groups: ContourGroups
             if let landmarks = state.rawLandmarks {
                 let bb = state.faceBoundingBox
-                let groups = extractContourGroups(landmarks: landmarks, bb: bb, w: w, h: h)
-
-                // 9a. Ghost trails (drawn first, behind everything)
-                updateContourSnapshots(groups: groups, state: state)
-                drawContourTrails(ctx: ctx)
-
-                // 9b. Energy aura
-                drawEnergyAura(ctx: ctx, groups: groups, energy: energy)
-
-                // 9c. Glowing face contour (the signature Tron look — 3-pass neon glow)
-                drawContourGlow(ctx: ctx, groups: groups, energy: energy)
-
-                // 9d. Iris glow (pulsing with audio)
-                drawIrisGlow(ctx: ctx, groups: groups, energy: energy)
-
-                // 9e. Landmark light points
-                drawLandmarkLights(ctx: ctx, groups: groups, energy: energy)
-
-                // 9f. Expression particles (mouth + eye sparkles)
-                updateFaceParticles(groups: groups, state: state, energy: energy)
-                drawFaceParticles(ctx: ctx)
+                groups = extractContourGroups(landmarks: landmarks, bb: bb, w: w, h: h)
             } else {
-                // No Vision landmarks (ARKit mode) — draw approximate face + all face effects
-                drawApproximateFace(ctx: ctx, cx: faceCx, cy: faceCy, w: w, h: h, state: state, energy: energy)
-
-                // Generate synthetic ContourGroups from approximate face geometry
-                // so iris glow, expression particles, landmark lights, ghost trails, energy aura all work
-                let synth = synthesizeContourGroups(cx: faceCx, cy: faceCy, w: w, h: h, state: state)
-
-                // Ghost trails
-                updateContourSnapshots(groups: synth, state: state)
-                drawContourTrails(ctx: ctx)
-
-                // Energy aura
-                drawEnergyAura(ctx: ctx, groups: synth, energy: energy)
-
-                // Iris glow
-                drawIrisGlow(ctx: ctx, groups: synth, energy: energy)
-
-                // Landmark lights
-                drawLandmarkLights(ctx: ctx, groups: synth, energy: energy)
-
-                // Expression particles
-                updateFaceParticles(groups: synth, state: state, energy: energy)
-                drawFaceParticles(ctx: ctx)
+                groups = synthesizeContourGroups(cx: faceCx, cy: faceCy, w: w, h: h, state: state)
             }
+
+            // Ghost trails
+            updateContourSnapshots(groups: groups, state: state)
+            drawContourTrails(ctx: ctx)
+
+            // Energy aura (soft breathing glow around face)
+            drawEnergyAura(ctx: ctx, groups: groups, energy: energy)
+
+            // Iris glow (the money effect — pulsing eye lights)
+            drawIrisGlow(ctx: ctx, groups: groups, energy: energy)
+
+            // Landmark lights (key facial points glow)
+            drawLandmarkLights(ctx: ctx, groups: groups, energy: energy)
+
+            // Expression particles (mouth sparkles + eye sparkles)
+            updateFaceParticles(groups: groups, state: state, energy: energy)
+            drawFaceParticles(ctx: ctx)
         }
 
-        // 10. Explosion particles
+        // 3f. Explosion particles
         updateAndDrawExplosion(ctx: ctx, w: w, h: h)
 
-        // 11. Beat flash overlay (matches web CSS beat-flash class)
+        // =====================================================
+        // LAYER 4: FULL-SCREEN POST EFFECTS
+        // =====================================================
+
+        // Beat flash overlay
         if beatPulse > 0.4 {
             let flashAlpha = (beatPulse - 0.4) * 0.18
             ctx.saveGState()
             ctx.setBlendMode(.plusLighter)
-            // Accent-tinted flash for more character
             ctx.setFillColor(UIColor(red: accentR * 0.3 + 0.7, green: accentG * 0.3 + 0.7, blue: accentB * 0.3 + 0.7, alpha: flashAlpha).cgColor)
             ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
             ctx.restoreGState()
         }
 
-        // 12. Vignette (subtle dark edges for cinematic look)
+        // Cinematic vignette
         drawVignette(ctx: ctx, w: w, h: h)
     }
 
@@ -329,6 +326,69 @@ class VisualizerUIView: UIView {
             ctx.drawRadialGradient(gradient, startCenter: CGPoint(x: cx, y: cy), startRadius: 0,
                                    endCenter: CGPoint(x: cx, y: cy), endRadius: maxR, options: [])
         }
+    }
+
+    // MARK: - Background Darken (darken + slight blur outside person silhouette)
+
+    private var cachedDarkenMask: CGImage?
+    private var cachedCutoutMask: CGImage?
+
+    private func updateSegmentationMasks(w: CGFloat, h: CGFloat, state: JammermanState) {
+        maskFrameCount += 1
+        guard maskFrameCount % 3 == 0 else { return }  // update every 3rd frame for perf
+        guard let segBuffer = state.segmentationBuffer else { return }
+
+        // ARKit segmentation buffer is in landscape (.right) orientation for front camera
+        // CIImage handles the rotation via orientation parameter
+        let ciImage = CIImage(cvPixelBuffer: segBuffer)
+            .oriented(.right)  // rotate to portrait
+
+        let extent = ciImage.extent
+
+        // === Darken mask: invert (background = white) → tint dark ===
+        let inverted = ciImage.applyingFilter("CIColorInvert")
+        let darkTint = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0.55))
+            .cropped(to: extent)
+        let darkBg = inverted.applyingFilter("CIMultiplyCompositing", parameters: [
+            "inputBackgroundImage": darkTint
+        ])
+        let softenedDark = darkBg.applyingGaussianBlur(sigma: 5).cropped(to: extent)
+        if let cgImg = ciContext.createCGImage(softenedDark, from: extent) {
+            cachedDarkenMask = cgImg
+        }
+
+        // === Cutout mask: person area (white), softened edges ===
+        let softenedCut = ciImage.applyingGaussianBlur(sigma: 8).cropped(to: extent)
+        if let cgImg = ciContext.createCGImage(softenedCut, from: extent) {
+            cachedCutoutMask = cgImg
+        }
+    }
+
+    private func drawBackgroundDarken(ctx: CGContext, w: CGFloat, h: CGFloat, state: JammermanState, energy: CGFloat) {
+        updateSegmentationMasks(w: w, h: h, state: state)
+
+        guard let mask = cachedDarkenMask else { return }
+
+        ctx.saveGState()
+        // Front camera: mirror X for selfie view
+        ctx.translateBy(x: w, y: 0)
+        ctx.scaleBy(x: -1, y: 1)
+        ctx.draw(mask, in: CGRect(x: 0, y: 0, width: w, height: h))
+        ctx.restoreGState()
+    }
+
+    // MARK: - Person Cutout (erase person area so effects appear behind)
+
+    private func cutoutPerson(ctx: CGContext, w: CGFloat, h: CGFloat, state: JammermanState) {
+        guard let mask = cachedCutoutMask else { return }
+
+        ctx.saveGState()
+        ctx.setBlendMode(.destinationOut)
+        // Front camera: mirror X for selfie view
+        ctx.translateBy(x: w, y: 0)
+        ctx.scaleBy(x: -1, y: 1)
+        ctx.draw(mask, in: CGRect(x: 0, y: 0, width: w, height: h))
+        ctx.restoreGState()
     }
 
     // MARK: - Approximate Face (when no Vision landmarks — ARKit mode)
