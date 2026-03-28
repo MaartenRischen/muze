@@ -210,9 +210,7 @@ class VisualizerUIView: UIView {
         let bloomExpand = beatBloomRadius * baseRadius * 0.18
         let radius = baseRadius + energy * 80 + beatExpand + bloomExpand
 
-        // === BACKGROUND EFFECTS (behind person) ===
-
-        drawBackgroundDarken(ctx: ctx, w: w, h: h, state: state, energy: energy)
+        // === EFFECTS ===
 
         drawModeGeometry(ctx: ctx, w: w, h: h, energy: energy)
 
@@ -226,9 +224,6 @@ class VisualizerUIView: UIView {
         drawArpViz(ctx: ctx, cx: cx, cy: cy, radius: radius, energy: energy)
 
         drawFrequencyArc(ctx: ctx, w: w, h: h, energy: energy)
-
-        // Cut out person so background effects appear behind them
-        cutoutPerson(ctx: ctx, w: w, h: h, state: state)
 
         // === FOREGROUND EFFECTS ===
 
