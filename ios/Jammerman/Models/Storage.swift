@@ -66,7 +66,7 @@ enum JammermanStorage {
         UserDefaults.standard.removeObject(forKey: "jammerman-settings-v3")
 
         // Version gate — clear storage on version change
-        let ver = "v4.4.0"
+        let ver = "v4.4.1"
         if UserDefaults.standard.string(forKey: "jammerman-ver") != ver {
             UserDefaults.standard.removeObject(forKey: key)
             UserDefaults.standard.set(ver, forKey: "jammerman-ver")
