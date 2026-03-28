@@ -938,10 +938,19 @@ class AudioEngine: ObservableObject {
 
         // Use either synth oscillator or SoundFont sampler, not both
         if useSoundFont, let sfm = soundFontManager {
-            sfm.stopChord(currentPadMidiNotes, on: sfm.padSampler)
-            currentPadMidiNotes = midiNotes.map { UInt8($0) }
+            let newNotes = midiNotes.map { UInt8($0) }
+            let oldNotes = currentPadMidiNotes
+            currentPadMidiNotes = newNotes
+
+            // Crossfade: start new chord FIRST, then fade out old after brief overlap
             if !padMuted {
-                sfm.playChord(currentPadMidiNotes, velocity: 90, on: sfm.padSampler)
+                sfm.playChord(newNotes, velocity: 90, on: sfm.padSampler)
+            }
+            // Stop old notes after ~80ms overlap for seamless transition
+            if !oldNotes.isEmpty {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                    sfm.stopChord(oldNotes, on: sfm.padSampler)
+                }
             }
         } else {
             padOsc.triggerNotes(midiNotes)
