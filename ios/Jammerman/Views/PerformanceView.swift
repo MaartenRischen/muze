@@ -33,7 +33,7 @@ struct PerformanceView: View {
             #endif
 
             // === BACKGROUND BLUR (real iOS blur masked by person segmentation) ===
-            SegmentedBlurOverlay(blurMask: coordinator.state.segBlurMask)
+            SegmentedBlurOverlay(blurMask: coordinator.state.segCutoutMask)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
