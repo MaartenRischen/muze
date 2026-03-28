@@ -64,13 +64,30 @@ struct MixerPanelView: View {
     // MARK: - Channel Strip
 
     private func channelStrip(name: String, id: String, color: Color) -> some View {
-        let vol = coordinator.audioEngine.channelVolumes[id] ?? -10
+        ChannelStripView(name: name, id: id, color: color, coordinator: coordinator, detailChannel: $detailChannel)
+    }
+
+    // MARK: - Channel Detail (stays in MixerPanelView for access to channels/detailChannel)
+}
+
+// Separate view for channel strip so @State works for fader drag
+struct ChannelStripView: View {
+    let name: String
+    let id: String
+    let color: Color
+    @ObservedObject var coordinator: TrackingCoordinator
+    @Binding var detailChannel: String?
+    @State private var dragVolume: Float? = nil // local tracking during drag
+
+    var body: some View {
+        let vol = dragVolume ?? (coordinator.audioEngine.channelVolumes[id] ?? -10)
         let muted = id == "master" ? false : coordinator.audioEngine.isMuted(id)
         let soloed = coordinator.audioEngine.soloChannel == id
         let stripWidth: CGFloat = (UIScreen.main.bounds.width - 20) / 7.5
+        let pct = CGFloat((vol + 60) / 66)
 
-        return VStack(spacing: 0) {
-            // Header
+        VStack(spacing: 0) {
+            // Header — tap to open detail
             Button { detailChannel = id } label: {
                 Text(name)
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
@@ -80,15 +97,11 @@ struct MixerPanelView: View {
                     .background(color)
             }
 
-            // Fader area with drag gesture
+            // Fader
             GeometryReader { geo in
-                let pct = CGFloat((vol + 60) / 66) // -60 to +6 dB
-
                 ZStack {
-                    // Track
                     Rectangle().fill(.white.opacity(0.05))
 
-                    // Colored fill from bottom
                     VStack {
                         Spacer()
                         Rectangle()
@@ -96,42 +109,46 @@ struct MixerPanelView: View {
                             .frame(height: geo.size.height * max(0, min(1, pct)))
                     }
 
-                    // Fader thumb
                     let y = geo.size.height * (1 - max(0, min(1, pct)))
                     RoundedRectangle(cornerRadius: 2)
                         .fill(.white.opacity(0.7))
                         .frame(width: stripWidth * 0.6, height: 8)
                         .position(x: geo.size.width / 2, y: y)
                 }
-                .gesture(DragGesture(minimumDistance: 0).onChanged { v in
-                    let pctNew = 1 - Float(v.location.y / geo.size.height)
-                    let db = -60 + max(0, min(1, pctNew)) * 66
-                    if id != "master" {
-                        coordinator.audioEngine.setChannelVolume(id, db: db)
+                .gesture(DragGesture(minimumDistance: 0)
+                    .onChanged { v in
+                        let pctNew = 1 - Float(v.location.y / geo.size.height)
+                        let db = -60 + max(0, min(1, pctNew)) * 66
+                        dragVolume = db
+                        if id != "master" {
+                            coordinator.audioEngine.setChannelVolume(id, db: db)
+                        }
                     }
-                })
+                    .onEnded { _ in
+                        dragVolume = nil
+                    }
+                )
             }
             .frame(height: 200)
 
-            // dB value
             Text("\(Int(vol))")
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.4))
                 .padding(.vertical, 2)
 
-            // Pan indicator
+            // Pan dot
             let pan = coordinator.audioEngine.channelPans[id] ?? 0
             HStack(spacing: 1) {
-                Rectangle().fill(pan < 0 ? color.opacity(0.5) : .white.opacity(0.1))
+                Rectangle().fill(pan < -0.05 ? color.opacity(0.5) : .white.opacity(0.1))
                     .frame(width: stripWidth * 0.2, height: 4)
                 Rectangle().fill(abs(pan) < 0.1 ? color.opacity(0.3) : .white.opacity(0.1))
                     .frame(width: stripWidth * 0.1, height: 4)
-                Rectangle().fill(pan > 0 ? color.opacity(0.5) : .white.opacity(0.1))
+                Rectangle().fill(pan > 0.05 ? color.opacity(0.5) : .white.opacity(0.1))
                     .frame(width: stripWidth * 0.2, height: 4)
             }
             .clipShape(RoundedRectangle(cornerRadius: 2))
 
-            // M / S buttons
+            // M / S
             HStack(spacing: 2) {
                 Button {
                     if id != "master" { coordinator.toggleMute(id) }
@@ -144,9 +161,7 @@ struct MixerPanelView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 3))
                 }
                 Button {
-                    if id != "master" {
-                        coordinator.audioEngine.toggleSolo(id)
-                    }
+                    if id != "master" { coordinator.audioEngine.toggleSolo(id) }
                 } label: {
                     Text("S")
                         .font(.system(size: 8, weight: .bold, design: .monospaced))
@@ -160,10 +175,12 @@ struct MixerPanelView: View {
         }
         .frame(width: stripWidth)
     }
+}
 
-    // MARK: - Channel Detail
+// MARK: - Channel Detail (extension on MixerPanelView)
 
-    private func channelDetail(_ id: String) -> some View {
+extension MixerPanelView {
+    func channelDetail(_ id: String) -> some View {
         let name = channels.first(where: { $0.1 == id })?.0 ?? id
         let color = channels.first(where: { $0.1 == id })?.2 ?? .white
         let eqGains = coordinator.audioEngine.channelEQGains[id] ?? [0, 0, 0]
@@ -250,13 +267,13 @@ struct MixerPanelView: View {
         .frame(height: 380)
     }
 
-    private func panLabel(_ pan: Float) -> String {
+    func panLabel(_ pan: Float) -> String {
         if abs(pan) < 0.05 { return "C" }
         if pan < 0 { return "L\(Int(abs(pan) * 100))" }
         return "R\(Int(pan * 100))"
     }
 
-    private func eqBandControl(_ label: String, channel: String, band: Int, value: Float, color: Color) -> some View {
+    func eqBandControl(_ label: String, channel: String, band: Int, value: Float, color: Color) -> some View {
         VStack(spacing: 4) {
             Text(label)
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -310,7 +327,7 @@ struct MixerPanelView: View {
         }
     }
 
-    private func sendControl(_ label: String, channel: String, color: Color, isReverb: Bool) -> some View {
+    func sendControl(_ label: String, channel: String, color: Color, isReverb: Bool) -> some View {
         let value: Float = isReverb
             ? (coordinator.audioEngine.channelReverbSends[channel] ?? 0)
             : (coordinator.audioEngine.channelDelaySends[channel] ?? 0)
