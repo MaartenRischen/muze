@@ -7,7 +7,7 @@ import SwiftUI
 struct InstrumentDetailView: View {
     let channel: String
     let color: Color
-    @ObservedObject var coordinator: TrackingCoordinator
+    let coordinator: TrackingCoordinator  // NOT @ObservedObject — prevents 30fps redraws
     @Binding var isPresented: Bool
 
     var body: some View {
@@ -84,7 +84,8 @@ struct InstrumentDetailView: View {
     }
 
     private var hasSynthParams: Bool {
-        ["pad", "arp", "arp2", "melody"].contains(channel)
+        // Synth ADSR only applies to built-in oscillators, not SoundFont samplers
+        !engine.useSoundFont && ["pad", "arp", "arp2", "melody"].contains(channel)
     }
 
     private var hasPatternSettings: Bool {

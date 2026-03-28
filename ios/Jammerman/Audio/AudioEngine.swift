@@ -474,11 +474,12 @@ class AudioEngine: ObservableObject {
             padReverbSendMixer, arpReverbSendMixer, arp2ReverbSendMixer, melodyReverbSendMixer,
             arpDelaySendMixer, arp2DelaySendMixer
         ]
-        // EQs bypassed for debugging — don't attach them
-        // for eq in channelEQs.values { allNodes.append(eq) }
+        // Attach per-channel EQs
+        for eq in channelEQs.values { allNodes.append(eq) }
         for node in allNodes { engine.attach(node) }
 
-        // DEBUG: pad → padMixer → mainMixerNode (skip masterMixer + masterEQ)
+        // Signal chain: sourceNode → channelMixer → channelEQ → (fan-out)
+        // EQ is AFTER mixer so it applies to both oscillator AND SoundFont sampler
         engine.connect(padNode, to: padMixer, format: format)
         engine.connect(arpNode, to: arpMixer, format: format)
         engine.connect(arp2Node, to: arp2Mixer, format: format)
@@ -491,41 +492,59 @@ class AudioEngine: ObservableObject {
         // Riser has no per-channel EQ
         engine.connect(riserNode, to: riserMixer, format: format)
 
-        // Wire: channel mixers → multiple destinations (dry + sends)
-        // AVAudioEngine requires connectionPoints API for fan-out
+        // Wire: channelMixer → channelEQ → fan-out (dry + sends)
+        // EQ sits after the mixer so it applies to both oscillators AND SoundFont samplers
         let mainNode = engine.mainMixerNode
 
+        // Helper to get EQ output node for a channel (falls back to mixer if no EQ)
+        func eqOut(_ name: String, mixer: AVAudioMixerNode) -> AVAudioNode {
+            if let eq = channelEQs[name] {
+                engine.connect(mixer, to: eq, format: format)
+                return eq
+            }
+            return mixer
+        }
+
+        let padOut = eqOut("pad", mixer: padMixer)
+        let arpOut = eqOut("arp", mixer: arpMixer)
+        let arp2Out = eqOut("arp2", mixer: arp2Mixer)
+        let melodyOut = eqOut("melody", mixer: melodyMixer)
+        let kickOut = eqOut("kick", mixer: kickMixer)
+        let snareOut = eqOut("snare", mixer: snareMixer)
+        let hatOut = eqOut("hat", mixer: hatMixer)
+        let binauralOut = eqOut("binaural", mixer: binauralMixer)
+
         // Pad: dry + reverb send
-        engine.connect(padMixer, to: [
+        engine.connect(padOut, to: [
             AVAudioConnectionPoint(node: mainNode, bus: mainNode.nextAvailableInputBus),
             AVAudioConnectionPoint(node: padReverbSendMixer, bus: 0)
         ], fromBus: 0, format: format)
 
         // Arp: dry + reverb + delay sends
-        engine.connect(arpMixer, to: [
+        engine.connect(arpOut, to: [
             AVAudioConnectionPoint(node: mainNode, bus: mainNode.nextAvailableInputBus),
             AVAudioConnectionPoint(node: arpReverbSendMixer, bus: 0),
             AVAudioConnectionPoint(node: arpDelaySendMixer, bus: 0)
         ], fromBus: 0, format: format)
 
         // Arp2: dry + reverb + delay sends
-        engine.connect(arp2Mixer, to: [
+        engine.connect(arp2Out, to: [
             AVAudioConnectionPoint(node: mainNode, bus: mainNode.nextAvailableInputBus),
             AVAudioConnectionPoint(node: arp2ReverbSendMixer, bus: 0),
             AVAudioConnectionPoint(node: arp2DelaySendMixer, bus: 0)
         ], fromBus: 0, format: format)
 
         // Melody: dry + reverb send
-        engine.connect(melodyMixer, to: [
+        engine.connect(melodyOut, to: [
             AVAudioConnectionPoint(node: mainNode, bus: mainNode.nextAvailableInputBus),
             AVAudioConnectionPoint(node: melodyReverbSendMixer, bus: 0)
         ], fromBus: 0, format: format)
 
-        // Drums, binaural, riser: dry only
-        engine.connect(kickMixer, to: mainNode, format: format)
-        engine.connect(snareMixer, to: mainNode, format: format)
-        engine.connect(hatMixer, to: mainNode, format: format)
-        engine.connect(binauralMixer, to: mainNode, format: format)
+        // Drums, binaural, riser: dry only (through EQ)
+        engine.connect(kickOut, to: mainNode, format: format)
+        engine.connect(snareOut, to: mainNode, format: format)
+        engine.connect(hatOut, to: mainNode, format: format)
+        engine.connect(binauralOut, to: mainNode, format: format)
         engine.connect(riserMixer, to: mainNode, format: format)
 
         // Send mixers → effects → output
