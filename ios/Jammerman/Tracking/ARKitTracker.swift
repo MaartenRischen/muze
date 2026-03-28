@@ -42,10 +42,7 @@ class ARKitTracker: NSObject {
     private var handFrameCount = 0
     private var lastHandOpen: Bool?
 
-    #if !targetEnvironment(simulator)
-    // Store latest frame for 3D→2D projection
-    private var latestFrame: ARFrame?
-    #endif
+    // No frame retention — use arSession?.currentFrame when needed
 
     /// Whether ARKit face tracking is available on this device
     static var isSupported: Bool {
@@ -149,7 +146,7 @@ class ARKitTracker: NSObject {
         var faceCenterX: Float = 0.5
         var faceCenterY: Float = 0.4
         #if !targetEnvironment(simulator)
-        if let frame = latestFrame {
+        if let frame = arSession?.currentFrame {
             // Get the 3D world position of the face (nose tip = origin of face anchor)
             let worldPos = simd_float3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
             // Project to 2D using ARCamera
@@ -273,7 +270,7 @@ class ARKitTracker: NSObject {
 #if !targetEnvironment(simulator)
 extension ARKitTracker: ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        latestFrame = frame
+        // Don't retain frame — use arSession?.currentFrame when needed
         // Hand detection on every frame (internally staggered)
         detectHand(in: frame)
 
