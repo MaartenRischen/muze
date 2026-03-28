@@ -39,6 +39,7 @@ class VisualizerUIView: UIView {
     private var beatBloomRadius: CGFloat = 0
     private var beatBloomVelocity: CGFloat = 0
     private var beatBloomTarget: CGFloat = 0
+    private var lastDrumStep: Int = -1
 
     // ---- Ring rotation (frame counter) ----
     private var ringRotationFrame: Int = 0
@@ -144,14 +145,27 @@ class VisualizerUIView: UIView {
         let energy: CGFloat = state.faceDetected ? CGFloat(0.1 + state.mouthOpenness * 0.4) : 0
         let bass: CGFloat = state.faceDetected ? CGFloat(0.05 + state.mouthOpenness * 0.3) : 0
 
-        // ---- Beat detection ----
-        if bass > lastBass * 1.4 && bass > 0.1 {
+        // ---- Beat detection (both energy-based and drum-step-synced) ----
+        let drumStep = coord.audioEngine.drumStep
+        let beatNotMuted = !coord.audioEngine.beatMuted
+        let isKickStep = (drumStep % 4 == 0)
+        let stepChanged = drumStep != lastDrumStep
+        lastDrumStep = drumStep
+
+        // Trigger from actual drum kick steps for tight sync
+        if stepChanged && isKickStep && beatNotMuted {
             beatPulse = 1.0
             beatBloomTarget = 1.0
             beatBloomVelocity = 0.25
             if shockwaves.count < 5 {
                 shockwaves.append(Shockwave(radius: 0, alpha: 0.4, speed: 4 + bass * 6))
             }
+        }
+        // Also trigger from energy spike (for instruments without drums)
+        if bass > lastBass * 1.4 && bass > 0.1 && beatPulse < 0.3 {
+            beatPulse = max(beatPulse, 0.7)
+            beatBloomTarget = max(beatBloomTarget, 0.7)
+            beatBloomVelocity = max(beatBloomVelocity, 0.15)
         }
         lastBass = bass
         beatPulse *= 0.90
@@ -253,13 +267,66 @@ class VisualizerUIView: UIView {
                 updateFaceParticles(groups: groups, state: state, energy: energy)
                 drawFaceParticles(ctx: ctx)
             } else {
-                // No Vision landmarks (ARKit mode) — draw approximate face using tracked center
+                // No Vision landmarks (ARKit mode) — draw approximate face + all face effects
                 drawApproximateFace(ctx: ctx, cx: faceCx, cy: faceCy, w: w, h: h, state: state, energy: energy)
+
+                // Generate synthetic ContourGroups from approximate face geometry
+                // so iris glow, expression particles, landmark lights, ghost trails, energy aura all work
+                let synth = synthesizeContourGroups(cx: faceCx, cy: faceCy, w: w, h: h, state: state)
+
+                // Ghost trails
+                updateContourSnapshots(groups: synth, state: state)
+                drawContourTrails(ctx: ctx)
+
+                // Energy aura
+                drawEnergyAura(ctx: ctx, groups: synth, energy: energy)
+
+                // Iris glow
+                drawIrisGlow(ctx: ctx, groups: synth, energy: energy)
+
+                // Landmark lights
+                drawLandmarkLights(ctx: ctx, groups: synth, energy: energy)
+
+                // Expression particles
+                updateFaceParticles(groups: synth, state: state, energy: energy)
+                drawFaceParticles(ctx: ctx)
             }
         }
 
         // 10. Explosion particles
         updateAndDrawExplosion(ctx: ctx, w: w, h: h)
+
+        // 11. Beat flash overlay (matches web CSS beat-flash class)
+        if beatPulse > 0.5 {
+            let flashAlpha = (beatPulse - 0.5) * 0.12
+            ctx.saveGState()
+            ctx.setFillColor(UIColor(white: 1, alpha: flashAlpha).cgColor)
+            ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+            ctx.restoreGState()
+        }
+
+        // 12. Vignette (subtle dark edges for cinematic look)
+        drawVignette(ctx: ctx, w: w, h: h)
+    }
+
+    // MARK: - Vignette Overlay
+
+    private func drawVignette(ctx: CGContext, w: CGFloat, h: CGFloat) {
+        let cx = w / 2
+        let cy = h / 2
+        let maxR = sqrt(cx * cx + cy * cy)
+
+        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: [
+                UIColor(white: 0, alpha: 0).cgColor,
+                UIColor(white: 0, alpha: 0).cgColor,
+                UIColor(white: 0, alpha: 0.15).cgColor,
+                UIColor(white: 0, alpha: 0.4).cgColor,
+            ] as CFArray,
+            locations: [0, 0.5, 0.8, 1]) {
+            ctx.drawRadialGradient(gradient, startCenter: CGPoint(x: cx, y: cy), startRadius: 0,
+                                   endCenter: CGPoint(x: cx, y: cy), endRadius: maxR, options: [])
+        }
     }
 
     // MARK: - Approximate Face (when no Vision landmarks — ARKit mode)
@@ -333,6 +400,85 @@ class VisualizerUIView: UIView {
         ctx.fillEllipse(in: CGRect(x: cx - faceW * 0.42 - 2, y: eyeY - 2, width: 4, height: 4))
         ctx.fillEllipse(in: CGRect(x: cx + faceW * 0.42 - 2, y: eyeY - 2, width: 4, height: 4))
         ctx.restoreGState()
+    }
+
+    // MARK: - Synthesize ContourGroups from Approximate Face (ARKit mode)
+
+    /// Generates synthetic face contour groups from the tracked face center so that
+    /// iris glow, expression particles, landmark lights, ghost trails, and energy aura
+    /// all work even without Vision landmarks.
+    private func synthesizeContourGroups(cx: CGFloat, cy: CGFloat, w: CGFloat, h: CGFloat, state: JammermanState) -> ContourGroups {
+        let faceW = w * 0.22
+        let faceH = h * 0.17
+
+        // Generate face oval as a smooth ellipse (32 points)
+        var oval: [CGPoint] = []
+        for i in 0..<32 {
+            let angle = CGFloat(i) / 32.0 * .pi * 2
+            oval.append(CGPoint(x: cx + cos(angle) * faceW, y: cy + sin(angle) * faceH))
+        }
+
+        // Eye positions
+        let eyeY = cy - faceH * 0.15
+        let leftEyeCenter = CGPoint(x: cx - faceW * 0.42, y: eyeY)
+        let rightEyeCenter = CGPoint(x: cx + faceW * 0.42, y: eyeY)
+
+        // Eye contours (small ellipses)
+        let eyeW = faceW * 0.32
+        let eyeH = faceH * 0.1 + CGFloat(state.eyeOpenness) * faceH * 0.05
+        var leftEye: [CGPoint] = []
+        var rightEye: [CGPoint] = []
+        for i in 0..<12 {
+            let a = CGFloat(i) / 12.0 * .pi * 2
+            leftEye.append(CGPoint(x: leftEyeCenter.x + cos(a) * eyeW / 2, y: leftEyeCenter.y + sin(a) * eyeH / 2))
+            rightEye.append(CGPoint(x: rightEyeCenter.x + cos(a) * eyeW / 2, y: rightEyeCenter.y + sin(a) * eyeH / 2))
+        }
+
+        // Mouth
+        let lipW = faceW * 0.35
+        let lipY = cy + faceH * 0.32
+        let mouthCenter = CGPoint(x: cx, y: lipY)
+        var outerLips: [CGPoint] = []
+        for i in 0..<12 {
+            let a = CGFloat(i) / 12.0 * .pi * 2
+            outerLips.append(CGPoint(x: cx + cos(a) * lipW, y: lipY + sin(a) * lipW * 0.4))
+        }
+
+        // Brows
+        let browY = eyeY - faceH * 0.17 - CGFloat(state.browHeight) * 6
+        let leftBrow = [
+            CGPoint(x: cx - faceW * 0.5, y: browY + 2),
+            CGPoint(x: cx - faceW * 0.32, y: browY),
+            CGPoint(x: cx - faceW * 0.12, y: browY + 2)
+        ]
+        let rightBrow = [
+            CGPoint(x: cx + faceW * 0.12, y: browY + 2),
+            CGPoint(x: cx + faceW * 0.32, y: browY),
+            CGPoint(x: cx + faceW * 0.5, y: browY + 2)
+        ]
+
+        // Nose
+        let noseTip = CGPoint(x: cx, y: cy + faceH * 0.12)
+        let noseBridge = [
+            CGPoint(x: cx, y: cy - faceH * 0.05),
+            noseTip
+        ]
+
+        var groups = ContourGroups()
+        groups.faceOval = oval
+        groups.leftEye = leftEye
+        groups.rightEye = rightEye
+        groups.outerLips = outerLips
+        groups.leftBrow = leftBrow
+        groups.rightBrow = rightBrow
+        groups.noseBridge = noseBridge
+        groups.leftEyeCenter = leftEyeCenter
+        groups.rightEyeCenter = rightEyeCenter
+        groups.mouthCenter = mouthCenter
+        groups.noseTip = noseTip
+        groups.faceCenter = CGPoint(x: cx, y: cy)
+        groups.allContours = [oval, leftEye, rightEye, outerLips, leftBrow, rightBrow, noseBridge]
+        return groups
     }
 
     // MARK: - ARKit 3D Face Mesh Wireframe

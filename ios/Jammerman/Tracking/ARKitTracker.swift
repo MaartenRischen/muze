@@ -43,6 +43,8 @@ class ARKitTracker: NSObject {
     private let handRequest = VNDetectHumanHandPoseRequest()
     private var handFrameCount = 0
     private var lastHandOpen: Bool?
+    private var isDetectingHand = false
+    private let handQueue = DispatchQueue(label: "com.jammerman.hand", qos: .userInitiated)
 
     // Vision face landmarks for precise contour rendering (runs on ARFrame)
     #if !targetEnvironment(simulator)
@@ -191,24 +193,76 @@ class ARKitTracker: NSObject {
     private func detectHand(in frame: ARFrame) {
         handFrameCount += 1
         guard handFrameCount % 2 == 1 else { return } // stagger: odd frames
+        guard !isDetectingHand else { return } // skip if previous detection still running
+        isDetectingHand = true
 
-        let pixelBuffer = frame.capturedImage
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right)
+        // Copy pixel buffer to avoid retaining the ARFrame
+        let srcBuffer = frame.capturedImage
+        var copiedBuffer: CVPixelBuffer?
+        let width = CVPixelBufferGetWidth(srcBuffer)
+        let height = CVPixelBufferGetHeight(srcBuffer)
+        let pixelFormat = CVPixelBufferGetPixelFormatType(srcBuffer)
+        CVPixelBufferCreate(kCFAllocatorDefault, width, height, pixelFormat, nil, &copiedBuffer)
 
-        do {
-            try handler.perform([handRequest])
-        } catch {
+        guard let dstBuffer = copiedBuffer else {
+            isDetectingHand = false
             return
         }
 
-        guard let handObs = handRequest.results?.first else {
-            delegate?.arKitTracker(self, didUpdateHand: HandFeatures(
-                handPresent: false, handX: 0.5, handY: 0.5, handOpen: true))
-            return
+        CVPixelBufferLockBaseAddress(srcBuffer, .readOnly)
+        CVPixelBufferLockBaseAddress(dstBuffer, [])
+        let srcPlanes = CVPixelBufferGetPlaneCount(srcBuffer)
+        if srcPlanes > 0 {
+            for plane in 0..<srcPlanes {
+                let srcAddr = CVPixelBufferGetBaseAddressOfPlane(srcBuffer, plane)!
+                let dstAddr = CVPixelBufferGetBaseAddressOfPlane(dstBuffer, plane)!
+                let srcRowBytes = CVPixelBufferGetBytesPerRowOfPlane(srcBuffer, plane)
+                let dstRowBytes = CVPixelBufferGetBytesPerRowOfPlane(dstBuffer, plane)
+                let planeHeight = CVPixelBufferGetHeightOfPlane(srcBuffer, plane)
+                if srcRowBytes == dstRowBytes {
+                    memcpy(dstAddr, srcAddr, srcRowBytes * planeHeight)
+                } else {
+                    for row in 0..<planeHeight {
+                        memcpy(dstAddr + row * dstRowBytes, srcAddr + row * srcRowBytes, min(srcRowBytes, dstRowBytes))
+                    }
+                }
+            }
+        } else {
+            let srcAddr = CVPixelBufferGetBaseAddress(srcBuffer)!
+            let dstAddr = CVPixelBufferGetBaseAddress(dstBuffer)!
+            let srcRowBytes = CVPixelBufferGetBytesPerRow(srcBuffer)
+            let dstRowBytes = CVPixelBufferGetBytesPerRow(dstBuffer)
+            let h = CVPixelBufferGetHeight(srcBuffer)
+            if srcRowBytes == dstRowBytes {
+                memcpy(dstAddr, srcAddr, srcRowBytes * h)
+            } else {
+                for row in 0..<h {
+                    memcpy(dstAddr + row * dstRowBytes, srcAddr + row * srcRowBytes, min(srcRowBytes, dstRowBytes))
+                }
+            }
         }
+        CVPixelBufferUnlockBaseAddress(dstBuffer, [])
+        CVPixelBufferUnlockBaseAddress(srcBuffer, .readOnly)
 
-        if let features = extractHandFeatures(from: handObs) {
-            delegate?.arKitTracker(self, didUpdateHand: features)
+        // Run hand detection on background queue with copied buffer
+        handQueue.async { [weak self] in
+            guard let self else { return }
+            defer { self.isDetectingHand = false }
+
+            let request = VNDetectHumanHandPoseRequest()
+            request.maximumHandCount = 1
+            let handler = VNImageRequestHandler(cvPixelBuffer: dstBuffer, orientation: .right)
+            try? handler.perform([request])
+
+            guard let handObs = request.results?.first else {
+                self.delegate?.arKitTracker(self, didUpdateHand: HandFeatures(
+                    handPresent: false, handX: 0.5, handY: 0.5, handOpen: true))
+                return
+            }
+
+            if let features = self.extractHandFeatures(from: handObs) {
+                self.delegate?.arKitTracker(self, didUpdateHand: features)
+            }
         }
     }
 
@@ -304,11 +358,8 @@ class ARKitTracker: NSObject {
 #if !targetEnvironment(simulator)
 extension ARKitTracker: ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        // Hand detection on every frame (internally staggered)
+        // Hand detection — runs async with copied pixel buffer to avoid retaining ARFrame
         detectHand(in: frame)
-
-        // Vision face detection DISABLED — retains ARFrames causing memory issues
-        // Use approximate face drawing from blend shapes instead
 
         // Forward segmentation buffer if available
         if let segBuffer = frame.segmentationBuffer {
