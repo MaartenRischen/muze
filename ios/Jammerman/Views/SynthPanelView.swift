@@ -138,6 +138,35 @@ struct SynthPanelView: View {
                 coordinator.audioEngine.applyPreset(jammermanPresets[coordinator.state.presetIdx], state: coordinator.state)
             }
 
+            sectionHeader("SOUND ENGINE")
+            HStack {
+                Text("source").font(.system(size: 12, design: .monospaced)).foregroundStyle(.white.opacity(0.5))
+                Spacer()
+                Button {
+                    coordinator.audioEngine.useSoundFont.toggle()
+                } label: {
+                    Text(coordinator.audioEngine.useSoundFont ? "SAMPLED" : "SYNTH")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundStyle(coordinator.audioEngine.useSoundFont ? .green : accentColor)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(coordinator.audioEngine.useSoundFont ? .green.opacity(0.15) : accentColor.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(
+                            coordinator.audioEngine.useSoundFont ? .green.opacity(0.4) : accentColor.opacity(0.3), lineWidth: 1))
+                }
+            }
+            if coordinator.audioEngine.useSoundFont {
+                labelRow("pad sound", value: SoundFontManager.padPresets[min(coordinator.state.presetIdx, SoundFontManager.padPresets.count - 1)].name) {
+                    let next = (coordinator.state.presetIdx + 1) % SoundFontManager.padPresets.count
+                    coordinator.audioEngine.soundFontManager?.loadPadPreset(next)
+                }
+                labelRow("lead sound", value: SoundFontManager.leadPresets[min(coordinator.state.presetIdx, SoundFontManager.leadPresets.count - 1)].name) {
+                    let next = (coordinator.state.presetIdx + 1) % SoundFontManager.leadPresets.count
+                    coordinator.audioEngine.soundFontManager?.loadLeadPreset(next)
+                }
+            }
+
             sectionHeader("TEMPO")
             sliderRow("BPM", value: Binding(
                 get: { Float(coordinator.audioEngine.bpm) },
