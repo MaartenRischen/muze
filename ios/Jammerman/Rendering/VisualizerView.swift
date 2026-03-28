@@ -210,41 +210,22 @@ class VisualizerUIView: UIView {
         let bloomExpand = beatBloomRadius * baseRadius * 0.18
         let radius = baseRadius + energy * 80 + beatExpand + bloomExpand
 
-        // =====================================================
-        // LAYER 1: BACKGROUND EFFECTS (drawn BEHIND the person)
-        // =====================================================
+        // === DRAW EFFECTS ===
 
-        // 1a. Background darken + blur outside person silhouette
-        drawBackgroundDarken(ctx: ctx, w: w, h: h, state: state, energy: energy)
-
-        // 1b. Mode geometry (very faint background texture)
         drawModeGeometry(ctx: ctx, w: w, h: h, energy: energy)
 
-        // 1c. Note constellation
         updateConstellation(state: state, w: w, h: h)
         drawConstellation(ctx: ctx, w: w, h: h)
 
-        // 1d. Waveform ring
         drawWaveformRing(ctx: ctx, cx: cx, cy: cy, radius: radius, energy: energy)
 
-        // 1e. Beat halo (sits above head)
         drawBeatHalo(ctx: ctx, w: w, h: h, bass: bass, energy: energy)
 
-        // 1f. Arp visualization
         drawArpViz(ctx: ctx, cx: cx, cy: cy, radius: radius, energy: energy)
 
-        // 1g. Frequency arc
         drawFrequencyArc(ctx: ctx, w: w, h: h, energy: energy)
 
-        // =====================================================
-        // LAYER 2: PERSON CUTOUT — erase person area so camera shows through
-        // This makes all Layer 1 effects appear BEHIND the person
-        // =====================================================
-        cutoutPerson(ctx: ctx, w: w, h: h, state: state)
-
-        // =====================================================
-        // LAYER 3: FOREGROUND EFFECTS (drawn ON TOP of the person)
-        // =====================================================
+        // === FOREGROUND EFFECTS ===
 
         // 3a. Particles (float in front)
         let particleEnergy = energy
@@ -293,9 +274,7 @@ class VisualizerUIView: UIView {
         // 3f. Explosion particles
         updateAndDrawExplosion(ctx: ctx, w: w, h: h)
 
-        // =====================================================
-        // LAYER 4: FULL-SCREEN POST EFFECTS
-        // =====================================================
+        // === POST EFFECTS ===
 
         // Beat flash overlay
         if beatPulse > 0.4 {

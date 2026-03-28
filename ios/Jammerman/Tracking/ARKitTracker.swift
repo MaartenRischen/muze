@@ -472,9 +472,6 @@ extension ARKitTracker: ARSessionDelegate {
 
             // Hand detection — async with copied pixel buffer (every 2nd frame)
             detectHand(in: frame)
-
-            // Person segmentation — async with copied pixel buffer (every 10th frame)
-            detectSegmentation(in: frame)
         }
     }
 
