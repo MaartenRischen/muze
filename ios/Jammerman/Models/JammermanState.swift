@@ -65,10 +65,8 @@ class JammermanState {
     var faceVertices: [simd_float3]?
     var faceTriangleIndices: [Int16]?
 
-    // ARKit segmentation (pre-processed CGImages — never store raw CVPixelBuffer!)
-    var segDarkenMask: CGImage?
-    var segCutoutMask: CGImage?       // person = white (for effects cutout)
-    var segBlurMask: CGImage?         // background = white (for blur overlay)
+    // ARKit segmentation — single lightweight CGImage (person = white, bg = black)
+    var segmentationMask: CGImage?
 
     // Whether using ARKit (true) or Vision fallback (false)
     var usingARKit: Bool = false

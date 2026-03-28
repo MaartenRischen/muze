@@ -32,11 +32,6 @@ struct PerformanceView: View {
                 .ignoresSafeArea()
             #endif
 
-            // === BACKGROUND BLUR (real iOS blur masked by person segmentation) ===
-            SegmentedBlurOverlay(blurMask: coordinator.state.segCutoutMask)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-
             // === VISUALIZER OVERLAY ===
             VisualizerOverlay(coordinator: coordinator)
                 .ignoresSafeArea()

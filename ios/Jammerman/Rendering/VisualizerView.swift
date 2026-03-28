@@ -331,28 +331,32 @@ class VisualizerUIView: UIView {
         }
     }
 
-    // MARK: - Background Darken (darken + slight blur outside person silhouette)
-    // Masks are pre-processed in TrackingCoordinator to avoid retaining ARFrames
+    // MARK: - Background Darken (dark overlay on background, person cut out)
+    // Uses single lightweight segmentation mask — no CIContext, no blur filters
 
     private func drawBackgroundDarken(ctx: CGContext, w: CGFloat, h: CGFloat, state: JammermanState, energy: CGFloat) {
-        guard let mask = state.segDarkenMask else { return }
+        guard state.segmentationMask != nil else { return }
 
+        // Draw dark overlay over entire frame
         ctx.saveGState()
-        // Front camera: mirror X for selfie view
+        ctx.setFillColor(UIColor(white: 0, alpha: 0.55).cgColor)
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+
+        // Cut out person area (person = white in mask, destinationOut erases)
+        ctx.setBlendMode(.destinationOut)
         ctx.translateBy(x: w, y: 0)
-        ctx.scaleBy(x: -1, y: 1)
-        ctx.draw(mask, in: CGRect(x: 0, y: 0, width: w, height: h))
+        ctx.scaleBy(x: -1, y: 1)  // mirror for front camera
+        ctx.draw(state.segmentationMask!, in: CGRect(x: 0, y: 0, width: w, height: h))
         ctx.restoreGState()
     }
 
-    // MARK: - Person Cutout (erase person area so effects appear behind)
+    // MARK: - Person Cutout (erase person area from effects so they appear behind)
 
     private func cutoutPerson(ctx: CGContext, w: CGFloat, h: CGFloat, state: JammermanState) {
-        guard let mask = state.segCutoutMask else { return }
+        guard let mask = state.segmentationMask else { return }
 
         ctx.saveGState()
         ctx.setBlendMode(.destinationOut)
-        // Front camera: mirror X for selfie view
         ctx.translateBy(x: w, y: 0)
         ctx.scaleBy(x: -1, y: 1)
         ctx.draw(mask, in: CGRect(x: 0, y: 0, width: w, height: h))

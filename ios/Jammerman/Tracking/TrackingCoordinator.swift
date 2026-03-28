@@ -41,8 +41,7 @@ class TrackingCoordinator: ObservableObject {
     private var prevHandOpen = true
     private var currentPadKey = ""
 
-    // Segmentation processing (off main thread, never store raw CVPixelBuffer)
-    private let segQueue = DispatchQueue(label: "com.jammerman.segmentation", qos: .userInitiated)
+    // Segmentation — just render raw mask to CGImage, no heavy processing
     private let segCIContext = CIContext(options: [.useSoftwareRenderer: false])
     private var isProcessingSeg = false
     private var segFrameCount = 0
@@ -394,48 +393,19 @@ extension TrackingCoordinator: ARKitTrackerDelegate {
         guard segFrameCount % 5 == 0, !isProcessingSeg else { return }
         isProcessingSeg = true
 
-        // Render the segmentation buffer to a standalone CGImage SYNCHRONOUSLY
-        // so the CVPixelBuffer (and thus the ARFrame) is released immediately.
-        // The segmentation buffer is small (~256x192) so this is fast.
+        // Render seg buffer to standalone CGImage synchronously (tiny ~256x192, fast)
+        // No CIImage filters, no blur, no compositing — just the raw mask
         let ciRaw = CIImage(cvPixelBuffer: buffer).oriented(.right)
         let extent = ciRaw.extent
-        guard let rawCG = segCIContext.createCGImage(ciRaw, from: extent) else {
+        guard let maskCG = segCIContext.createCGImage(ciRaw, from: extent) else {
             isProcessingSeg = false
             return
         }
-        // rawCG is now a standalone CGImage — no CVPixelBuffer reference
+        isProcessingSeg = false
 
-        // Heavy processing (blur, compositing) on background queue
-        segQueue.async { [weak self] in
-            guard let self else { return }
-            defer { self.isProcessingSeg = false }
-
-            let ciImage = CIImage(cgImage: rawCG)
-            let ext = ciImage.extent
-
-            // Darken mask: invert + dark tint + blur
-            let inverted = ciImage.applyingFilter("CIColorInvert")
-            let darkTint = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0.55))
-                .cropped(to: ext)
-            let darkBg = inverted.applyingFilter("CIMultiplyCompositing", parameters: [
-                "inputBackgroundImage": darkTint
-            ])
-            let softenedDark = darkBg.applyingGaussianBlur(sigma: 5).cropped(to: ext)
-            let darkenCG = self.segCIContext.createCGImage(softenedDark, from: ext)
-
-            // Cutout mask: person = white (for effects cutout)
-            let softenedCut = ciImage.applyingGaussianBlur(sigma: 8).cropped(to: ext)
-            let cutoutCG = self.segCIContext.createCGImage(softenedCut, from: ext)
-
-            // Blur mask: background = white (inverted cutout, for blur overlay)
-            let blurMaskCI = softenedCut.applyingFilter("CIColorInvert")
-            let blurCG = self.segCIContext.createCGImage(blurMaskCI, from: ext)
-
-            DispatchQueue.main.async { [weak self] in
-                self?.state.segDarkenMask = darkenCG
-                self?.state.segCutoutMask = cutoutCG
-                self?.state.segBlurMask = blurCG
-            }
+        // Store single lightweight mask on main thread
+        DispatchQueue.main.async { [weak self] in
+            self?.state.segmentationMask = maskCG
         }
     }
 
