@@ -24,7 +24,8 @@ class HandTracker {
 
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return nil }
 
-        try? sequenceHandler.perform([handRequest], on: pixelBuffer, orientation: .up)
+        // .leftMirrored for front camera in portrait mode
+        try? sequenceHandler.perform([handRequest], on: pixelBuffer, orientation: .leftMirrored)
 
         guard let handObs = handRequest.results?.first else {
             return HandFeatures(handPresent: false, handX: 0.5, handY: 0.5, handOpen: true)

@@ -1,70 +1,64 @@
 // Jammerman — Background Blur
-// Uses Vision PersonSegmentationRequest to blur non-person areas
-// Processing happens on background thread to avoid blocking main
+// Uses Vision PersonSegmentationRequest to darken non-person areas
+// Processing on background thread
 
 import SwiftUI
 import Vision
 import CoreImage
-import CoreImage.CIFilterBuiltins
 
-class PersonSegmenter {
+class PersonSegmenter: ObservableObject {
     private let request = VNGeneratePersonSegmentationRequest()
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
     private let processingQueue = DispatchQueue(label: "com.jammerman.segmentation", qos: .userInitiated)
+    private var isProcessing = false
 
-    @Published var blurredImage: UIImage?
+    @Published var maskImage: UIImage?
     var isEnabled = true
 
     init() {
-        request.qualityLevel = .balanced // fast enough for real-time
+        request.qualityLevel = .balanced
         request.outputPixelFormat = kCVPixelFormatType_OneComponent8
     }
 
     func processFrame(_ sampleBuffer: CMSampleBuffer) {
-        guard isEnabled else { return }
+        guard isEnabled, !isProcessing else { return }
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        isProcessing = true
 
         processingQueue.async { [weak self] in
             guard let self else { return }
+            defer { self.isProcessing = false }
 
-            let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up)
+            let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right) // .right for front camera in portrait
             try? handler.perform([self.request])
 
             guard let result = self.request.results?.first else { return }
             let maskBuffer = result.pixelBuffer
 
-            // Create dark overlay blended with mask
-            let maskImage = CIImage(cvPixelBuffer: maskBuffer)
-            let cameraImage = CIImage(cvPixelBuffer: pixelBuffer)
+            // Convert mask to UIImage with dark tint for background
+            let maskCI = CIImage(cvPixelBuffer: maskBuffer)
 
-            // Scale mask to match camera
-            let scaleX = cameraImage.extent.width / maskImage.extent.width
-            let scaleY = cameraImage.extent.height / maskImage.extent.height
-            let scaledMask = maskImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+            // Invert mask (person = black/transparent, background = white/dark)
+            let inverted = maskCI.applyingFilter("CIColorInvert")
 
-            // Blur the mask edges for smooth transition
-            let softMask = scaledMask
-                .applyingGaussianBlur(sigma: 8)
-                .cropped(to: cameraImage.extent)
+            // Tint to dark semi-transparent
+            let darkTint = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0.55))
+                .cropped(to: maskCI.extent)
 
-            // Dark semi-transparent overlay for background
-            let darkOverlay = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0.5))
-                .cropped(to: cameraImage.extent)
-
-            // Clear for person area
-            let clear = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0))
-                .cropped(to: cameraImage.extent)
-
-            // Blend: person = clear, background = dark
-            let blended = clear.applyingFilter("CIBlendWithMask", parameters: [
-                "inputBackgroundImage": darkOverlay,
-                "inputMaskImage": softMask
+            // Multiply inverted mask with dark tint
+            let darkBg = inverted.applyingFilter("CIMultiplyCompositing", parameters: [
+                "inputBackgroundImage": darkTint
             ])
 
-            if let cgImage = self.ciContext.createCGImage(blended, from: cameraImage.extent) {
-                let uiImage = UIImage(cgImage: cgImage)
+            // Soften edges
+            let softened = darkBg
+                .applyingGaussianBlur(sigma: 3)
+                .cropped(to: maskCI.extent)
+
+            if let cgImage = self.ciContext.createCGImage(softened, from: maskCI.extent) {
+                let img = UIImage(cgImage: cgImage, scale: 1, orientation: .upMirrored)
                 DispatchQueue.main.async {
-                    self.blurredImage = uiImage
+                    self.maskImage = img
                 }
             }
         }
