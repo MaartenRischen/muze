@@ -33,8 +33,7 @@ class FaceTracker {
 
         // Run face detection
         let detectRequest = VNDetectFaceRectanglesRequest()
-        // .leftMirrored for front camera in portrait mode
-        try? sequenceHandler.perform([detectRequest, faceRequest], on: pixelBuffer, orientation: .leftMirrored)
+        try? sequenceHandler.perform([detectRequest, faceRequest], on: pixelBuffer, orientation: .up)
 
         guard let faceObs = faceRequest.results?.first,
               let landmarks = faceObs.landmarks else {

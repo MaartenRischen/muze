@@ -18,8 +18,8 @@ struct PerformanceView: View {
             CameraPreview(session: coordinator.camera.captureSession)
                 .ignoresSafeArea()
 
-            // === BACKGROUND BLUR (person segmentation) ===
-            BackgroundBlurOverlay(image: coordinator.personSegmenter.maskImage)
+            // === BACKGROUND BLUR (disabled — needs orientation fix) ===
+            // BackgroundBlurOverlay(image: coordinator.personSegmenter.maskImage)
 
             // === VISUALIZER OVERLAY ===
             VisualizerOverlay(coordinator: coordinator)
@@ -66,7 +66,7 @@ struct PerformanceView: View {
             VStack {
                 Spacer()
                 HStack {
-                    Text("v4.1.1")
+                    Text("v4.1.2")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .foregroundStyle(.red.opacity(0.8))
                     Spacer()
