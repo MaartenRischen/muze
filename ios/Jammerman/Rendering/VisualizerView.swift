@@ -794,7 +794,7 @@ class VisualizerUIView: UIView {
             if constellationNotes.count > 48 { constellationNotes.removeFirst() }
 
             // Trigger note burst
-            triggerNoteBurst(note: note, handX: 1 - CGFloat(state.handX), handY: CGFloat(state.handY), w: w, h: h)
+            triggerNoteBurst(note: note, handX: 1 - CGFloat(state.handX), handY: 1 - CGFloat(state.handY), w: w, h: h)
         }
 
         if state.melodyNote == nil { lastMelodyNote = nil }
@@ -1255,7 +1255,7 @@ class VisualizerUIView: UIView {
 
         if state.handPresent {
             let px = (1 - CGFloat(state.handX)) * w
-            let py = CGFloat(state.handY) * h
+            let py = (1 - CGFloat(state.handY)) * h
             let glow = handGlowRadius
             let bloom = handBloomRadius
             let core: CGFloat = state.handOpen ? 4 : 2
@@ -1355,7 +1355,7 @@ class VisualizerUIView: UIView {
         guard state.handPresent, state.faceDetected else { return }
 
         let hx = (1 - CGFloat(state.handX)) * w
-        let hy = CGFloat(state.handY) * h
+        let hy = (1 - CGFloat(state.handY)) * h
 
         // Target points on face
         var targets: [CGPoint] = []
