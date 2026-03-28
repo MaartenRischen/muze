@@ -733,13 +733,15 @@ class AudioEngine: ObservableObject {
 
     func triggerPad(notes: [String]) {
         let midiNotes = notes.compactMap { noteNameToMidi($0) }
-        padOsc.triggerNotes(midiNotes)
 
-        // Also trigger SoundFont sampler if enabled
+        // Use either synth oscillator or SoundFont sampler, not both
         if useSoundFont, let sfm = soundFontManager {
             sfm.stopChord(currentPadMidiNotes, on: sfm.padSampler)
             currentPadMidiNotes = midiNotes.map { UInt8($0) }
             sfm.playChord(currentPadMidiNotes, velocity: 90, on: sfm.padSampler)
+            padOsc.release() // silence the synth oscillator
+        } else {
+            padOsc.triggerNotes(midiNotes)
         }
         // Update binaural if following chord
         if binauralFollowChord, let first = midiNotes.first {
