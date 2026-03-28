@@ -193,31 +193,20 @@ class AudioEngine: ObservableObject {
     private func buildGraph() {
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
 
-        padNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
-            guard let self else { return noErr }
-            // DEBUG: If padOsc produces silence, generate test tone to verify audio graph
-            let result = self.padOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: self.sampleRate, muted: self.padMuted)
-            if !self.padMuted {
-                // Check if padOsc produced any non-zero samples
-                let abl = UnsafeMutableAudioBufferListPointer(bufferList)
-                let L = abl[0].mData!.assumingMemoryBound(to: Float.self)
-                var hasSignal = false
-                for i in 0..<min(Int(frameCount), 8) {
-                    if abs(L[i]) > 0.0001 { hasSignal = true; break }
-                }
-                if !hasSignal {
-                    // Pad isn't producing sound — generate test tone at 220Hz
-                    let R = abl[1].mData!.assumingMemoryBound(to: Float.self)
-                    for i in 0..<Int(frameCount) {
-                        let phase = Double(self.padOsc.debugSampleCount + i) / self.sampleRate * 220.0
-                        let sample = Float(sin(phase * 2.0 * .pi)) * 0.3
-                        L[i] = sample
-                        R[i] = sample
-                    }
-                    self.padOsc.debugSampleCount += Int(frameCount)
-                }
+        // DEBUG: padNode ALWAYS plays 440Hz sine at full volume to test audio graph
+        var padTestPhase: Double = 0
+        padNode = AVAudioSourceNode { _, _, frameCount, bufferList -> OSStatus in
+            let abl = UnsafeMutableAudioBufferListPointer(bufferList)
+            let L = abl[0].mData!.assumingMemoryBound(to: Float.self)
+            let R = abl[1].mData!.assumingMemoryBound(to: Float.self)
+            for i in 0..<Int(frameCount) {
+                let sample = Float(sin(padTestPhase * 2.0 * .pi)) * 0.5
+                L[i] = sample
+                R[i] = sample
+                padTestPhase += 440.0 / 44100.0
+                if padTestPhase > 1.0 { padTestPhase -= 1.0 }
             }
-            return result
+            return noErr
         }
         arpNode = AVAudioSourceNode { [weak self] _, _, frameCount, bufferList -> OSStatus in
             guard let self else { return noErr }
