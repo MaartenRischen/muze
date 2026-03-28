@@ -5,6 +5,7 @@
 import Foundation
 import Combine
 import CoreMedia
+import CoreImage
 import simd
 import Vision
 
@@ -39,6 +40,12 @@ class TrackingCoordinator: ObservableObject {
     private var prevMelodyNote: Int?
     private var prevHandOpen = true
     private var currentPadKey = ""
+
+    // Segmentation processing (off main thread, never store raw CVPixelBuffer)
+    private let segQueue = DispatchQueue(label: "com.jammerman.segmentation", qos: .userInitiated)
+    private let segCIContext = CIContext(options: [.useSoftwareRenderer: false])
+    private var isProcessingSeg = false
+    private var segFrameCount = 0
 
     deinit {
         saveTimer?.invalidate()
@@ -381,8 +388,49 @@ extension TrackingCoordinator: ARKitTrackerDelegate {
     }
 
     func arKitTracker(_ tracker: ARKitTracker, didUpdateSegmentation buffer: CVPixelBuffer?) {
-        DispatchQueue.main.async { [weak self] in
-            self?.state.segmentationBuffer = buffer
+        guard let buffer = buffer else { return }
+        // Skip if already processing or throttle to every 5th frame
+        segFrameCount += 1
+        guard segFrameCount % 5 == 0, !isProcessingSeg else { return }
+        isProcessingSeg = true
+
+        // Render the segmentation buffer to a standalone CGImage SYNCHRONOUSLY
+        // so the CVPixelBuffer (and thus the ARFrame) is released immediately.
+        // The segmentation buffer is small (~256x192) so this is fast.
+        let ciRaw = CIImage(cvPixelBuffer: buffer).oriented(.right)
+        let extent = ciRaw.extent
+        guard let rawCG = segCIContext.createCGImage(ciRaw, from: extent) else {
+            isProcessingSeg = false
+            return
+        }
+        // rawCG is now a standalone CGImage — no CVPixelBuffer reference
+
+        // Heavy processing (blur, compositing) on background queue
+        segQueue.async { [weak self] in
+            guard let self else { return }
+            defer { self.isProcessingSeg = false }
+
+            let ciImage = CIImage(cgImage: rawCG)
+            let ext = ciImage.extent
+
+            // Darken mask: invert + dark tint + blur
+            let inverted = ciImage.applyingFilter("CIColorInvert")
+            let darkTint = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0.55))
+                .cropped(to: ext)
+            let darkBg = inverted.applyingFilter("CIMultiplyCompositing", parameters: [
+                "inputBackgroundImage": darkTint
+            ])
+            let softenedDark = darkBg.applyingGaussianBlur(sigma: 5).cropped(to: ext)
+            let darkenCG = self.segCIContext.createCGImage(softenedDark, from: ext)
+
+            // Cutout mask: person area + blur edges
+            let softenedCut = ciImage.applyingGaussianBlur(sigma: 8).cropped(to: ext)
+            let cutoutCG = self.segCIContext.createCGImage(softenedCut, from: ext)
+
+            DispatchQueue.main.async { [weak self] in
+                self?.state.segDarkenMask = darkenCG
+                self?.state.segCutoutMask = cutoutCG
+            }
         }
     }
 

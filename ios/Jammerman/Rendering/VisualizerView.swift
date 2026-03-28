@@ -114,9 +114,7 @@ class VisualizerUIView: UIView {
     // ---- Cached color space (avoid per-frame allocation) ----
     private let colorSpace = CGColorSpaceCreateDeviceRGB()
 
-    // ---- Person segmentation mask (for behind-head effects) ----
-    private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
-    private var maskFrameCount: Int = 0
+    // ---- Person segmentation (masks pre-processed in TrackingCoordinator) ----
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
@@ -334,45 +332,10 @@ class VisualizerUIView: UIView {
     }
 
     // MARK: - Background Darken (darken + slight blur outside person silhouette)
-
-    private var cachedDarkenMask: CGImage?
-    private var cachedCutoutMask: CGImage?
-
-    private func updateSegmentationMasks(w: CGFloat, h: CGFloat, state: JammermanState) {
-        maskFrameCount += 1
-        guard maskFrameCount % 5 == 0 else { return }  // update every 5th frame for perf
-        guard let segBuffer = state.segmentationBuffer else { return }
-
-        // ARKit segmentation buffer is in landscape (.right) orientation for front camera
-        // CIImage handles the rotation via orientation parameter
-        let ciImage = CIImage(cvPixelBuffer: segBuffer)
-            .oriented(.right)  // rotate to portrait
-
-        let extent = ciImage.extent
-
-        // === Darken mask: invert (background = white) → tint dark ===
-        let inverted = ciImage.applyingFilter("CIColorInvert")
-        let darkTint = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0.55))
-            .cropped(to: extent)
-        let darkBg = inverted.applyingFilter("CIMultiplyCompositing", parameters: [
-            "inputBackgroundImage": darkTint
-        ])
-        let softenedDark = darkBg.applyingGaussianBlur(sigma: 5).cropped(to: extent)
-        if let cgImg = ciContext.createCGImage(softenedDark, from: extent) {
-            cachedDarkenMask = cgImg
-        }
-
-        // === Cutout mask: person area (white), softened edges ===
-        let softenedCut = ciImage.applyingGaussianBlur(sigma: 8).cropped(to: extent)
-        if let cgImg = ciContext.createCGImage(softenedCut, from: extent) {
-            cachedCutoutMask = cgImg
-        }
-    }
+    // Masks are pre-processed in TrackingCoordinator to avoid retaining ARFrames
 
     private func drawBackgroundDarken(ctx: CGContext, w: CGFloat, h: CGFloat, state: JammermanState, energy: CGFloat) {
-        updateSegmentationMasks(w: w, h: h, state: state)
-
-        guard let mask = cachedDarkenMask else { return }
+        guard let mask = state.segDarkenMask else { return }
 
         ctx.saveGState()
         // Front camera: mirror X for selfie view
@@ -385,7 +348,7 @@ class VisualizerUIView: UIView {
     // MARK: - Person Cutout (erase person area so effects appear behind)
 
     private func cutoutPerson(ctx: CGContext, w: CGFloat, h: CGFloat, state: JammermanState) {
-        guard let mask = cachedCutoutMask else { return }
+        guard let mask = state.segCutoutMask else { return }
 
         ctx.saveGState()
         ctx.setBlendMode(.destinationOut)
