@@ -193,6 +193,7 @@ class AudioEngine: ObservableObject {
     var soundFontManager: SoundFontManager?
     @Published var useSoundFont = true // default to sampled instruments
     private var currentPadMidiNotes: [UInt8] = []
+    private var padCrossfadeWorkItem: DispatchWorkItem?
     private var currentMelodyMidiNote: UInt8? = nil
 
     // Master filter cutoff (face-driven)
@@ -863,15 +864,21 @@ class AudioEngine: ObservableObject {
             let oldNotes = currentPadMidiNotes
             currentPadMidiNotes = newNotes
 
+            // Cancel any pending crossfade stop from a previous chord change
+            padCrossfadeWorkItem?.cancel()
+
             // Crossfade: start new chord FIRST, then fade out old after brief overlap
             if !padMuted {
                 sfm.playChord(newNotes, velocity: 90, on: sfm.padSampler)
             }
-            // Stop old notes after ~80ms overlap for seamless transition
-            if !oldNotes.isEmpty {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                    sfm.stopChord(oldNotes, on: sfm.padSampler)
+            // Stop old notes that aren't in the new chord after ~120ms overlap
+            let notesToStop = oldNotes.filter { !newNotes.contains($0) }
+            if !notesToStop.isEmpty {
+                let work = DispatchWorkItem { [weak sfm] in
+                    sfm?.stopChord(notesToStop, on: sfm?.padSampler)
                 }
+                padCrossfadeWorkItem = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
             }
         } else {
             padOsc.triggerNotes(midiNotes)
