@@ -133,15 +133,21 @@ class ARKitTracker: NSObject {
         // Roll: rotation around Z axis — atan2 of column 0 and 1 Y components
         let roll = atan2(transform.columns.0.y, transform.columns.1.y)
 
-        // Face center from transform translation
-        // ARKit face anchor: X=right, Y=up, Z=towards camera, in meters from camera
-        // Front camera is mirrored, so negate X
+        // Face center: compute from the nose tip vertex projected to screen
+        // Use the transform to get face position relative to camera
+        // ARKit: columns.3 = translation (x=right, y=up, z=towards user)
+        // For screen mapping: use the running Vision-based tracker as backup
+        // since ARKit 3D→2D projection is unreliable without camera intrinsics
+        // Just pass 0.5, 0.5 — the visualizer's smoothed faceCx/faceCy
+        // will be driven by the Vision fallback tracker if running,
+        // or we compute from the nose vertex below
         let tx = transform.columns.3.x
         let ty = transform.columns.3.y
-        // Typical face is ~0.4m from camera, tx/ty range ~±0.15m
-        // Map to 0..1 normalized screen coords
-        let faceCenterX = clamp01(0.5 - tx * 3.0) // negate + scale (mirrored front cam)
-        let faceCenterY = clamp01(0.4 - ty * 3.0) // Y up → screen Y down, offset for typical face position
+        let tz = transform.columns.3.z
+        // Perspective projection: divide by Z distance, scale to screen
+        let focalLength: Float = 3.5  // approximate, adjusts projection strength
+        let faceCenterX = clamp01(0.5 - (tx / max(abs(tz), 0.1)) * focalLength)
+        let faceCenterY = clamp01(0.5 - (ty / max(abs(tz), 0.1)) * focalLength)
 
         return FaceFeatures(
             mouthOpenness: mouthOpenness,

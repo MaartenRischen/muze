@@ -335,23 +335,20 @@ extension TrackingCoordinator: ARKitTrackerDelegate {
             self.state.headPitch = features.headPitch
             self.state.headYaw = features.headYaw
             self.state.headRoll = features.headRoll
-            self.state.faceCenterX = features.faceCenterX
-            self.state.faceCenterY = features.faceCenterY
+            // DON'T set faceCenterX/Y from ARKit — Vision's screen coords are more accurate
+            // Vision tracker keeps running and provides face center via processFrame()
             self.state.faceDetected = true
 
-            // Switch to ARKit camera on first face detection
+            // Switch to ARKit camera (keep Vision camera running for face position)
             if !self.state.usingARKit {
                 self.state.usingARKit = true
-                self.camera.stop() // stop AVCaptureSession, ARSCNView takes over
-                print("[ARKit] First face detected — switching to AR camera")
+                // DON'T stop camera — Vision needs it for face center coordinates
+                print("[ARKit] First face detected — AR camera active")
             }
 
             // Store ARKit face mesh data for visualizer
             self.state.faceVertices = vertices
             self.state.faceTriangleIndices = triangleIndices
-
-            // Clear Vision landmarks (not used in ARKit mode)
-            self.state.rawLandmarks = nil
 
             self.updateAudio()
         }

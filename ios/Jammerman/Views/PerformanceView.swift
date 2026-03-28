@@ -17,20 +17,10 @@ struct PerformanceView: View {
 
     var body: some View {
         ZStack {
-            // Full-screen camera
+            // Full-screen camera — always use AVCaptureSession (ARKit runs in background)
             Color.black.ignoresSafeArea()
-            #if !targetEnvironment(simulator)
-            if coordinator.state.usingARKit, let session = coordinator.arKitTracker.session {
-                ARCameraPreview(session: session)
-                    .ignoresSafeArea()
-            } else {
-                CameraPreview(session: coordinator.camera.captureSession)
-                    .ignoresSafeArea()
-            }
-            #else
             CameraPreview(session: coordinator.camera.captureSession)
                 .ignoresSafeArea()
-            #endif
 
             // === BACKGROUND BLUR (disabled — needs orientation fix) ===
             // BackgroundBlurOverlay(image: coordinator.personSegmenter.maskImage)
