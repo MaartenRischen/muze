@@ -94,8 +94,10 @@ class ARKitTracker: NSObject {
         let config = ARFaceTrackingConfiguration()
         config.maximumNumberOfTrackedFaces = 1
 
-        // Person segmentation DISABLED — the ML model kills performance
-        // (was causing app to run at <5fps)
+        // Person segmentation — light version only (no depth), runs on Neural Engine
+        if ARFaceTrackingConfiguration.supportsFrameSemantics(.personSegmentation) {
+            config.frameSemantics.insert(.personSegmentation)
+        }
 
         session.run(config, options: [.resetTracking, .removeExistingAnchors])
         print("[ARKit] Session started with face tracking")
@@ -472,6 +474,36 @@ extension ARKitTracker: ARSessionDelegate {
 
             // Hand detection — async with copied pixel buffer (every 2nd frame)
             detectHand(in: frame)
+
+            // Person segmentation — tiny buffer (~49KB), fast byte copy every 8 frames
+            segFrameCount += 1
+            if segFrameCount % 8 == 0, !isSegmenting, let segBuf = frame.segmentationBuffer {
+                isSegmenting = true
+                let w = CVPixelBufferGetWidth(segBuf)
+                let h = CVPixelBufferGetHeight(segBuf)
+                let bpr = CVPixelBufferGetBytesPerRow(segBuf)
+                CVPixelBufferLockBaseAddress(segBuf, .readOnly)
+                if let base = CVPixelBufferGetBaseAddress(segBuf) {
+                    let data = Data(bytes: base, count: bpr * h)
+                    CVPixelBufferUnlockBaseAddress(segBuf, .readOnly)
+                    // Create CGImage on background queue from copied bytes
+                    segQueue.async { [weak self] in
+                        guard let self else { return }
+                        defer { self.isSegmenting = false }
+                        guard let provider = CGDataProvider(data: data as CFData) else { return }
+                        let cs = CGColorSpaceCreateDeviceGray()
+                        guard let img = CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 8,
+                                                bytesPerRow: bpr, space: cs,
+                                                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+                                                provider: provider, decode: nil,
+                                                shouldInterpolate: true, intent: .defaultIntent) else { return }
+                        self.delegate?.arKitTracker(self, didUpdateSegmentation: img)
+                    }
+                } else {
+                    CVPixelBufferUnlockBaseAddress(segBuf, .readOnly)
+                    isSegmenting = false
+                }
+            }
         }
     }
 

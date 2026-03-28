@@ -210,7 +210,9 @@ class VisualizerUIView: UIView {
         let bloomExpand = beatBloomRadius * baseRadius * 0.18
         let radius = baseRadius + energy * 80 + beatExpand + bloomExpand
 
-        // === DRAW EFFECTS ===
+        // === BACKGROUND EFFECTS (behind person) ===
+
+        drawBackgroundDarken(ctx: ctx, w: w, h: h, state: state, energy: energy)
 
         drawModeGeometry(ctx: ctx, w: w, h: h, energy: energy)
 
@@ -224,6 +226,9 @@ class VisualizerUIView: UIView {
         drawArpViz(ctx: ctx, cx: cx, cy: cy, radius: radius, energy: energy)
 
         drawFrequencyArc(ctx: ctx, w: w, h: h, energy: energy)
+
+        // Cut out person so background effects appear behind them
+        cutoutPerson(ctx: ctx, w: w, h: h, state: state)
 
         // === FOREGROUND EFFECTS ===
 
@@ -313,19 +318,27 @@ class VisualizerUIView: UIView {
     // MARK: - Background Darken (dark overlay on background, person cut out)
     // Uses single lightweight segmentation mask — no CIContext, no blur filters
 
-    private func drawBackgroundDarken(ctx: CGContext, w: CGFloat, h: CGFloat, state: JammermanState, energy: CGFloat) {
-        guard state.segmentationMask != nil else { return }
+    /// Draw segmentation mask with proper rotation (landscape → portrait) and front camera mirror
+    private func drawSegMask(ctx: CGContext, mask: CGImage, w: CGFloat, h: CGFloat) {
+        ctx.saveGState()
+        // Rotate 90° CW from landscape to portrait + mirror X for front camera
+        ctx.translateBy(x: w, y: h)
+        ctx.rotate(by: -.pi / 2)
+        ctx.scaleBy(x: 1, y: -1)
+        ctx.draw(mask, in: CGRect(x: 0, y: 0, width: h, height: w))
+        ctx.restoreGState()
+    }
 
-        // Draw dark overlay over entire frame
+    private func drawBackgroundDarken(ctx: CGContext, w: CGFloat, h: CGFloat, state: JammermanState, energy: CGFloat) {
+        guard let mask = state.segmentationMask else { return }
+
+        // Dark overlay over entire frame
         ctx.saveGState()
         ctx.setFillColor(UIColor(white: 0, alpha: 0.55).cgColor)
         ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
-
-        // Cut out person area (person = white in mask, destinationOut erases)
+        // Cut out person (person = white, destinationOut erases dark overlay there)
         ctx.setBlendMode(.destinationOut)
-        ctx.translateBy(x: w, y: 0)
-        ctx.scaleBy(x: -1, y: 1)  // mirror for front camera
-        ctx.draw(state.segmentationMask!, in: CGRect(x: 0, y: 0, width: w, height: h))
+        drawSegMask(ctx: ctx, mask: mask, w: w, h: h)
         ctx.restoreGState()
     }
 
@@ -333,12 +346,9 @@ class VisualizerUIView: UIView {
 
     private func cutoutPerson(ctx: CGContext, w: CGFloat, h: CGFloat, state: JammermanState) {
         guard let mask = state.segmentationMask else { return }
-
         ctx.saveGState()
         ctx.setBlendMode(.destinationOut)
-        ctx.translateBy(x: w, y: 0)
-        ctx.scaleBy(x: -1, y: 1)
-        ctx.draw(mask, in: CGRect(x: 0, y: 0, width: w, height: h))
+        drawSegMask(ctx: ctx, mask: mask, w: w, h: h)
         ctx.restoreGState()
     }
 
