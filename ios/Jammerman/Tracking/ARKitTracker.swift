@@ -5,7 +5,6 @@
 
 import Foundation
 import Vision
-import CoreMedia
 import simd
 
 #if !targetEnvironment(simulator)
@@ -40,7 +39,6 @@ class ARKitTracker: NSObject {
     #endif
 
     // Hand tracking via Vision on ARFrame images
-    private let handRequest = VNDetectHumanHandPoseRequest()
     private var handFrameCount = 0
     private var lastHandOpen: Bool?
     private var isDetectingHand = false
@@ -57,12 +55,6 @@ class ARKitTracker: NSObject {
     private var cachedCamera: ARCamera?
     #endif
 
-    // Lightweight person segmentation via Vision (runs async every ~10 frames)
-    private let segRequest = VNGeneratePersonSegmentationRequest()
-    private var segFrameCount = 0
-    private var isSegmenting = false
-    private let segQueue = DispatchQueue(label: "com.jammerman.seg", qos: .utility)
-
     /// Whether ARKit face tracking is available on this device
     static var isSupported: Bool {
         #if !targetEnvironment(simulator)
@@ -73,9 +65,6 @@ class ARKitTracker: NSObject {
     }
 
     override init() {
-        handRequest.maximumHandCount = 1
-        segRequest.qualityLevel = .fast
-        segRequest.outputPixelFormat = kCVPixelFormatType_OneComponent8
         #if !targetEnvironment(simulator)
         // Create session in init so ARSCNView can bind to it immediately
         if ARKitTracker.isSupported {
@@ -195,76 +184,20 @@ class ARKitTracker: NSObject {
     #if !targetEnvironment(simulator)
     private func detectHand(in frame: ARFrame) {
         handFrameCount += 1
-        guard handFrameCount % 2 == 1 else { return } // stagger: odd frames
-        guard !isDetectingHand else { return } // skip if previous detection still running
+        guard handFrameCount % 4 == 0 else { return }  // every 4th frame (15fps, was every 2nd)
+        guard !isDetectingHand else { return }
         isDetectingHand = true
 
-        // Copy pixel buffer to avoid retaining the ARFrame
-        let srcBuffer = frame.capturedImage
-        var copiedBuffer: CVPixelBuffer?
-        let width = CVPixelBufferGetWidth(srcBuffer)
-        let height = CVPixelBufferGetHeight(srcBuffer)
-        let pixelFormat = CVPixelBufferGetPixelFormatType(srcBuffer)
-        CVPixelBufferCreate(kCFAllocatorDefault, width, height, pixelFormat, nil, &copiedBuffer)
+        let pixelBuffer = frame.capturedImage
 
-        guard let dstBuffer = copiedBuffer else {
-            isDetectingHand = false
-            return
-        }
-
-        CVPixelBufferLockBaseAddress(srcBuffer, .readOnly)
-        CVPixelBufferLockBaseAddress(dstBuffer, [])
-        let srcPlanes = CVPixelBufferGetPlaneCount(srcBuffer)
-        if srcPlanes > 0 {
-            for plane in 0..<srcPlanes {
-                guard let srcAddr = CVPixelBufferGetBaseAddressOfPlane(srcBuffer, plane),
-                      let dstAddr = CVPixelBufferGetBaseAddressOfPlane(dstBuffer, plane) else { continue }
-                let srcRowBytes = CVPixelBufferGetBytesPerRowOfPlane(srcBuffer, plane)
-                let dstRowBytes = CVPixelBufferGetBytesPerRowOfPlane(dstBuffer, plane)
-                let planeHeight = CVPixelBufferGetHeightOfPlane(srcBuffer, plane)
-                if srcRowBytes == dstRowBytes {
-                    memcpy(dstAddr, srcAddr, srcRowBytes * planeHeight)
-                } else {
-                    for row in 0..<planeHeight {
-                        memcpy(dstAddr + row * dstRowBytes, srcAddr + row * srcRowBytes, min(srcRowBytes, dstRowBytes))
-                    }
-                }
-            }
-        } else {
-            guard let srcAddr = CVPixelBufferGetBaseAddress(srcBuffer),
-                  let dstAddr = CVPixelBufferGetBaseAddress(dstBuffer) else {
-                CVPixelBufferUnlockBaseAddress(dstBuffer, [])
-                CVPixelBufferUnlockBaseAddress(srcBuffer, .readOnly)
-                isDetectingHand = false
-                return
-            }
-            let srcRowBytes = CVPixelBufferGetBytesPerRow(srcBuffer)
-            let dstRowBytes = CVPixelBufferGetBytesPerRow(dstBuffer)
-            let h = CVPixelBufferGetHeight(srcBuffer)
-            if srcRowBytes == dstRowBytes {
-                memcpy(dstAddr, srcAddr, srcRowBytes * h)
-            } else {
-                for row in 0..<h {
-                    memcpy(dstAddr + row * dstRowBytes, srcAddr + row * srcRowBytes, min(srcRowBytes, dstRowBytes))
-                }
-            }
-        }
-        CVPixelBufferUnlockBaseAddress(dstBuffer, [])
-        CVPixelBufferUnlockBaseAddress(srcBuffer, .readOnly)
-
-        // Run hand detection on background queue with copied buffer
         handQueue.async { [weak self] in
             guard let self else { return }
             defer { self.isDetectingHand = false }
 
             let request = VNDetectHumanHandPoseRequest()
             request.maximumHandCount = 1
-            let handler = VNImageRequestHandler(cvPixelBuffer: dstBuffer, orientation: .right)
-            do {
-                try handler.perform([request])
-            } catch {
-                // Vision request failed silently
-            }
+            let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right)
+            do { try handler.perform([request]) } catch { return }
 
             guard let handObs = request.results?.first else {
                 self.delegate?.arKitTracker(self, didUpdateHand: HandFeatures(
@@ -322,97 +255,6 @@ class ARKitTracker: NSObject {
             handOpen: open
         )
     }
-    // MARK: - Person Segmentation (Vision, async, every ~10 frames)
-
-    private func detectSegmentation(in frame: ARFrame) {
-        segFrameCount += 1
-        guard segFrameCount % 10 == 0, !isSegmenting else { return }
-        isSegmenting = true
-
-        // Copy pixel buffer to avoid retaining ARFrame (same pattern as hand detection)
-        let srcBuffer = frame.capturedImage
-        let width = CVPixelBufferGetWidth(srcBuffer)
-        let height = CVPixelBufferGetHeight(srcBuffer)
-        let pixelFormat = CVPixelBufferGetPixelFormatType(srcBuffer)
-        var copiedBuffer: CVPixelBuffer?
-        CVPixelBufferCreate(kCFAllocatorDefault, width, height, pixelFormat, nil, &copiedBuffer)
-        guard let dstBuffer = copiedBuffer else { isSegmenting = false; return }
-
-        CVPixelBufferLockBaseAddress(srcBuffer, .readOnly)
-        CVPixelBufferLockBaseAddress(dstBuffer, [])
-        let planes = CVPixelBufferGetPlaneCount(srcBuffer)
-        if planes > 0 {
-            for plane in 0..<planes {
-                guard let src = CVPixelBufferGetBaseAddressOfPlane(srcBuffer, plane),
-                      let dst = CVPixelBufferGetBaseAddressOfPlane(dstBuffer, plane) else { continue }
-                let srcRow = CVPixelBufferGetBytesPerRowOfPlane(srcBuffer, plane)
-                let dstRow = CVPixelBufferGetBytesPerRowOfPlane(dstBuffer, plane)
-                let h = CVPixelBufferGetHeightOfPlane(srcBuffer, plane)
-                if srcRow == dstRow {
-                    memcpy(dst, src, srcRow * h)
-                } else {
-                    for row in 0..<h { memcpy(dst + row * dstRow, src + row * srcRow, min(srcRow, dstRow)) }
-                }
-            }
-        } else {
-            guard let src = CVPixelBufferGetBaseAddress(srcBuffer),
-                  let dst = CVPixelBufferGetBaseAddress(dstBuffer) else {
-                CVPixelBufferUnlockBaseAddress(dstBuffer, [])
-                CVPixelBufferUnlockBaseAddress(srcBuffer, .readOnly)
-                isSegmenting = false; return
-            }
-            let srcRow = CVPixelBufferGetBytesPerRow(srcBuffer)
-            let dstRow = CVPixelBufferGetBytesPerRow(dstBuffer)
-            let h = CVPixelBufferGetHeight(srcBuffer)
-            if srcRow == dstRow { memcpy(dst, src, srcRow * h) }
-            else { for row in 0..<h { memcpy(dst + row * dstRow, src + row * srcRow, min(srcRow, dstRow)) } }
-        }
-        CVPixelBufferUnlockBaseAddress(dstBuffer, [])
-        CVPixelBufferUnlockBaseAddress(srcBuffer, .readOnly)
-
-        // Run segmentation on low-priority background queue
-        segQueue.async { [weak self] in
-            guard let self else { return }
-            defer { self.isSegmenting = false }
-
-            let handler = VNImageRequestHandler(cvPixelBuffer: dstBuffer, orientation: .right)
-            let request = VNGeneratePersonSegmentationRequest()
-            request.qualityLevel = .fast
-            request.outputPixelFormat = kCVPixelFormatType_OneComponent8
-            do { try handler.perform([request]) } catch { return }
-
-            guard let result = request.results?.first else { return }
-            let maskBuffer = result.pixelBuffer
-
-            // Convert mask to CGImage via pure CPU byte copy (no CIContext)
-            CVPixelBufferLockBaseAddress(maskBuffer, .readOnly)
-            defer { CVPixelBufferUnlockBaseAddress(maskBuffer, .readOnly) }
-
-            let mw = CVPixelBufferGetWidth(maskBuffer)
-            let mh = CVPixelBufferGetHeight(maskBuffer)
-            let mBytesPerRow = CVPixelBufferGetBytesPerRow(maskBuffer)
-            guard let mBase = CVPixelBufferGetBaseAddress(maskBuffer) else { return }
-
-            let data = Data(bytes: mBase, count: mBytesPerRow * mh)
-            guard let provider = CGDataProvider(data: data as CFData) else { return }
-            let colorSpace = CGColorSpaceCreateDeviceGray()
-
-            // Mask is already in portrait orientation (Vision handles it)
-            guard let maskImage = CGImage(
-                width: mw, height: mh,
-                bitsPerComponent: 8, bitsPerPixel: 8,
-                bytesPerRow: mBytesPerRow,
-                space: colorSpace,
-                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
-                provider: provider,
-                decode: nil, shouldInterpolate: true,
-                intent: .defaultIntent
-            ) else { return }
-
-            self.delegate?.arKitTracker(self, didUpdateSegmentation: maskImage)
-        }
-    }
-
     // Vision face detection on ARFrame for precise contour landmarks
     private var isDetectingVisionFace = false
     private let visionQueue = DispatchQueue(label: "com.jammerman.visionface", qos: .userInitiated)
@@ -469,7 +311,7 @@ extension ARKitTracker: ARSessionDelegate {
             // Cache camera for face projection
             cachedCamera = frame.camera
 
-            // Hand detection — async with copied pixel buffer (every 2nd frame)
+            // Hand detection — async, every 4th frame (~15fps)
             detectHand(in: frame)
         }
     }
