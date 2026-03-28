@@ -47,7 +47,7 @@ class HandTracker {
         guard wrist.confidence > 0.3, middleMCP.confidence > 0.3 else { return nil }
 
         // Hand position (center between wrist and middle MCP)
-        // Camera preview already mirrors — no extra flip needed
+        // No mirror — camera isVideoMirrored handles it
         let handX = Float((wrist.location.x + middleMCP.location.x) / 2)
         let handY = Float((wrist.location.y + middleMCP.location.y) / 2)
 

@@ -794,7 +794,7 @@ class VisualizerUIView: UIView {
             if constellationNotes.count > 48 { constellationNotes.removeFirst() }
 
             // Trigger note burst
-            triggerNoteBurst(note: note, handX: CGFloat(state.handX), handY: CGFloat(state.handY), w: w, h: h)
+            triggerNoteBurst(note: note, handX: 1 - CGFloat(state.handX), handY: CGFloat(state.handY), w: w, h: h)
         }
 
         if state.melodyNote == nil { lastMelodyNote = nil }
@@ -1254,7 +1254,7 @@ class VisualizerUIView: UIView {
         handBloomRadius += (handBloomTarget - handBloomRadius) * 0.3
 
         if state.handPresent {
-            let px = CGFloat(state.handX) * w
+            let px = (1 - CGFloat(state.handX)) * w
             let py = CGFloat(state.handY) * h
             let glow = handGlowRadius
             let bloom = handBloomRadius
@@ -1354,7 +1354,7 @@ class VisualizerUIView: UIView {
     private func drawConnectionWeb(ctx: CGContext, w: CGFloat, h: CGFloat, state: JammermanState, energy: CGFloat) {
         guard state.handPresent, state.faceDetected else { return }
 
-        let hx = CGFloat(state.handX) * w
+        let hx = (1 - CGFloat(state.handX)) * w
         let hy = CGFloat(state.handY) * h
 
         // Target points on face
