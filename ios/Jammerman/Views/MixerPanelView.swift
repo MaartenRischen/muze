@@ -185,167 +185,174 @@ extension MixerPanelView {
     }
 }
 
-// Separate view so @State bindings work for responsive sliders
+// DAW-style channel detail — organized like Logic Pro channel strip
 struct ChannelDetailView: View {
     let id: String
     let channels: [(String, String, Color)]
     @ObservedObject var coordinator: TrackingCoordinator
     @Binding var detailChannel: String?
 
-    // Local state for responsive sliders
-    @State private var localPan: Float? = nil
-    @State private var localReverbSend: Float? = nil
-    @State private var localDelaySend: Float? = nil
-    @State private var localEqLow: Float? = nil
-    @State private var localEqMid: Float? = nil
-    @State private var localEqHigh: Float? = nil
+    // Local Double state for responsive Slider binding (SwiftUI Slider uses Double)
+    @State private var pan: Double = 0
+    @State private var reverbSend: Double = 0
+    @State private var delaySend: Double = 0
+    @State private var eqLow: Double = 0
+    @State private var eqMid: Double = 0
+    @State private var eqHigh: Double = 0
 
     var body: some View {
         let name = channels.first(where: { $0.1 == id })?.0 ?? id
         let color = channels.first(where: { $0.1 == id })?.2 ?? .white
 
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 16) {
-                // Header
-                HStack {
-                    Text(name)
-                        .font(.system(size: 14, weight: .heavy, design: .monospaced))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .background(color)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    Spacer()
-                    Button { detailChannel = nil } label: {
-                        Text("BACK")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.6))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(.white.opacity(0.08))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.1), lineWidth: 1))
-                    }
-                }
-
-                // EQ
-                sectionHeader("EQUALIZER")
-                eqRow("LOW", band: 0, local: $localEqLow, color: color)
-                eqRow("MID", band: 1, local: $localEqMid, color: color)
-                eqRow("HIGH", band: 2, local: $localEqHigh, color: color)
-
-                if id != "master" {
-                    // Sends
-                    sectionHeader("SENDS")
-                    sendRow("REVERB", local: $localReverbSend, isReverb: true, color: color)
-                    sendRow("DELAY", local: $localDelaySend, isReverb: false, color: color)
-
-                    // Pan
-                    sectionHeader("PAN")
-                    panRow(color: color)
+        VStack(spacing: 0) {
+            // Header bar
+            HStack {
+                Text(name)
+                    .font(.system(size: 15, weight: .black, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(color)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                Spacer()
+                Button { detailChannel = nil } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .frame(width: 32, height: 32)
+                        .background(.white.opacity(0.08))
+                        .clipShape(Circle())
                 }
             }
-            .padding(16)
-        }
-        .frame(height: 400)
-        .onAppear {
-            // Load current values into local state
-            let eqGains = coordinator.audioEngine.channelEQGains[id] ?? [0, 0, 0]
-            localEqLow = eqGains[0]
-            localEqMid = eqGains[1]
-            localEqHigh = eqGains[2]
-            localPan = coordinator.audioEngine.channelPans[id] ?? 0
-            localReverbSend = coordinator.audioEngine.channelReverbSends[id] ?? 0
-            localDelaySend = coordinator.audioEngine.channelDelaySends[id] ?? 0
-        }
-    }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
 
-    private func sectionHeader(_ title: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.4))
-                .tracking(2)
-            Spacer()
-        }
-    }
+            // Channel strip content
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 20) {
 
-    private func eqRow(_ label: String, band: Int, local: Binding<Float?>, color: Color) -> some View {
-        let value = local.wrappedValue ?? 0
-        return HStack {
-            Text(label)
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
-                .frame(width: 40, alignment: .leading)
-            Slider(value: Binding(
-                get: { value },
-                set: { new in
-                    local.wrappedValue = new
-                    coordinator.audioEngine.setChannelEQ(id, band: band, gain: new)
-                }
-            ), in: -12...12)
-            .tint(color)
-            Text("\(Int(value)) dB")
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.4))
-                .frame(width: 45, alignment: .trailing)
-        }
-    }
-
-    private func sendRow(_ label: String, local: Binding<Float?>, isReverb: Bool, color: Color) -> some View {
-        let value = local.wrappedValue ?? 0
-        return HStack {
-            Text(label)
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
-                .frame(width: 55, alignment: .leading)
-            Slider(value: Binding(
-                get: { value },
-                set: { new in
-                    local.wrappedValue = new
-                    if isReverb {
-                        coordinator.audioEngine.setChannelReverbSend(id, amount: new)
-                    } else {
-                        coordinator.audioEngine.setChannelDelaySend(id, amount: new)
+                    // === PAN (top, most used) ===
+                    if id != "master" {
+                        VStack(spacing: 6) {
+                            HStack {
+                                Text("PAN")
+                                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                                    .foregroundStyle(color.opacity(0.7))
+                                Spacer()
+                                Text(panLabel)
+                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(.white.opacity(0.6))
+                            }
+                            HStack(spacing: 8) {
+                                Text("L").font(.system(size: 10, design: .monospaced)).foregroundStyle(.white.opacity(0.25))
+                                Slider(value: $pan, in: -1...1)
+                                    .tint(color)
+                                    .onChange(of: pan) { _, new in
+                                        coordinator.audioEngine.setChannelPan(id, pan: Float(new))
+                                    }
+                                Text("R").font(.system(size: 10, design: .monospaced)).foregroundStyle(.white.opacity(0.25))
+                            }
+                        }
+                        .padding(12)
+                        .background(.white.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
+
+                    // === SENDS ===
+                    if id != "master" {
+                        VStack(spacing: 12) {
+                            HStack {
+                                Text("SENDS")
+                                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                                    .foregroundStyle(color.opacity(0.7))
+                                Spacer()
+                            }
+                            sliderRow("Reverb", value: $reverbSend, color: color) { new in
+                                coordinator.audioEngine.setChannelReverbSend(id, amount: Float(new))
+                            }
+                            sliderRow("Delay", value: $delaySend, color: color) { new in
+                                coordinator.audioEngine.setChannelDelaySend(id, amount: Float(new))
+                            }
+                        }
+                        .padding(12)
+                        .background(.white.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+
+                    // === EQ ===
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("EQ")
+                                .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                                .foregroundStyle(color.opacity(0.7))
+                            Spacer()
+                        }
+                        eqSlider("Low", value: $eqLow, color: color, band: 0)
+                        eqSlider("Mid", value: $eqMid, color: color, band: 1)
+                        eqSlider("High", value: $eqHigh, color: color, band: 2)
+                    }
+                    .padding(12)
+                    .background(.white.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    Spacer().frame(height: 40) // safe area padding
                 }
-            ), in: 0...1)
-            .tint(color)
-            Text("\(Int(value * 100))%")
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.4))
-                .frame(width: 35, alignment: .trailing)
+                .padding(.horizontal, 16)
+            }
         }
+        .frame(height: 380)
+        .onAppear { loadValues() }
     }
 
-    private func panRow(color: Color) -> some View {
-        let value = localPan ?? 0
-        return HStack {
-            Text("L")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.3))
-            Slider(value: Binding(
-                get: { (value + 1) / 2 }, // -1..1 → 0..1
-                set: { new in
-                    let pan = new * 2 - 1 // 0..1 → -1..1
-                    localPan = pan
-                    coordinator.audioEngine.setChannelPan(id, pan: pan)
-                }
-            ), in: 0...1)
-            .tint(color)
-            Text("R")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.3))
-            Text(panLabel(value))
+    private func loadValues() {
+        let eqGains = coordinator.audioEngine.channelEQGains[id] ?? [0, 0, 0]
+        eqLow = Double(eqGains[0])
+        eqMid = Double(eqGains[1])
+        eqHigh = Double(eqGains[2])
+        pan = Double(coordinator.audioEngine.channelPans[id] ?? 0)
+        reverbSend = Double(coordinator.audioEngine.channelReverbSends[id] ?? 0)
+        delaySend = Double(coordinator.audioEngine.channelDelaySends[id] ?? 0)
+    }
+
+    private func sliderRow(_ label: String, value: Binding<Double>, color: Color, onChange: @escaping (Double) -> Void) -> some View {
+        HStack(spacing: 8) {
+            Text(label)
                 .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.5))
+                .frame(width: 50, alignment: .leading)
+            Slider(value: value, in: 0...1)
+                .tint(color)
+                .onChange(of: value.wrappedValue) { _, new in onChange(new) }
+            Text("\(Int(value.wrappedValue * 100))%")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.4))
                 .frame(width: 35, alignment: .trailing)
         }
     }
 
-    private func panLabel(_ pan: Float) -> String {
-        if abs(pan) < 0.05 { return "C" }
-        if pan < 0 { return "L\(Int(abs(pan) * 100))" }
-        return "R\(Int(pan * 100))"
+    private func eqSlider(_ label: String, value: Binding<Double>, color: Color, band: Int) -> some View {
+        HStack(spacing: 8) {
+            Text(label)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.5))
+                .frame(width: 35, alignment: .leading)
+            Slider(value: value, in: -12...12)
+                .tint(color)
+                .onChange(of: value.wrappedValue) { _, new in
+                    coordinator.audioEngine.setChannelEQ(id, band: band, gain: Float(new))
+                }
+            Text(String(format: "%+.0f", value.wrappedValue))
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
+                .frame(width: 30, alignment: .trailing)
+        }
+    }
+
+    private var panLabel: String {
+        let p = pan
+        if abs(p) < 0.05 { return "C" }
+        if p < 0 { return "L\(Int(abs(p) * 100))" }
+        return "R\(Int(p * 100))"
     }
 }
