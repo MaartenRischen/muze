@@ -168,11 +168,13 @@ class AudioEngine: ObservableObject {
     @Published var sidechainRatio: Float = 8       // compression ratio
     @Published var sidechainEnabled: Bool = true
 
-    // Sidechain state (per channel, updated in render callback)
+    // Sidechain state
     private var sidechainGainReduction: [String: Float] = [
         "pad": 1, "arp": 1, "arp2": 1, "melody": 1
     ]
     private var kickTriggered: Bool = false
+    private var kickTriggerSample: UInt64 = 0  // when kick last fired
+    private let sidechainHoldSamples: UInt64 = 2205  // ~50ms hold at 44.1kHz
 
     // Reverb parameters
     @Published var reverbWetDry: Float = 35        // 0-100%
@@ -273,8 +275,11 @@ class AudioEngine: ObservableObject {
                             let vel = self.drumVelocity.count > 0 && step < self.drumVelocity[0].count ? self.drumVelocity[0][step] : 0.8
                             self.kickOsc.trigger(velocity: vel)
                             self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmKick, withVelocity: UInt8(vel * 127), onChannel: 9)
-                            // Trigger sidechain
-                            if self.sidechainEnabled { self.kickTriggered = true }
+                            // Trigger sidechain — mark sample position
+                            if self.sidechainEnabled {
+                                self.kickTriggered = true
+                                self.kickTriggerSample = self.globalSampleCount + UInt64(i)
+                            }
                         }
                         if self.drumPattern[1][step] == 1 {
                             let vel = self.drumVelocity.count > 1 && step < self.drumVelocity[1].count ? self.drumVelocity[1][step] : 0.7
@@ -333,30 +338,53 @@ class AudioEngine: ObservableObject {
 
             // Sidechain compressor — apply gain reduction to ducked channels
             if self.sidechainEnabled {
-                let attackCoeff = expf(-1.0 / (self.sidechainAttack * 0.001 * Float(sr) + 1))
-                let releaseCoeff = expf(-1.0 / (self.sidechainRelease * 0.001 * Float(sr) + 1))
+                let currentSample = self.globalSampleCount
+                let samplesSinceKick = currentSample > self.kickTriggerSample ? currentSample - self.kickTriggerSample : UInt64.max
+                let inHold = samplesSinceKick < self.sidechainHoldSamples
+                let releaseProgress = inHold ? Float(0) : min(1, Float(samplesSinceKick - self.sidechainHoldSamples) / (self.sidechainRelease * 0.001 * Float(sr)))
 
+                var needsUpdate = false
                 for ch in ["pad", "arp", "arp2", "melody"] {
                     let amount = self.channelSidechainAmounts[ch] ?? 0
                     guard amount > 0 else { continue }
 
-                    var gr = self.sidechainGainReduction[ch] ?? 1.0
-                    let target: Float = self.kickTriggered ? (1.0 - amount) : 1.0
-
-                    if target < gr {
-                        // Attack (fast duck)
-                        gr = target + attackCoeff * (gr - target)
+                    let gr: Float
+                    if inHold {
+                        gr = 1.0 - amount  // full duck
                     } else {
-                        // Release (slow recovery)
-                        gr = target + releaseCoeff * (gr - target)
+                        gr = (1.0 - amount) + amount * releaseProgress  // recovering
                     }
-                    self.sidechainGainReduction[ch] = gr
 
-                    // Apply to channel mixer volume
-                    let baseVol = self.dbToGain(self.channelVolumes[ch] ?? -10)
-                    self.mixerForChannel(ch)?.outputVolume = baseVol * gr
+                    let prev = self.sidechainGainReduction[ch] ?? 1.0
+                    if abs(gr - prev) > 0.01 {
+                        self.sidechainGainReduction[ch] = gr
+                        needsUpdate = true
+                    }
                 }
-                self.kickTriggered = false
+
+                if needsUpdate {
+                    // Apply on main thread since AVAudioMixerNode properties may not be audio-thread safe
+                    let reductions = self.sidechainGainReduction
+                    let volumes = self.channelVolumes
+                    let isMuted = (self.padMuted, self.arpMuted, self.arp2Muted, self.melodyMuted)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self else { return }
+                        for ch in ["pad", "arp", "arp2", "melody"] {
+                            let chMuted: Bool
+                            switch ch {
+                            case "pad": chMuted = isMuted.0
+                            case "arp": chMuted = isMuted.1
+                            case "arp2": chMuted = isMuted.2
+                            case "melody": chMuted = isMuted.3
+                            default: chMuted = false
+                            }
+                            guard !chMuted else { continue }
+                            let baseVol = self.dbToGain(volumes[ch] ?? -10)
+                            let gr = reductions[ch] ?? 1.0
+                            self.mixerForChannel(ch)?.outputVolume = baseVol * gr
+                        }
+                    }
+                }
             }
 
             return self.kickOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: sr, muted: self.beatMuted)
