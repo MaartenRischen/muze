@@ -867,18 +867,16 @@ class AudioEngine: ObservableObject {
             // Cancel any pending crossfade stop from a previous chord change
             padCrossfadeWorkItem?.cancel()
 
-            // Crossfade: start new chord FIRST, then fade out old after brief overlap
+            // Crossfade: start new chord FIRST, then stop ALL old notes after brief overlap
             if !padMuted {
                 sfm.playChord(newNotes, velocity: 90, on: sfm.padSampler)
             }
-            // Stop old notes that aren't in the new chord after ~120ms overlap
-            let notesToStop = oldNotes.filter { !newNotes.contains($0) }
-            if !notesToStop.isEmpty {
+            if !oldNotes.isEmpty {
                 let work = DispatchWorkItem { [weak sfm] in
-                    sfm?.stopChord(notesToStop, on: sfm?.padSampler)
+                    sfm?.stopChord(oldNotes, on: sfm?.padSampler)
                 }
                 padCrossfadeWorkItem = work
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work)
             }
         } else {
             padOsc.triggerNotes(midiNotes)
