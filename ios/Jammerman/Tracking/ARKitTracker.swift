@@ -133,21 +133,17 @@ class ARKitTracker: NSObject {
         // Roll: rotation around Z axis — atan2 of column 0 and 1 Y components
         let roll = atan2(transform.columns.0.y, transform.columns.1.y)
 
-        // Face center: compute from the nose tip vertex projected to screen
-        // Use the transform to get face position relative to camera
-        // ARKit: columns.3 = translation (x=right, y=up, z=towards user)
-        // For screen mapping: use the running Vision-based tracker as backup
-        // since ARKit 3D→2D projection is unreliable without camera intrinsics
-        // Just pass 0.5, 0.5 — the visualizer's smoothed faceCx/faceCy
-        // will be driven by the Vision fallback tracker if running,
-        // or we compute from the nose vertex below
+        // Face center from ARKit transform
+        // ARKit: X=right, Y=up, Z=towards camera (negative = in front of camera)
+        // Front camera is mirrored in the ARSCNView display
         let tx = transform.columns.3.x
         let ty = transform.columns.3.y
-        let tz = transform.columns.3.z
-        // Perspective projection: divide by Z distance, scale to screen
-        let focalLength: Float = 3.5  // approximate, adjusts projection strength
-        let faceCenterX = clamp01(0.5 - (tx / max(abs(tz), 0.1)) * focalLength)
-        let faceCenterY = clamp01(0.5 - (ty / max(abs(tz), 0.1)) * focalLength)
+        let tz = abs(transform.columns.3.z)
+        // Perspective: project 3D to 2D using approximate focal length
+        // iPhone front camera ~30mm equiv, sensor ~4mm → focal ~7 in normalized coords
+        let fov: Float = 4.0  // tunable: higher = face center moves more with head
+        let faceCenterX = clamp01(0.5 + (tx / max(tz, 0.2)) * fov)  // no negate — ARSCNView mirrors
+        let faceCenterY = clamp01(0.45 - (ty / max(tz, 0.2)) * fov) // Y up → screen down, slight upward offset
 
         return FaceFeatures(
             mouthOpenness: mouthOpenness,

@@ -94,15 +94,14 @@ class TrackingCoordinator: ObservableObject {
         // Load saved settings
         JammermanStorage.load(state: state, engine: audioEngine)
 
-        // Start regular camera immediately for instant preview
-        camera.start()
-
-        // Use ARKit if supported — usingARKit set to true after first frame arrives
+        // Use ARKit if supported, otherwise AVCaptureSession + Vision
         if ARKitTracker.isSupported {
+            // ARKit takes over the camera — DON'T start AVCaptureSession
             arKitTracker.start()
-            // Don't set usingARKit=true yet — wait for first ARKit callback
-            print("[ARKit] Face tracking starting...")
+            state.usingARKit = true
+            print("[ARKit] Face tracking started")
         } else {
+            camera.start()
             state.usingARKit = false
             print("[Vision] Fallback face tracking")
         }
@@ -335,16 +334,9 @@ extension TrackingCoordinator: ARKitTrackerDelegate {
             self.state.headPitch = features.headPitch
             self.state.headYaw = features.headYaw
             self.state.headRoll = features.headRoll
-            // DON'T set faceCenterX/Y from ARKit — Vision's screen coords are more accurate
-            // Vision tracker keeps running and provides face center via processFrame()
+            self.state.faceCenterX = features.faceCenterX
+            self.state.faceCenterY = features.faceCenterY
             self.state.faceDetected = true
-
-            // Switch to ARKit camera (keep Vision camera running for face position)
-            if !self.state.usingARKit {
-                self.state.usingARKit = true
-                // DON'T stop camera — Vision needs it for face center coordinates
-                print("[ARKit] First face detected — AR camera active")
-            }
 
             // Store ARKit face mesh data for visualizer
             self.state.faceVertices = vertices
