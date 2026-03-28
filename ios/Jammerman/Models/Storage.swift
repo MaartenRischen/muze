@@ -61,11 +61,12 @@ enum JammermanStorage {
     }
 
     static func load(state: JammermanState, engine: AudioEngine) {
-        // Clear ALL stale storage from any version
+        // Clean legacy keys
         UserDefaults.standard.removeObject(forKey: "jammerman-settings-v1")
         UserDefaults.standard.removeObject(forKey: "jammerman-settings-v3")
-        // Force fresh start every time version changes
-        let ver = "v3.8.0"
+
+        // Version gate — clear storage on version change
+        let ver = "v3.8.3"
         if UserDefaults.standard.string(forKey: "jammerman-ver") != ver {
             UserDefaults.standard.removeObject(forKey: key)
             UserDefaults.standard.set(ver, forKey: "jammerman-ver")
@@ -95,12 +96,9 @@ enum JammermanStorage {
             }
         }
 
-        if let v = dict["padMuted"] { engine.padMuted = v == "1" }
-        if let v = dict["arpMuted"] { engine.arpMuted = v == "1" }
-        if let v = dict["arp2Muted"] { engine.arp2Muted = v == "1" }
-        if let v = dict["melodyMuted"] { engine.melodyMuted = v == "1" }
-        if let v = dict["beatMuted"] { engine.beatMuted = v == "1" }
-        if let v = dict["binauralActive"] { engine.binauralActive = v == "1" }
+        // NEVER restore mute states — instruments always start muted
+        // engine.padMuted, arpMuted, etc. keep their default = true
+        // User must explicitly unmute each instrument
 
         if let v = dict["binauralBeatHz"], let n = Float(v) { engine.setBinauralBeatHz(n) }
         if let v = dict["binauralFollowChord"] { engine.binauralFollowChord = v == "1" }
