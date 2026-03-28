@@ -5,6 +5,44 @@
 import AVFoundation
 import Accelerate
 
+// MARK: - Lock-free SPSC Ring Buffer for MIDI Events
+
+// Lock-free SPSC ring buffer for MIDI events (audio thread → main thread)
+struct MidiEvent {
+    var type: UInt8     // 0x90 = noteOn, 0x80 = noteOff
+    var note: UInt8
+    var velocity: UInt8
+    var channel: UInt8
+    var samplerIdx: UInt8  // 0=drum, 1=arp, 2=arp2
+}
+
+class MidiEventQueue {
+    private let capacity = 64
+    private var buffer: [MidiEvent]
+    private var readIndex = 0
+    private var writeIndex = 0
+
+    init() {
+        buffer = Array(repeating: MidiEvent(type: 0, note: 0, velocity: 0, channel: 0, samplerIdx: 0), count: 64)
+    }
+
+    // Called from audio thread
+    func enqueue(_ event: MidiEvent) {
+        let next = (writeIndex + 1) % capacity
+        guard next != readIndex else { return } // full, drop event
+        buffer[writeIndex] = event
+        writeIndex = next
+    }
+
+    // Called from main/drain thread
+    func dequeue() -> MidiEvent? {
+        guard readIndex != writeIndex else { return nil }
+        let event = buffer[readIndex]
+        readIndex = (readIndex + 1) % capacity
+        return event
+    }
+}
+
 // MARK: - Waveform Type
 
 enum WaveformType: String, CaseIterable {
@@ -196,6 +234,10 @@ class AudioEngine: ObservableObject {
     private var padCrossfadeWorkItem: DispatchWorkItem?
     private var currentMelodyMidiNote: UInt8? = nil
 
+    // Lock-free MIDI event queue (audio thread enqueues, main thread drains)
+    private let midiQueue = MidiEventQueue()
+    private var midiDrainTimer: Timer?
+
     // Master filter cutoff (face-driven)
     private var masterFilterFreq: Float = 10000
 
@@ -272,111 +314,125 @@ class AudioEngine: ObservableObject {
             let samplesPerBeat = sr * 60.0 / currentBpm
             let samplesPerSixteenth = samplesPerBeat / 4.0
 
-            // Stop any pending arp note-offs from the previous step
+            // Stop any pending arp note-offs from the previous buffer
             if let pendingOff = self.arpPendingNoteOff {
-                self.soundFontManager?.arpSampler?.stopNote(pendingOff, onChannel: 0)
+                self.midiQueue.enqueue(MidiEvent(type: 0x80, note: pendingOff, velocity: 0, channel: 0, samplerIdx: 1))
                 self.arpPendingNoteOff = nil
             }
             if let pendingOff = self.arp2PendingNoteOff {
-                self.soundFontManager?.arp2Sampler?.stopNote(pendingOff, onChannel: 0)
+                self.midiQueue.enqueue(MidiEvent(type: 0x80, note: pendingOff, velocity: 0, channel: 0, samplerIdx: 2))
                 self.arp2PendingNoteOff = nil
             }
 
-            for i in 0..<Int(frameCount) {
-                let pos = self.globalSampleCount + UInt64(i)
-                let sixteenthStep = Int(Double(pos) / samplesPerSixteenth) % 16
+            // --- Optimized: pre-calculate which samples trigger step changes ---
+            let bufferStart = self.globalSampleCount
+            let bufferEnd = bufferStart + UInt64(frameCount)
 
-                // Drum sequencer — on new 16th note step
-                if sixteenthStep != self.lastDrumStep {
-                    self.lastDrumStep = sixteenthStep
-                    if !localBeatMuted && localDrumPattern.count >= 3 {
-                        // Bounds-safe step index
-                        guard localDrumPattern[0].count > 0 else { continue }
-                        let step = sixteenthStep % localDrumPattern[0].count
+            let arpDivisor = self.noteValueDivisor(localArpNoteValue)
+            let samplesPerArpStep = samplesPerBeat / Double(arpDivisor)
+            let arp2Divisor = self.noteValueDivisor(localArp2NoteValue)
+            let samplesPerArp2Step = samplesPerBeat / Double(arp2Divisor)
 
-                        // Kick
-                        if step < localDrumPattern[0].count && localDrumPattern[0][step] == 1 {
-                            let vel: Float = (localDrumVelocity.count > 0 && step < localDrumVelocity[0].count) ? localDrumVelocity[0][step] : 0.8
-                            self.kickOsc.trigger(velocity: vel)
-                            self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmKick, withVelocity: UInt8(vel * 127), onChannel: 9)
-                        }
-                        // Snare
-                        if localDrumPattern[1].count > 0 {
-                            let snareStep = step % localDrumPattern[1].count
-                            if localDrumPattern[1][snareStep] == 1 {
-                                let vel: Float = (localDrumVelocity.count > 1 && snareStep < localDrumVelocity[1].count) ? localDrumVelocity[1][snareStep] : 0.7
-                                self.snareOsc.trigger(velocity: vel)
-                                self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmSnare, withVelocity: UInt8(vel * 127), onChannel: 9)
-                            }
-                        }
-                        // Hat
-                        if localDrumPattern[2].count > 0 {
-                            let hatStep = step % localDrumPattern[2].count
-                            if localDrumPattern[2][hatStep] == 1 {
-                                let vel: Float = (localDrumVelocity.count > 2 && hatStep < localDrumVelocity[2].count) ? localDrumVelocity[2][hatStep] : 0.5
-                                self.hatOsc.trigger(velocity: vel)
-                                self.soundFontManager?.drumSampler?.startNote(SoundFontManager.gmClosedHat, withVelocity: UInt8(vel * 127), onChannel: 9)
-                            }
-                        }
-                        // Update UI drum step (weak self, only if changed)
-                        let pendingStep = sixteenthStep
-                        if self._pendingDrumStep != pendingStep {
-                            self._pendingDrumStep = pendingStep
-                            DispatchQueue.main.async { [weak self] in
-                                self?.drumStep = pendingStep
-                            }
+            // Find all 16th-note boundaries within this buffer
+            let firstDrumStep = Int(Double(bufferStart) / samplesPerSixteenth)
+            let lastDrumStepInBuffer = Int(Double(bufferEnd - 1) / samplesPerSixteenth)
+
+            for drumStepCandidate in firstDrumStep...lastDrumStepInBuffer {
+                let sixteenthStep = drumStepCandidate % 16
+                if sixteenthStep == self.lastDrumStep { continue }
+                self.lastDrumStep = sixteenthStep
+
+                if !localBeatMuted && localDrumPattern.count >= 3 {
+                    guard localDrumPattern[0].count > 0 else { continue }
+                    let step = sixteenthStep % localDrumPattern[0].count
+
+                    // Kick
+                    if step < localDrumPattern[0].count && localDrumPattern[0][step] == 1 {
+                        let vel: Float = (localDrumVelocity.count > 0 && step < localDrumVelocity[0].count) ? localDrumVelocity[0][step] : 0.8
+                        self.kickOsc.trigger(velocity: vel)
+                        self.midiQueue.enqueue(MidiEvent(type: 0x90, note: SoundFontManager.gmKick, velocity: UInt8(vel * 127), channel: 9, samplerIdx: 0))
+                    }
+                    // Snare
+                    if localDrumPattern[1].count > 0 {
+                        let snareStep = step % localDrumPattern[1].count
+                        if localDrumPattern[1][snareStep] == 1 {
+                            let vel: Float = (localDrumVelocity.count > 1 && snareStep < localDrumVelocity[1].count) ? localDrumVelocity[1][snareStep] : 0.7
+                            self.snareOsc.trigger(velocity: vel)
+                            self.midiQueue.enqueue(MidiEvent(type: 0x90, note: SoundFontManager.gmSnare, velocity: UInt8(vel * 127), channel: 9, samplerIdx: 0))
                         }
                     }
-                }
-
-                // Arp 1 sequencer
-                let arpDivisor = self.noteValueDivisor(localArpNoteValue)
-                let samplesPerArpStep = samplesPerBeat / Double(arpDivisor)
-                let arpStep = Int(Double(pos) / samplesPerArpStep)
-                if arpStep != self.lastArpStep {
-                    self.lastArpStep = arpStep
-                    if !localArpNotes.isEmpty && !localArpMuted {
-                        // Stop previous note before starting new one
-                        if localUseSoundFont, let prevNote = self.arpPendingNoteOff {
-                            self.soundFontManager?.arpSampler?.stopNote(prevNote, onChannel: 0)
-                            self.arpPendingNoteOff = nil
-                        }
-                        let note = self.getNextArpNote(notes: localArpNotes, index: &self.arpIndex, direction: &self.arpDirection, pattern: localArpPattern)
-                        if localUseSoundFont {
-                            let midiNote = UInt8(note)
-                            self.soundFontManager?.arpSampler?.startNote(midiNote, withVelocity: 85, onChannel: 0)
-                            // Track for note-off at next step change
-                            self.arpPendingNoteOff = midiNote
-                        } else {
-                            self.arpOsc.triggerNote(note)
+                    // Hat
+                    if localDrumPattern[2].count > 0 {
+                        let hatStep = step % localDrumPattern[2].count
+                        if localDrumPattern[2][hatStep] == 1 {
+                            let vel: Float = (localDrumVelocity.count > 2 && hatStep < localDrumVelocity[2].count) ? localDrumVelocity[2][hatStep] : 0.5
+                            self.hatOsc.trigger(velocity: vel)
+                            self.midiQueue.enqueue(MidiEvent(type: 0x90, note: SoundFontManager.gmClosedHat, velocity: UInt8(vel * 127), channel: 9, samplerIdx: 0))
                         }
                     }
-                }
-
-                // Arp 2 sequencer
-                let arp2Divisor = self.noteValueDivisor(localArp2NoteValue)
-                let samplesPerArp2Step = samplesPerBeat / Double(arp2Divisor)
-                let arp2Step = Int(Double(pos) / samplesPerArp2Step)
-                if arp2Step != self.lastArp2Step {
-                    self.lastArp2Step = arp2Step
-                    if !localArp2Notes.isEmpty && !localArp2Muted {
-                        // Stop previous note before starting new one
-                        if localUseSoundFont, let prevNote = self.arp2PendingNoteOff {
-                            self.soundFontManager?.arp2Sampler?.stopNote(prevNote, onChannel: 0)
-                            self.arp2PendingNoteOff = nil
-                        }
-                        let note = self.getNextArpNote(notes: localArp2Notes, index: &self.arp2Index, direction: &self.arp2Direction, pattern: localArp2Pattern)
-                        if localUseSoundFont {
-                            let midiNote = UInt8(note)
-                            self.soundFontManager?.arp2Sampler?.startNote(midiNote, withVelocity: 80, onChannel: 0)
-                            // Track for note-off at next step change
-                            self.arp2PendingNoteOff = midiNote
-                        } else {
-                            self.arp2Osc.triggerNote(note)
+                    // Update UI drum step (weak self, only if changed)
+                    let pendingStep = sixteenthStep
+                    if self._pendingDrumStep != pendingStep {
+                        self._pendingDrumStep = pendingStep
+                        DispatchQueue.main.async { [weak self] in
+                            self?.drumStep = pendingStep
                         }
                     }
                 }
             }
+
+            // Find all arp1 step boundaries within this buffer
+            let firstArpStep = Int(Double(bufferStart) / samplesPerArpStep)
+            let lastArpStepInBuffer = Int(Double(bufferEnd - 1) / samplesPerArpStep)
+
+            for arpStepCandidate in firstArpStep...lastArpStepInBuffer {
+                if arpStepCandidate == self.lastArpStep { continue }
+                self.lastArpStep = arpStepCandidate
+
+                if !localArpNotes.isEmpty && !localArpMuted {
+                    // Stop previous note before starting new one
+                    if localUseSoundFont, let prevNote = self.arpPendingNoteOff {
+                        self.midiQueue.enqueue(MidiEvent(type: 0x80, note: prevNote, velocity: 0, channel: 0, samplerIdx: 1))
+                        self.arpPendingNoteOff = nil
+                    }
+                    let note = self.getNextArpNote(notes: localArpNotes, index: &self.arpIndex, direction: &self.arpDirection, pattern: localArpPattern)
+                    if localUseSoundFont {
+                        let midiNote = UInt8(note)
+                        self.midiQueue.enqueue(MidiEvent(type: 0x90, note: midiNote, velocity: 85, channel: 0, samplerIdx: 1))
+                        // Track for note-off at next step change
+                        self.arpPendingNoteOff = midiNote
+                    } else {
+                        self.arpOsc.triggerNote(note)
+                    }
+                }
+            }
+
+            // Find all arp2 step boundaries within this buffer
+            let firstArp2Step = Int(Double(bufferStart) / samplesPerArp2Step)
+            let lastArp2StepInBuffer = Int(Double(bufferEnd - 1) / samplesPerArp2Step)
+
+            for arp2StepCandidate in firstArp2Step...lastArp2StepInBuffer {
+                if arp2StepCandidate == self.lastArp2Step { continue }
+                self.lastArp2Step = arp2StepCandidate
+
+                if !localArp2Notes.isEmpty && !localArp2Muted {
+                    // Stop previous note before starting new one
+                    if localUseSoundFont, let prevNote = self.arp2PendingNoteOff {
+                        self.midiQueue.enqueue(MidiEvent(type: 0x80, note: prevNote, velocity: 0, channel: 0, samplerIdx: 2))
+                        self.arp2PendingNoteOff = nil
+                    }
+                    let note = self.getNextArpNote(notes: localArp2Notes, index: &self.arp2Index, direction: &self.arp2Direction, pattern: localArp2Pattern)
+                    if localUseSoundFont {
+                        let midiNote = UInt8(note)
+                        self.midiQueue.enqueue(MidiEvent(type: 0x90, note: midiNote, velocity: 80, channel: 0, samplerIdx: 2))
+                        // Track for note-off at next step change
+                        self.arp2PendingNoteOff = midiNote
+                    } else {
+                        self.arp2Osc.triggerNote(note)
+                    }
+                }
+            }
+
             self.globalSampleCount += UInt64(frameCount)
 
             return self.kickOsc.render(frameCount: frameCount, bufferList: bufferList, sampleRate: sr, muted: localBeatMuted)
@@ -629,16 +685,40 @@ class AudioEngine: ObservableObject {
             isPlaying = true
             // Arp/drum sequencing now handled in kick render callback (sample-accurate)
             // No more Timer-based sequencing
+
+            // High-frequency timer drains MIDI events from audio thread to main thread
+            midiDrainTimer = Timer.scheduledTimer(withTimeInterval: 0.002, repeats: true) { [weak self] _ in
+                self?.drainMidiQueue()
+            }
         } catch {
             print("Engine start error: \(error)")
         }
     }
 
     func stop() {
+        midiDrainTimer?.invalidate()
+        midiDrainTimer = nil
         chordAdvanceTimer?.invalidate()
         riserTimer?.invalidate()
         engine.stop()
         isPlaying = false
+    }
+
+    private func drainMidiQueue() {
+        while let event = midiQueue.dequeue() {
+            let sampler: AVAudioUnitSampler?
+            switch event.samplerIdx {
+            case 0: sampler = soundFontManager?.drumSampler
+            case 1: sampler = soundFontManager?.arpSampler
+            case 2: sampler = soundFontManager?.arp2Sampler
+            default: sampler = nil
+            }
+            if event.type == 0x90 {
+                sampler?.startNote(event.note, withVelocity: event.velocity, onChannel: event.channel)
+            } else {
+                sampler?.stopNote(event.note, onChannel: event.channel)
+            }
+        }
     }
 
     // Convert note value string to beat divisor (e.g. "8n" = 2 per beat)
