@@ -12,41 +12,43 @@ class SoundFontManager {
     var leadSampler: AVAudioUnitSampler?
     var bassSampler: AVAudioUnitSampler?
 
-    // Available instrument presets (Bank 0 = melodic, Bank 128 = drums)
+    // Available instrument presets
+    // AVAudioUnitSampler uses GM convention: bankMSB 0x79 (121) for melodic, 0x78 (120) for drums
     struct Preset {
         let name: String
-        let bank: UInt8  // MSB
         let program: UInt8
+        let bankMSB: UInt8
+        let bankLSB: UInt8
     }
 
     static let padPresets: [Preset] = [
-        Preset(name: "Warm Pad", bank: 0, program: 89),
-        Preset(name: "Synth Strings", bank: 0, program: 50),
-        Preset(name: "Halo Pad", bank: 0, program: 94),
-        Preset(name: "Atmosphere", bank: 0, program: 99),
-        Preset(name: "Sweep Pad", bank: 0, program: 95),
-        Preset(name: "Choir Aahs", bank: 0, program: 52),
-        Preset(name: "Strings Slow", bank: 0, program: 49),
-        Preset(name: "Polysynth", bank: 0, program: 90),
+        Preset(name: "Warm Pad", program: 89, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Synth Strings", program: 50, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Halo Pad", program: 94, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Atmosphere", program: 99, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Sweep Pad", program: 95, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Choir Aahs", program: 52, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Strings Slow", program: 49, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Polysynth", program: 90, bankMSB: 0x79, bankLSB: 0),
     ]
 
     static let leadPresets: [Preset] = [
-        Preset(name: "Saw Lead", bank: 0, program: 81),
-        Preset(name: "Square Lead", bank: 0, program: 80),
-        Preset(name: "Calliope Lead", bank: 0, program: 82),
-        Preset(name: "Chiffer Lead", bank: 0, program: 83),
-        Preset(name: "Charang", bank: 0, program: 84),
-        Preset(name: "FM Piano", bank: 0, program: 5),
-        Preset(name: "Music Box", bank: 0, program: 10),
-        Preset(name: "Vibraphone", bank: 0, program: 11),
+        Preset(name: "Saw Lead", program: 81, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Square Lead", program: 80, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Calliope Lead", program: 82, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Chiffer Lead", program: 83, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Charang", program: 84, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "FM Piano", program: 5, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Music Box", program: 10, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Vibraphone", program: 11, bankMSB: 0x79, bankLSB: 0),
     ]
 
     static let bassPresets: [Preset] = [
-        Preset(name: "Synth Bass 1", bank: 0, program: 38),
-        Preset(name: "Synth Bass 2", bank: 0, program: 39),
-        Preset(name: "Fingered Bass", bank: 0, program: 33),
-        Preset(name: "Picked Bass", bank: 0, program: 34),
-        Preset(name: "Acoustic Bass", bank: 0, program: 32),
+        Preset(name: "Synth Bass 1", program: 38, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Synth Bass 2", program: 39, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Fingered Bass", program: 33, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Picked Bass", program: 34, bankMSB: 0x79, bankLSB: 0),
+        Preset(name: "Acoustic Bass", program: 32, bankMSB: 0x79, bankLSB: 0),
     ]
 
     private var soundFontURL: URL?
@@ -110,8 +112,8 @@ class SoundFontManager {
         guard index < presets.count, let sampler = padSampler, let url = soundFontURL else { return }
         let p = presets[index]
         do {
-            try sampler.loadSoundBankInstrument(at: url, program: p.program, bankMSB: p.bank, bankLSB: 0)
-            print("[SFManager] Pad loaded: \(p.name)")
+            try sampler.loadSoundBankInstrument(at: url, program: p.program, bankMSB: p.bankMSB, bankLSB: p.bankLSB)
+            print("[SFManager] Pad loaded: \(p.name) (program \(p.program), bankMSB \(p.bankMSB))")
         } catch {
             print("[SFManager] Pad load error: \(error)")
         }
@@ -122,8 +124,8 @@ class SoundFontManager {
         guard index < presets.count, let sampler = leadSampler, let url = soundFontURL else { return }
         let p = presets[index]
         do {
-            try sampler.loadSoundBankInstrument(at: url, program: p.program, bankMSB: p.bank, bankLSB: 0)
-            print("[SFManager] Lead loaded: \(p.name)")
+            try sampler.loadSoundBankInstrument(at: url, program: p.program, bankMSB: p.bankMSB, bankLSB: p.bankLSB)
+            print("[SFManager] Lead loaded: \(p.name) (program \(p.program), bankMSB \(p.bankMSB))")
         } catch {
             print("[SFManager] Lead load error: \(error)")
         }
@@ -134,8 +136,8 @@ class SoundFontManager {
         guard index < presets.count, let sampler = bassSampler, let url = soundFontURL else { return }
         let p = presets[index]
         do {
-            try sampler.loadSoundBankInstrument(at: url, program: p.program, bankMSB: p.bank, bankLSB: 0)
-            print("[SFManager] Bass loaded: \(p.name)")
+            try sampler.loadSoundBankInstrument(at: url, program: p.program, bankMSB: p.bankMSB, bankLSB: p.bankLSB)
+            print("[SFManager] Bass loaded: \(p.name) (program \(p.program), bankMSB \(p.bankMSB))")
         } catch {
             print("[SFManager] Bass load error: \(error)")
         }

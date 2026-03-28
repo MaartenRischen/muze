@@ -63,7 +63,7 @@ struct PerformanceView: View {
             VStack {
                 Spacer()
                 HStack {
-                    Text("v3.7.2")
+                    Text("v3.7.3")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .foregroundStyle(.red.opacity(0.8))
                     Spacer()
