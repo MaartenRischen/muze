@@ -54,11 +54,28 @@ class SoundFontManager {
     init(engine: AVAudioEngine) {
         self.engine = engine
         soundFontURL = Bundle.main.url(forResource: "MuseScore_General", withExtension: "sf2")
+        if soundFontURL != nil {
+            print("[SFManager] Found SF2 at: \(soundFontURL!)")
+        } else {
+            // Try alternate locations
+            let resourcesFolder = Bundle.main.url(forResource: "Resources", withExtension: nil)
+            print("[SFManager] SF2 NOT found via forResource. Resources folder: \(resourcesFolder?.path ?? "nil")")
+            // List bundle contents for debugging
+            if let bundlePath = Bundle.main.resourcePath {
+                let files = (try? FileManager.default.contentsOfDirectory(atPath: bundlePath)) ?? []
+                let sf2Files = files.filter { $0.hasSuffix(".sf2") }
+                print("[SFManager] SF2 files in bundle: \(sf2Files)")
+                // Check in Resources subfolder
+                let resPath = bundlePath + "/Resources"
+                let resFiles = (try? FileManager.default.contentsOfDirectory(atPath: resPath)) ?? []
+                print("[SFManager] Files in Resources/: \(resFiles)")
+            }
+        }
     }
 
     func setupSamplers(mainMixerNode: AVAudioNode, format: AVAudioFormat) {
-        guard let sfURL = soundFontURL else {
-            print("[SFManager] SoundFont file not found in bundle")
+        guard soundFontURL != nil else {
+            print("[SFManager] Cannot setup — SoundFont file not found")
             return
         }
 

@@ -9,7 +9,11 @@ targets:
     type: application
     platform: iOS
     sources:
-      - Jammerman
+      - path: Jammerman
+        excludes:
+          - "Resources/*.sf2"
+      - path: Jammerman/Resources/MuseScore_General.sf2
+        buildPhase: resources
     info:
       path: Jammerman/Info.plist
       properties:
