@@ -47,21 +47,24 @@ class ARKitTracker: NSObject {
 
     override init() {
         handRequest.maximumHandCount = 1
+        #if !targetEnvironment(simulator)
+        // Create session in init so ARSCNView can bind to it immediately
+        if ARKitTracker.isSupported {
+            let s = ARSession()
+            self.arSession = s
+        }
+        #endif
         super.init()
     }
 
     func start() {
         #if !targetEnvironment(simulator)
-        guard ARKitTracker.isSupported else { return }
-
-        let session = ARSession()
+        guard let session = arSession else { return }
         session.delegate = self
-        self.arSession = session
 
         let config = ARFaceTrackingConfiguration()
         config.maximumNumberOfTrackedFaces = 1
 
-        // Enable person segmentation with depth if available
         if ARFaceTrackingConfiguration.supportsFrameSemantics(.personSegmentationWithDepth) {
             config.frameSemantics.insert(.personSegmentationWithDepth)
         } else if ARFaceTrackingConfiguration.supportsFrameSemantics(.personSegmentation) {
@@ -69,6 +72,7 @@ class ARKitTracker: NSObject {
         }
 
         session.run(config, options: [.resetTracking, .removeExistingAnchors])
+        print("[ARKit] Session started with face tracking")
         #endif
     }
 
