@@ -5,7 +5,6 @@
 import Foundation
 import Combine
 import CoreMedia
-import CoreImage
 import simd
 import Vision
 
@@ -41,9 +40,7 @@ class TrackingCoordinator: ObservableObject {
     private var prevHandOpen = true
     private var currentPadKey = ""
 
-    // Segmentation — just render raw mask to CGImage, no heavy processing
-    private let segCIContext = CIContext(options: [.useSoftwareRenderer: false])
-    private var isProcessingSeg = false
+    // Segmentation — lightweight byte copy, no CIContext
     private var segFrameCount = 0
 
     deinit {
@@ -390,22 +387,54 @@ extension TrackingCoordinator: ARKitTrackerDelegate {
         guard let buffer = buffer else { return }
         // Skip if already processing or throttle to every 5th frame
         segFrameCount += 1
-        guard segFrameCount % 5 == 0, !isProcessingSeg else { return }
-        isProcessingSeg = true
+        guard segFrameCount % 5 == 0 else { return }
 
-        // Render seg buffer to standalone CGImage synchronously (tiny ~256x192, fast)
-        // No CIImage filters, no blur, no compositing — just the raw mask
-        let ciRaw = CIImage(cvPixelBuffer: buffer).oriented(.right)
-        let extent = ciRaw.extent
-        guard let maskCG = segCIContext.createCGImage(ciRaw, from: extent) else {
-            isProcessingSeg = false
-            return
-        }
-        isProcessingSeg = false
+        // Convert CVPixelBuffer to CGImage by copying raw bytes — NO CIContext, NO GPU
+        // Seg buffer is ~256x192 single-channel grayscale, so this is <50KB copy
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
 
-        // Store single lightweight mask on main thread
+        let w = CVPixelBufferGetWidth(buffer)
+        let h = CVPixelBufferGetHeight(buffer)
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
+        guard let baseAddr = CVPixelBufferGetBaseAddress(buffer) else { return }
+
+        // Copy bytes so we don't retain the CVPixelBuffer/ARFrame
+        let dataSize = bytesPerRow * h
+        let dataCopy = Data(bytes: baseAddr, count: dataSize)
+
+        // Create CGImage from copied bytes (grayscale, 8-bit)
+        guard let provider = CGDataProvider(data: dataCopy as CFData) else { return }
+        let colorSpace = CGColorSpaceCreateDeviceGray()
+        // The seg buffer is landscape (w > h). ARKit front camera in portrait needs 90° CW rotation.
+        let landscapeImage = CGImage(
+            width: w, height: h,
+            bitsPerComponent: 8, bitsPerPixel: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+            provider: provider,
+            decode: nil, shouldInterpolate: true,
+            intent: .defaultIntent
+        )
+        guard let landscape = landscapeImage else { return }
+
+        // Rotate 90° CW for portrait orientation using a tiny CGContext
+        let rotW = h  // swapped
+        let rotH = w
+        guard let rotCtx = CGContext(
+            data: nil, width: rotW, height: rotH,
+            bitsPerComponent: 8, bytesPerRow: rotW,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ) else { return }
+        rotCtx.translateBy(x: CGFloat(rotW), y: 0)
+        rotCtx.rotate(by: .pi / 2)
+        rotCtx.draw(landscape, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let rotated = rotCtx.makeImage() else { return }
+
         DispatchQueue.main.async { [weak self] in
-            self?.state.segmentationMask = maskCG
+            self?.state.segmentationMask = rotated
         }
     }
 
