@@ -17,6 +17,7 @@ class TrackingCoordinator: ObservableObject {
     let sceneManager = SceneManager()
     let gyroscopeManager = GyroscopeManager()
     let recordingManager = RecordingManager()
+    let personSegmenter = PersonSegmenter()
 
     // Forward audioEngine changes to trigger SwiftUI re-renders
     private var audioEngineCancellable: AnyCancellable?
@@ -109,9 +110,17 @@ class TrackingCoordinator: ObservableObject {
 
     // MARK: - Frame Processing (runs on camera queue)
 
+    private var segmentFrameCount = 0
+
     private func processFrame(_ sampleBuffer: CMSampleBuffer) {
         let now = Date()
         let timestamp = now.timeIntervalSince1970 * 1000
+
+        // Background segmentation (every 3rd frame to save CPU)
+        segmentFrameCount += 1
+        if segmentFrameCount % 3 == 0 {
+            personSegmenter.processFrame(sampleBuffer)
+        }
 
         // Face detection (runs every other frame via internal stagger)
         if let result = faceTracker.detect(sampleBuffer: sampleBuffer) {

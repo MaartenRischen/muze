@@ -24,6 +24,7 @@
 		74AF2B4F9584CF76556A396A /* FeatureExtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 595A81D709627AD351FAC005 /* FeatureExtraction.swift */; };
 		7A9521C0D5D1A6AA2C972357 /* JammermanConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 632721E18A98DF36C69420B7 /* JammermanConfig.swift */; };
 		7E1FA72994FBB1C68B03ECEC /* SynthPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB61258A32E116A9BDF327E7 /* SynthPanelView.swift */; };
+		817E7349BCE702460A8D4B5F /* BackgroundBlurView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DFF4B1608551EA8D58C80A9 /* BackgroundBlurView.swift */; };
 		847CB1108468B8E2E21B763F /* PerformanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C218E26F294C2AE0DC8DAD4 /* PerformanceView.swift */; };
 		94D529ACAA5EFC49CD4F8CBC /* AUv3Host.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0F45595AC9AB89600C9D02 /* AUv3Host.swift */; };
 		950E3089208686751B040702 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7952C6405DD06507C3238E5A /* SplashView.swift */; };
@@ -52,6 +53,7 @@
 		7FD1D5F5640DA2F5583FF502 /* LoopRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopRecorder.swift; sourceTree = "<group>"; };
 		888293D9F6D5BA45BD6E3F66 /* TrackingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackingCoordinator.swift; sourceTree = "<group>"; };
 		88C6C42861FFD12A4B35640F /* JammermanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JammermanApp.swift; sourceTree = "<group>"; };
+		9DFF4B1608551EA8D58C80A9 /* BackgroundBlurView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundBlurView.swift; sourceTree = "<group>"; };
 		A5A841FB2B3C2FEE67C951ED /* GyroscopeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroscopeManager.swift; sourceTree = "<group>"; };
 		A881EC8140E0A0F8A962D7A3 /* MuseScore_General.sf2 */ = {isa = PBXFileReference; path = MuseScore_General.sf2; sourceTree = "<group>"; };
 		AD2D342CC441E7794DA51557 /* SoundFontManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundFontManager.swift; sourceTree = "<group>"; };
@@ -167,6 +169,7 @@
 		F153BEB2DFE5EE1C27745E79 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				9DFF4B1608551EA8D58C80A9 /* BackgroundBlurView.swift */,
 				C62BB724F810BD730BEDA99B /* CameraPreview.swift */,
 				C03825479B9B72708C7873D5 /* MixerPanelView.swift */,
 				2C218E26F294C2AE0DC8DAD4 /* PerformanceView.swift */,
@@ -250,6 +253,7 @@
 			files = (
 				94D529ACAA5EFC49CD4F8CBC /* AUv3Host.swift in Sources */,
 				5E8907EC3B761A8F3D24D576 /* AudioEngine.swift in Sources */,
+				817E7349BCE702460A8D4B5F /* BackgroundBlurView.swift in Sources */,
 				705F35AFA04C4FC2766EA62D /* CameraManager.swift in Sources */,
 				47CD8C42718983435D903BB4 /* CameraPreview.swift in Sources */,
 				B480A17FE30CF111580A2C47 /* FaceTracker.swift in Sources */,
