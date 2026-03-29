@@ -415,7 +415,7 @@ struct SegTuningPanel: View {
                 segSlider("Edge Low", value: $edgeLow, range: 0...0.5)
                 segSlider("Edge High", value: $edgeHigh, range: 0.5...1.0)
                 segSlider("Darken", value: $darkenAlpha, range: 0...1.0)
-                segSlider("Feather", value: $feather, range: 0...30)
+                segSlider("Feather", value: $feather, range: -30...30)
                 Toggle("Flip X", isOn: $flipX)
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.7))

@@ -227,20 +227,35 @@ fragment float4 segDarkenFragment(QuadVertexOut in [[stage_in]],
     if (params.maskFlipX > 0.5) uv.x = 1.0 - uv.x;
     uv = (uv - 0.5) * params.scale + 0.5 + params.offset;
 
-    // Feather: sample mask in a radius and average (9-tap box blur)
+    // Feather: blur the mask edge
+    // Positive = expand/soften person boundary (blur then threshold)
+    // Negative = shrink/tighten person boundary (erode)
     float2 texSize = float2(segMask.get_width(), segMask.get_height());
     float2 texelSize = 1.0 / texSize;
-    float r = params.feather;
+    float r = abs(params.feather);
     float sum = 0;
     float count = 0;
-    for (float dy = -r; dy <= r; dy += r * 0.5) {
-        for (float dx = -r; dx <= r; dx += r * 0.5) {
-            float2 sampleUV = uv + float2(dx, dy) * texelSize;
-            sum += segMask.sample(s, sampleUV).r;
-            count += 1.0;
+    if (r > 0.5) {
+        float step = max(r * 0.5, 1.0);
+        for (float dy = -r; dy <= r; dy += step) {
+            for (float dx = -r; dx <= r; dx += step) {
+                float2 sampleUV = uv + float2(dx, dy) * texelSize;
+                sum += segMask.sample(s, sampleUV).r;
+                count += 1.0;
+            }
         }
+        sum /= max(count, 1.0);
+    } else {
+        sum = segMask.sample(s, uv).r;
     }
-    float person = sum / max(count, 1.0);
+    // Negative feather: use min of samples (erode) instead of average
+    float person;
+    if (params.feather < 0) {
+        // Shrink: bias the blurred value downward — makes the cutout tighter
+        person = smoothstep(0.0, 1.0, sum * (1.0 + params.feather * 0.03));
+    } else {
+        person = sum;
+    }
 
     float bgAlpha = (1.0 - smoothstep(params.edgeLow, params.edgeHigh, person)) * params.darkenAlpha;
     return float4(0, 0, 0, bgAlpha);
