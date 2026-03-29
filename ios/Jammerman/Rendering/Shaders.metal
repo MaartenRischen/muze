@@ -95,8 +95,9 @@ fragment float4 particleFragment(ParticleVertexOut in [[stage_in]]) {
     alpha *= alpha; // quadratic falloff for softer glow
     alpha *= in.life * in.life; // fade with life
     alpha *= in.color.a;
+    alpha = min(alpha, 0.15); // cap to prevent accumulation to opaque
 
-    return float4(in.color.rgb, alpha);
+    return float4(in.color.rgb * alpha, alpha);
 }
 
 // MARK: - Line Rendering (thick lines via screen-aligned quads)
@@ -137,8 +138,8 @@ fragment float4 lineFragment(LineVertexOut in [[stage_in]],
                               constant float4 &color [[buffer(0)]]) {
     // Soft edges for anti-aliasing
     float edgeFade = 1.0 - smoothstep(0.6, 1.0, abs(in.edge));
-    float a = color.a * in.alpha * edgeFade;
-    return float4(color.rgb, a);
+    float a = min(color.a * in.alpha * edgeFade, 0.12);
+    return float4(color.rgb * a, a);
 }
 
 // MARK: - Radial Gradient (for halos, iris glow, landmarks, explosion)
@@ -159,8 +160,8 @@ fragment float4 radialGradientFragment(QuadVertexOut in [[stage_in]],
 
     float t = saturate((dist - params.innerRadius) / max(params.outerRadius - params.innerRadius, 0.001));
     float4 color = mix(params.innerColor, params.outerColor, t);
-    // Output non-premultiplied — blend mode handles alpha weighting
-    return float4(color.rgb, color.a);
+    float a = min(color.a, 0.15);
+    return float4(color.rgb * a, a);
 }
 
 // MARK: - Vignette
@@ -185,9 +186,9 @@ fragment float4 vignetteFragment(QuadVertexOut in [[stage_in]],
 fragment float4 beatFlashFragment(QuadVertexOut in [[stage_in]],
                                    constant VisualizerUniforms &uniforms [[buffer(0)]]) {
     if (uniforms.beatPulse < 0.4) discard_fragment();
-    float flashAlpha = (uniforms.beatPulse - 0.4) * 0.18;
+    float flashAlpha = min((uniforms.beatPulse - 0.4) * 0.12, 0.08);
     float3 flashColor = uniforms.accentColor * 0.3 + 0.7;
-    return float4(flashColor, flashAlpha);
+    return float4(flashColor * flashAlpha, flashAlpha);
 }
 
 // MARK: - Trail Composite (sample trail texture, additive blend)
@@ -285,7 +286,7 @@ fragment float4 ellipseFragment(EllipseVertexOut in [[stage_in]]) {
     float halfWidth = in.lineWidth * 0.5;
     float ring = 1.0 - smoothstep(halfWidth - 1.0, halfWidth + 1.0, abs(pixelDist));
 
-    float a = ring * in.color.a;
+    float a = min(ring * in.color.a, 0.15);
     if (a < 0.001) discard_fragment();
-    return float4(in.color.rgb, a);
+    return float4(in.color.rgb * a, a);
 }
