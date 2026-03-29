@@ -592,7 +592,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             center: SIMD2(faceCx, haloCy),
             innerRadius: 0,
             outerRadius: haloR * 3.5 + haloGlow * 120,
-            innerColor: SIMD4(accentR, accentG, accentB, min(0.12, haloGlow * 0.1 + haloFlash * 0.05)),
+            innerColor: SIMD4(accentR, accentG, accentB, min(0.35, haloGlow * 0.25 + haloFlash * 0.15)),
             outerColor: SIMD4(accentR, accentG, accentB, 0))
 
         encoder.setRenderPipelineState(gradientPipeline)
@@ -603,7 +603,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         // Flash burst
         if haloFlash > 0.1 {
             params.outerRadius = haloR * 2.5 + haloFlash * 60
-            params.innerColor = SIMD4(1, 1, 1, haloFlash * 0.1)
+            params.innerColor = SIMD4(1, 1, 1, haloFlash * 0.3)
             params.outerColor = SIMD4(1, 1, 1, 0)
             encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
@@ -617,7 +617,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         let spacing = faceW * 0.22
         let pulseScale: Float = 1.0 + uniforms.energy * 1.2 + beatPulse * 1.8
         let r = 10 * pulseScale
-        let baseAlpha = min(0.15, 0.06 + uniforms.energy * 0.06 + beatPulse * 0.05)
+        let baseAlpha = min(0.5, 0.2 + uniforms.energy * 0.2 + beatPulse * 0.15)
 
         for eyeX in [faceCx - spacing, faceCx + spacing] {
             var params = GPUGradientParams(
@@ -660,12 +660,12 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         computeRingPoints(cx: cx, cy: cy, radius: radius, energy: energy, w: w, h: h)
         guard ringPoints.count > 2 else { return }
 
-        // Multi-pass neon glow — low alphas to stay transparent over camera
+        // Multi-pass neon glow
         let passes: [(Float, Float, SIMD4<Float>)] = [
-            (14, 0.015,                    SIMD4(accentR, accentG, accentB, 1)),
-            (6,  0.04 + beatPulse * 0.02,  SIMD4(accentR, accentG, accentB, 1)),
-            (2,  0.08 + energy * 0.05,     SIMD4(accentR, accentG, accentB, 1)),
-            (0.8, 0.12 + energy * 0.06,    SIMD4(1, 1, 1, 1)),
+            (14, 0.05 + beatPulse * 0.03,  SIMD4(accentR, accentG, accentB, 1)),
+            (6,  0.12 + beatPulse * 0.05,  SIMD4(accentR, accentG, accentB, 1)),
+            (2.5, 0.25 + energy * 0.15,    SIMD4(accentR, accentG, accentB, 1)),
+            (1,  0.5 + energy * 0.2,       SIMD4(1, 1, 1, 1)),
         ]
 
         for (lineWidth, alpha, baseColor) in passes {
@@ -883,8 +883,8 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             SIMD2(faceCx + faceRx * 0.3, faceCy + faceRy * 0.54),    // right mouth
         ]
 
-        let r: Float = 5 + energy * 10 + beatPulse * 12
-        let alpha = min(0.1, 0.03 + energy * 0.04 + beatPulse * 0.05)
+        let r: Float = 5 + energy * 12 + beatPulse * 15
+        let alpha = min(0.4, 0.15 + energy * 0.15 + beatPulse * 0.2)
 
         for pt in keyPoints {
             var params = GPUGradientParams(
