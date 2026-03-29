@@ -39,6 +39,8 @@
 		5BC1D837D0F485B974F78D67 /* MetalVisualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69147CED8FD1D6BF4719C155 /* MetalVisualizer.swift */; };
 		DEACECB9626587FA34612E47 /* MetalVisualizerOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 980238EAD327DF27EFEBF741 /* MetalVisualizerOverlay.swift */; };
 		E56F17BD4CAE04EFE37AC55C /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = B4A92B54933DADD649BA6EF2 /* Shaders.metal */; };
+		EEE24FDAD7013728E0BCC26B /* VisualEffectParams.swift in Sources */ = {isa = PBXBuildFile; fileRef = 053395AF691B17FADD38C5BF /* VisualEffectParams.swift */; };
+		649AE51E89810198069B4440 /* VfxToggleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8B5C723B9D39F9E510DB36D /* VfxToggleView.swift */; };
 		DB28DF3003B195FAED723574 /* VisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57943F33B859022E2441B2B /* VisualizerView.swift */; };
 		E86DD060D915E14DFA60A6D1 /* Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10631F86D4D4125290AA1567 /* Storage.swift */; };
 		F6CDAD16A5988A17A6837B94 /* TrackingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888293D9F6D5BA45BD6E3F66 /* TrackingCoordinator.swift */; };
@@ -81,6 +83,8 @@
 		69147CED8FD1D6BF4719C155 /* MetalVisualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalVisualizer.swift; sourceTree = "<group>"; };
 		980238EAD327DF27EFEBF741 /* MetalVisualizerOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalVisualizerOverlay.swift; sourceTree = "<group>"; };
 		B4A92B54933DADD649BA6EF2 /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
+		053395AF691B17FADD38C5BF /* VisualEffectParams.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectParams.swift; sourceTree = "<group>"; };
+		F8B5C723B9D39F9E510DB36D /* VfxToggleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = VfxToggleView.swift; path = ../Views/VfxToggleView.swift; sourceTree = "<group>"; };
 		F57943F33B859022E2441B2B /* VisualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualizerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -124,6 +128,8 @@
 				69147CED8FD1D6BF4719C155 /* MetalVisualizer.swift */,
 				980238EAD327DF27EFEBF741 /* MetalVisualizerOverlay.swift */,
 				B4A92B54933DADD649BA6EF2 /* Shaders.metal */,
+				053395AF691B17FADD38C5BF /* VisualEffectParams.swift */,
+				F8B5C723B9D39F9E510DB36D /* VfxToggleView.swift */,
 				F57943F33B859022E2441B2B /* VisualizerView.swift */,
 			);
 			path = Rendering;
@@ -324,6 +330,8 @@
 				5BC1D837D0F485B974F78D67 /* MetalVisualizer.swift in Sources */,
 				DEACECB9626587FA34612E47 /* MetalVisualizerOverlay.swift in Sources */,
 				E56F17BD4CAE04EFE37AC55C /* Shaders.metal in Sources */,
+				EEE24FDAD7013728E0BCC26B /* VisualEffectParams.swift in Sources */,
+				649AE51E89810198069B4440 /* VfxToggleView.swift in Sources */,
 				DB28DF3003B195FAED723574 /* VisualizerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

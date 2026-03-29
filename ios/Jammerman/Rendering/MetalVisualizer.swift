@@ -104,6 +104,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue
     private weak var coordinator: TrackingCoordinator?
+    var vfxParams: VisualEffectParams { coordinator?.vfxParams ?? VisualEffectParams() }
 
     // Pipeline states
     private var particlePipeline: MTLRenderPipelineState!
@@ -338,29 +339,21 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             return
         }
 
-        // === BEHIND PERSON (drawn before seg cutout) ===
+        let p = vfxParams
 
-        // 0. Mode geometry (faint background)
-        drawModeGeometry(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
-
-        // 1. Halo glow (behind head — the signature halo effect)
-        drawHaloGradients(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
-
-        // 2. Waveform ring
-        drawWaveformRing(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
-
-        // 3. Rings (shockwaves, halo rings)
+        // === BEHIND PERSON ===
+        if p.modeGeoEnabled { drawModeGeometry(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h) }
+        if p.haloEnabled { drawHaloGradients(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h) }
+        if p.ringEnabled { drawWaveformRing(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h) }
         drawRings(encoder: encoder, uniformBuf: uniformBuf)
 
-        // === SEGMENTATION: cutout person from behind-effects, then darken bg ===
-        if let segTex = segTexture {
-            // Step 1: Erase halo/ring/mode-geo where the person is (so they appear BEHIND)
+        // === SEGMENTATION CUTOUT + DARKEN ===
+        if p.segEnabled, let segTex = segTexture {
             encoder.setRenderPipelineState(segCutoutPipeline)
             encoder.setFragmentTexture(segTex, index: 0)
             encoder.setFragmentBytes(&segParams, length: MemoryLayout<GPUSegParams>.stride, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
 
-            // Step 2: Darken the background area
             encoder.setRenderPipelineState(segDarkenPipeline)
             encoder.setFragmentTexture(segTex, index: 0)
             encoder.setFragmentBytes(&segParams, length: MemoryLayout<GPUSegParams>.stride, index: 0)
@@ -368,31 +361,22 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         }
 
         // === IN FRONT OF PERSON ===
+        if p.freqArcEnabled { drawFrequencyArc(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h) }
+        if p.particlesEnabled { drawParticles(encoder: encoder, uniformBuf: uniformBuf) }
 
-        // 4. Frequency arc
-        drawFrequencyArc(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
-
-        // 5. Particles
-        drawParticles(encoder: encoder, uniformBuf: uniformBuf)
-
-        // 6. Hand trail composite
-        if let trailTex = trailUseA ? trailTextureA : trailTextureB {
+        if p.trailEnabled, let trailTex = trailUseA ? trailTextureA : trailTextureB {
             encoder.setRenderPipelineState(trailCompositePipeline)
             encoder.setFragmentTexture(trailTex, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
 
-        // 7. Face effects
         if state.faceDetected {
-            drawIrisGlow(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
-            drawLandmarkLights(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
+            if p.irisEnabled { drawIrisGlow(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h) }
+            if p.landmarksEnabled { drawLandmarkLights(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h) }
         }
 
-        // 8. Connection web
-        drawConnectionWeb(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
-
-        // 9. Arp visualization
-        drawArpViz(encoder: encoder, uniformBuf: uniformBuf, engine: engine, w: w, h: h)
+        if p.connectionWebEnabled { drawConnectionWeb(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h) }
+        if p.arpVizEnabled { drawArpViz(encoder: encoder, uniformBuf: uniformBuf, engine: engine, w: w, h: h) }
 
         // 9c. Ghost trails (contour snapshots)
         drawContourTrails(encoder: encoder, uniformBuf: uniformBuf)

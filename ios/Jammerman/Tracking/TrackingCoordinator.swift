@@ -16,7 +16,8 @@ class TrackingCoordinator: ObservableObject {
 
     @Published var state = JammermanState()
     let audioEngine = AudioEngine()
-    var metalRenderer: MetalVisualizer?  // set by MetalVisualizerOverlay for dev UI access
+    let vfxParams = VisualEffectParams()
+    var metalRenderer: MetalVisualizer?
     let loopRecorder = LoopRecorder()
     let sceneManager = SceneManager()
     let gyroscopeManager = GyroscopeManager()
