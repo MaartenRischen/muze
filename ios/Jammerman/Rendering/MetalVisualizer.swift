@@ -48,7 +48,7 @@ struct GPUSegParams {
     var edgeHigh: Float = 0.75
     var darkenAlpha: Float = 0.65
     var maskFlipX: Float = 0
-    var feather: Float = 8.0  // blur radius in UV-scaled pixels
+    var feather: Float = -8.0
 }
 
 struct GPUGradientParams {

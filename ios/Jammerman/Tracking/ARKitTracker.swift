@@ -58,7 +58,7 @@ class ARKitTracker: NSObject {
     // Lightweight person segmentation via Vision (async, every ~15 frames)
     private var segFrameCount = 0
     private var isSegmenting = false
-    private let segQueue = DispatchQueue(label: "com.jammerman.seg", qos: .utility)
+    private let segQueue = DispatchQueue(label: "com.jammerman.seg", qos: .userInitiated)
 
     /// Whether ARKit face tracking is available on this device
     static var isSupported: Bool {
@@ -265,7 +265,7 @@ class ARKitTracker: NSObject {
     #if !targetEnvironment(simulator)
     private func detectSegmentation(in frame: ARFrame) {
         segFrameCount += 1
-        guard segFrameCount % 15 == 0, !isSegmenting else { return }
+        guard segFrameCount % 6 == 0, !isSegmenting else { return }
         isSegmenting = true
 
         // Pass capturedImage directly — no copy (same approach as hand detection)
