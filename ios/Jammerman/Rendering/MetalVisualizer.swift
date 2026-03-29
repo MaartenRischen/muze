@@ -323,16 +323,13 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             return
         }
 
-        // 0. Background darken via segmentation (if available)
-        if let segTex = segTexture {
-            encoder.setRenderPipelineState(segDarkenPipeline)
-            encoder.setFragmentTexture(segTex, index: 0)
-            encoder.setFragmentBytes(&segParams, length: MemoryLayout<GPUSegParams>.stride, index: 0)
-            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
-        }
+        // === BEHIND PERSON (drawn before seg cutout) ===
 
-        // 1. Mode geometry
+        // 0. Mode geometry (faint background)
         drawModeGeometry(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
+
+        // 1. Halo glow (behind head — the signature halo effect)
+        drawHaloGradients(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
 
         // 2. Waveform ring
         drawWaveformRing(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
@@ -340,32 +337,39 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         // 3. Rings (shockwaves, halo rings)
         drawRings(encoder: encoder, uniformBuf: uniformBuf)
 
-        // 4. Halo gradient glows
-        drawHaloGradients(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
+        // === SEGMENTATION CUTOUT (darkens bg, person stays bright) ===
+        if let segTex = segTexture {
+            encoder.setRenderPipelineState(segDarkenPipeline)
+            encoder.setFragmentTexture(segTex, index: 0)
+            encoder.setFragmentBytes(&segParams, length: MemoryLayout<GPUSegParams>.stride, index: 0)
+            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        }
 
-        // 5. Frequency arc
+        // === IN FRONT OF PERSON ===
+
+        // 4. Frequency arc
         drawFrequencyArc(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
 
-        // 6. Particles
+        // 5. Particles
         drawParticles(encoder: encoder, uniformBuf: uniformBuf)
 
-        // 7. Hand trail composite (from offscreen texture)
+        // 6. Hand trail composite
         if let trailTex = trailUseA ? trailTextureA : trailTextureB {
             encoder.setRenderPipelineState(trailCompositePipeline)
             encoder.setFragmentTexture(trailTex, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
 
-        // 8. Face effects
+        // 7. Face effects
         if state.faceDetected {
             drawIrisGlow(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
             drawLandmarkLights(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
         }
 
-        // 9. Connection web
+        // 8. Connection web
         drawConnectionWeb(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
 
-        // 9b. Arp visualization columns
+        // 9. Arp visualization
         drawArpViz(encoder: encoder, uniformBuf: uniformBuf, engine: engine, w: w, h: h)
 
         // 9c. Ghost trails (contour snapshots)
@@ -686,16 +690,17 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private func drawHaloGradients(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, w: Float, h: Float) {
         guard haloGlow > 0.01 else { return }
 
-        let headTopY = faceCy - h * 0.14
-        let haloCy = headTopY - min(w, h) * 0.16 * 0.3
-        let haloR = min(w, h) * 0.16
+        // Halo sits well above the head, 2x bigger than before
+        let headTopY = faceCy - h * 0.22  // higher up
+        let haloCy = headTopY - min(w, h) * 0.12
+        let haloR = min(w, h) * 0.32  // 2x bigger
 
         // Ambient glow
         var params = GPUGradientParams(
             center: SIMD2(faceCx, haloCy),
             innerRadius: 0,
-            outerRadius: haloR * 3.5 + haloGlow * 120,
-            innerColor: SIMD4(accentR, accentG, accentB, min(0.35, haloGlow * 0.25 + haloFlash * 0.15)),
+            outerRadius: haloR * 3.0 + haloGlow * 150,
+            innerColor: SIMD4(accentR, accentG, accentB, min(0.4, haloGlow * 0.3 + haloFlash * 0.2)),
             outerColor: SIMD4(accentR, accentG, accentB, 0))
 
         encoder.setRenderPipelineState(gradientPipeline)
@@ -705,8 +710,8 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
 
         // Flash burst
         if haloFlash > 0.1 {
-            params.outerRadius = haloR * 2.5 + haloFlash * 60
-            params.innerColor = SIMD4(1, 1, 1, haloFlash * 0.3)
+            params.outerRadius = haloR * 2.0 + haloFlash * 80
+            params.innerColor = SIMD4(1, 1, 1, haloFlash * 0.35)
             params.outerColor = SIMD4(1, 1, 1, 0)
             encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
@@ -1044,12 +1049,12 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
 
                 if let prev = prevHandPos {
                     let dx = px - prev.x, dy = py - prev.y
-                    if dx * dx + dy * dy > 1 {
+                    if dx * dx + dy * dy > 4 {
                         // Draw glowing line from prev to current
                         let line = [prev, SIMD2(px, py)]
                         // Core bright line
-                        var col = SIMD4<Float>(accentR, accentG, accentB, 0.8)
-                        var lw = 3 * displayScale
+                        var col = SIMD4<Float>(accentR, accentG, accentB, 0.9)
+                        var lw = 4 * displayScale
                         fadeEnc.setRenderPipelineState(linePipeline)
 
                         // Build line vertices inline
@@ -1064,8 +1069,8 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                         }
 
                         // Wider glow line
-                        lw = handGlowRadius
-                        col = SIMD4(accentR, accentG, accentB, 0.15)
+                        lw = handGlowRadius * 2
+                        col = SIMD4(accentR, accentG, accentB, 0.3)
                         if let vBuf = device.makeBuffer(bytes: &verts, length: bufSize, options: .storageModeShared) {
                             fadeEnc.setVertexBytes(&lw, length: 4, index: 2)
                             fadeEnc.setFragmentBytes(&col, length: 16, index: 0)
@@ -1262,18 +1267,19 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
 
     private func updateArpState(engine: AudioEngine, energy: Float, w: Float, h: Float) {
         let n = 8
-        let currentIdx = Int(geoPhase * 4) % n
+        let arp1Idx = (engine.drumStep / 2) % n
+        let arp2Idx = engine.drumStep % n
 
         // Arp 1
         if !engine.arpMuted {
-            if currentIdx != arp1LastIdx {
+            if arp1Idx != arp1LastIdx {
                 arp1Flash = 1.0
-                arp1LastIdx = currentIdx
+                arp1LastIdx = arp1Idx
                 let colOffset = min(w, h) * 0.18 + 50
                 let colX = faceCx - colOffset
                 let vH = min(Float(280), faceCy * 0.65)
                 let botY = faceCy + vH / 2
-                let sy = botY - (Float(currentIdx) / Float(n - 1)) * vH
+                let sy = botY - (Float(arp1Idx) / Float(n - 1)) * vH
                 for _ in 0..<5 {
                     let angle = Float.random(in: 0...(Float.pi * 2))
                     let speed: Float = 1 + Float.random(in: 0...2.5)
@@ -1289,14 +1295,14 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
 
         // Arp 2
         if !engine.arp2Muted {
-            if currentIdx != arp2LastIdx {
+            if arp2Idx != arp2LastIdx {
                 arp2Flash = 1.0
-                arp2LastIdx = currentIdx
-                let colOffset = min(w, h) * 0.18 + 50
+                arp2LastIdx = arp2Idx
+                let colOffset = min(w, h) * 0.18 + 50 * displayScale
                 let colX = faceCx + colOffset
-                let vH = min(Float(280), faceCy * 0.65)
+                let vH = min(Float(280) * displayScale, faceCy * 0.65)
                 let botY = faceCy + vH / 2
-                let sy = botY - (Float(currentIdx) / Float(n - 1)) * vH
+                let sy = botY - (Float(arp2Idx) / Float(n - 1)) * vH
                 for _ in 0..<5 {
                     let angle = Float.random(in: 0...(Float.pi * 2))
                     let speed: Float = 1 + Float.random(in: 0...2.5)
@@ -1334,15 +1340,18 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         let energy = uniforms.energy
         let baseR = min(w, h) * 0.18
         let radius = baseR + energy * 80 + beatPulse * 30
-        let colOffset = radius + 50
-        let vH = min(Float(280), faceCy * 0.65)
+        let colOffset = radius + 50 * displayScale
+        let vH = min(Float(280) * displayScale, faceCy * 0.65)
         let topY = faceCy - vH / 2
         let botY = faceCy + vH / 2
         let n = 8
-        let currentIdx = Int(geoPhase * 4) % n
+        // Use drum step to derive arp position (8th notes = drumStep/2, 16th = drumStep)
+        let arp1Idx = (engine.drumStep / 2) % n  // 8th note default
+        let arp2Idx = engine.drumStep % n          // 16th note default
 
         func drawColumn(colX: Float, flash: Float, sparks: [MetalArpSpark],
-                        colorR: Float, colorG: Float, colorB: Float) {
+                        colorR: Float, colorG: Float, colorB: Float, activeIdx: Int) {
+            let currentIdx = activeIdx
             // Faint vertical guide line
             let guideLine = [SIMD2<Float>(colX, topY), SIMD2<Float>(colX, botY)]
             drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: guideLine,
@@ -1421,11 +1430,11 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
 
         if !engine.arpMuted {
             drawColumn(colX: faceCx - colOffset, flash: arp1Flash, sparks: arp1Sparks,
-                       colorR: 74.0/255, colorG: 222.0/255, colorB: 128.0/255)
+                       colorR: 74.0/255, colorG: 222.0/255, colorB: 128.0/255, activeIdx: arp1Idx)
         }
         if !engine.arp2Muted {
             drawColumn(colX: faceCx + colOffset, flash: arp2Flash, sparks: arp2Sparks,
-                       colorR: 52.0/255, colorG: 211.0/255, colorB: 153.0/255)
+                       colorR: 52.0/255, colorG: 211.0/255, colorB: 153.0/255, activeIdx: arp2Idx)
         }
     }
 
