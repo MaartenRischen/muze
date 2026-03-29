@@ -35,6 +35,12 @@ struct GPUEllipse {
     var color: SIMD4<Float>
 }
 
+struct GPULineVertex {
+    var position: SIMD2<Float>
+    var normal: SIMD2<Float>
+    var alpha: Float
+}
+
 struct GPUGradientParams {
     var center: SIMD2<Float>
     var innerRadius: Float
@@ -111,6 +117,9 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private var rings: [MetalRing] = []  // shockwaves + halo rings combined
     private var lastMelodyNote: Int?
 
+    // Waveform ring points (recomputed each frame)
+    private var ringPoints: [SIMD2<Float>] = []
+
     // Accent color
     private var accentR: Float = 0.13, accentG: Float = 0.83, accentB: Float = 0.93
     private var cachedMode = ""
@@ -168,6 +177,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         particlePipeline = additivePipeline(vertex: "particleVertex", fragment: "particleFragment")
         ellipsePipeline = additivePipeline(vertex: "ellipseVertex", fragment: "ellipseFragment")
         gradientPipeline = additivePipeline(vertex: "fullscreenQuadVertex", fragment: "radialGradientFragment")
+        linePipeline = additivePipeline(vertex: "lineVertex", fragment: "lineFragment")
         vignettePipeline = alphaPipeline(vertex: "fullscreenQuadVertex", fragment: "vignetteFragment")
         beatFlashPipeline = additivePipeline(vertex: "fullscreenQuadVertex", fragment: "beatFlashFragment")
     }
@@ -229,30 +239,44 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             return
         }
 
-        // === RENDER ALL EFFECTS ===
+        // === RENDER ALL EFFECTS (back to front) ===
 
-        // 1. Rings (shockwaves, halo rings)
+        // 1. Mode geometry (faint background patterns)
+        drawModeGeometry(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
+
+        // 2. Waveform ring
+        drawWaveformRing(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
+
+        // 3. Rings (shockwaves, halo rings)
         drawRings(encoder: encoder, uniformBuf: uniformBuf)
 
-        // 2. Particles (all types packed into one buffer)
-        drawParticles(encoder: encoder, uniformBuf: uniformBuf)
-
-        // 3. Halo gradient glows
+        // 4. Halo gradient glows
         drawHaloGradients(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
 
-        // 4. Iris glow (if face detected)
+        // 5. Frequency arc
+        drawFrequencyArc(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
+
+        // 6. Particles (all types packed into one buffer)
+        drawParticles(encoder: encoder, uniformBuf: uniformBuf)
+
+        // 7. Face effects
         if state.faceDetected {
+            drawFaceContours(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
             drawIrisGlow(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
+            drawLandmarkLights(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
         }
 
-        // 5. Beat flash
+        // 8. Connection web (hand to face)
+        drawConnectionWeb(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
+
+        // 9. Beat flash
         if beatPulse > 0.4 {
             encoder.setRenderPipelineState(beatFlashPipeline)
             encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
 
-        // 6. Vignette (always last)
+        // 10. Vignette (always last)
         encoder.setRenderPipelineState(vignettePipeline)
         encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
@@ -595,6 +619,315 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 1)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
+    }
+
+    // MARK: - Waveform Ring
+
+    private func computeRingPoints(cx: Float, cy: Float, radius: Float, energy: Float, w: Float, h: Float) {
+        ringPoints.removeAll(keepingCapacity: true)
+        let segments = 128
+        let wobbleAmount = energy * 40 + beatPulse * 25
+        for i in 0...segments {
+            let t = Float(i) / Float(segments)
+            let angle = t * Float.pi * 2 + ringRotation * Float.pi / 180
+            let wobble = sin(angle * 4 + geoPhase * 8) * wobbleAmount +
+                         sin(angle * 7 + geoPhase * 5) * wobbleAmount * 0.5
+            let r = radius + wobble
+            ringPoints.append(SIMD2(cx + cos(angle) * r, cy + sin(angle) * r))
+        }
+    }
+
+    private func drawWaveformRing(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, w: Float, h: Float) {
+        let energy = uniforms.energy
+        let baseR = min(w, h) * 0.18
+        let radius = baseR + energy * 80 + beatPulse * 30
+        let cx = faceCx
+        let cy = faceCy - min(w, h) * 0.14 * 0.5
+
+        computeRingPoints(cx: cx, cy: cy, radius: radius, energy: energy, w: w, h: h)
+        guard ringPoints.count > 2 else { return }
+
+        // Multi-pass neon glow: wide dim → medium → thin bright → hot core
+        let passes: [(Float, Float, SIMD4<Float>)] = [
+            (18, 0.03 + beatPulse * 0.02, SIMD4(accentR, accentG, accentB, 1)),
+            (8,  0.08 + beatPulse * 0.04, SIMD4(accentR, accentG, accentB, 1)),
+            (3,  0.25 + energy * 0.3,     SIMD4(accentR, accentG, accentB, 1)),
+            (1,  0.6 + energy * 0.3,      SIMD4(1, 1, 1, 1)),
+        ]
+
+        for (lineWidth, alpha, baseColor) in passes {
+            let color = SIMD4<Float>(baseColor.x, baseColor.y, baseColor.z, alpha)
+            drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: ringPoints,
+                         lineWidth: lineWidth, color: color, closed: true)
+        }
+    }
+
+    // MARK: - Face Contour Glow
+
+    private func drawFaceContours(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, state: JammermanState, w: Float, h: Float) {
+        guard state.faceDetected else { return }
+        let energy = uniforms.energy
+
+        // Synthesize face contour from face center position
+        let faceRx = w * 0.19
+        let faceRy = h * 0.14
+
+        // Face oval (32 points)
+        var oval: [SIMD2<Float>] = []
+        for i in 0..<32 {
+            let a = Float(i) / 32.0 * Float.pi * 2
+            oval.append(SIMD2(faceCx + cos(a) * faceRx, faceCy + sin(a) * faceRy))
+        }
+
+        // Eyes
+        let eyeY = faceCy - faceRy * 0.43
+        let eyeSpacing = faceRx * 0.58
+        let eyeW = faceRx * 0.29
+        let eyeH = faceRy * 0.06 + state.eyeOpenness * faceRy * 0.04
+        for ecx in [faceCx - eyeSpacing, faceCx + eyeSpacing] {
+            var eye: [SIMD2<Float>] = []
+            for i in 0..<16 {
+                let a = Float(i) / 16.0 * Float.pi * 2
+                eye.append(SIMD2(ecx + cos(a) * eyeW, eyeY + sin(a) * eyeH))
+            }
+            // 3-pass glow for eyes
+            drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: eye,
+                         lineWidth: 6, color: SIMD4(accentR, accentG, accentB, 0.06 + energy * 0.03), closed: true)
+            drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: eye,
+                         lineWidth: 2, color: SIMD4(accentR, accentG, accentB, 0.15 + energy * 0.1), closed: true)
+            drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: eye,
+                         lineWidth: 0.8, color: SIMD4(1, 1, 1, 0.2 + energy * 0.15), closed: true)
+        }
+
+        // Mouth
+        let lipW = faceRx * 0.58
+        let lipY = faceCy + faceRy * 0.54
+        let mouthOpen = state.mouthOpenness * faceRy * 0.15
+        var mouth: [SIMD2<Float>] = []
+        for i in 0..<16 {
+            let a = Float(i) / 16.0 * Float.pi * 2
+            mouth.append(SIMD2(faceCx + cos(a) * lipW, lipY + sin(a) * (lipW * 0.3 + mouthOpen * 0.5)))
+        }
+
+        // Brows
+        let browY = eyeY - faceRy * 0.18 - state.browHeight * 10
+        let browSpread = faceRx * 0.74
+        let leftBrow: [SIMD2<Float>] = [
+            SIMD2(faceCx - browSpread, browY + 3),
+            SIMD2(faceCx - browSpread * 0.5, browY),
+            SIMD2(faceCx - browSpread * 0.15, browY + 3)]
+        let rightBrow: [SIMD2<Float>] = [
+            SIMD2(faceCx + browSpread * 0.15, browY + 3),
+            SIMD2(faceCx + browSpread * 0.5, browY),
+            SIMD2(faceCx + browSpread, browY + 3)]
+
+        // 3-pass neon glow for face oval
+        let contours: [([SIMD2<Float>], Bool)] = [
+            (oval, true), (mouth, true), (leftBrow, false), (rightBrow, false)
+        ]
+        let glowPasses: [(Float, Float)] = [(10, 0.04 + energy * 0.02), (4, 0.12 + energy * 0.06), (1.2, 0.3 + energy * 0.15)]
+        for (points, closed) in contours {
+            for (lw, alpha) in glowPasses {
+                drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: points,
+                             lineWidth: lw, color: SIMD4(accentR, accentG, accentB, alpha), closed: closed)
+            }
+        }
+    }
+
+    // MARK: - Connection Web (hand to face)
+
+    private func drawConnectionWeb(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, state: JammermanState, w: Float, h: Float) {
+        guard state.faceDetected, state.handPresent else { return }
+        let handScreenX = state.handX * w
+        let handScreenY = state.handY * h
+        let energy = uniforms.energy
+
+        // Target points on face
+        let faceRy = h * 0.14
+        let targets: [SIMD2<Float>] = [
+            SIMD2(faceCx, faceCy - faceRy * 0.5),   // forehead
+            SIMD2(faceCx, faceCy + faceRy * 0.5),   // chin
+            SIMD2(faceCx, faceCy),                    // nose
+        ]
+
+        let webAlpha: Float = 0.15 + energy * 0.15 + beatPulse * 0.1
+        for target in targets {
+            let line = [SIMD2(handScreenX, handScreenY), target]
+            drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: line,
+                         lineWidth: 1.5, color: SIMD4(accentR, accentG, accentB, webAlpha), closed: false)
+        }
+    }
+
+    // MARK: - Mode Geometry (faint background patterns)
+
+    private func drawModeGeometry(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, w: Float, h: Float) {
+        let modeIdx: Int
+        switch cachedMode {
+        case "phrygian", "aeolian": modeIdx = 0
+        case "dorian", "mixolydian": modeIdx = 1
+        case "ionian", "lydian": modeIdx = 2
+        default: modeIdx = 1
+        }
+
+        let alpha: Float = 0.03
+        let color = SIMD4<Float>(accentR, accentG, accentB, alpha)
+        let cx = w / 2, cy = h / 2
+
+        switch modeIdx {
+        case 0: // Angular shards — radiating lines from center
+            for i in 0..<18 {
+                let angle = Float(i) / 18.0 * Float.pi * 2 + geoPhase
+                let len = min(w, h) * 0.4 + sin(geoPhase * 3 + Float(i)) * 40
+                let line = [SIMD2(cx, cy), SIMD2(cx + cos(angle) * len, cy + sin(angle) * len)]
+                drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: line,
+                             lineWidth: 0.5, color: color, closed: false)
+            }
+        case 1: // Hex lattice — hexagonal grid
+            let spacing: Float = 60
+            let cols = Int(w / spacing) + 2
+            let rows = Int(h / spacing) + 2
+            for row in 0..<rows {
+                for col in 0..<cols {
+                    let hx = Float(col) * spacing + (row % 2 == 0 ? 0 : spacing * 0.5) - spacing
+                    let hy = Float(row) * spacing * 0.866 - spacing
+                    // Small hexagon
+                    let hexR: Float = 8 + sin(geoPhase * 2 + Float(row + col)) * 3
+                    var hex: [SIMD2<Float>] = []
+                    for s in 0..<6 {
+                        let a = Float(s) / 6.0 * Float.pi * 2 + geoPhase * 0.5
+                        hex.append(SIMD2(hx + cos(a) * hexR, hy + sin(a) * hexR))
+                    }
+                    drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: hex,
+                                 lineWidth: 0.3, color: color, closed: true)
+                }
+            }
+        default: // Flowing curves — orbiting ellipses
+            for i in 0..<6 {
+                let angle = Float(i) / 6.0 * Float.pi * 2 + geoPhase * 0.8
+                let dist = min(w, h) * (0.15 + Float(i) * 0.05)
+                var curve: [SIMD2<Float>] = []
+                for j in 0..<24 {
+                    let t = Float(j) / 24.0 * Float.pi * 2
+                    let rx = dist * (0.6 + sin(geoPhase + Float(i)) * 0.3)
+                    let ry = dist * (0.3 + cos(geoPhase * 0.7 + Float(i)) * 0.2)
+                    curve.append(SIMD2(cx + cos(t + angle) * rx, cy + sin(t + angle) * ry))
+                }
+                drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: curve,
+                             lineWidth: 0.4, color: color, closed: true)
+            }
+        }
+    }
+
+    // MARK: - Frequency Arc
+
+    private func drawFrequencyArc(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, w: Float, h: Float) {
+        let energy = uniforms.energy
+        guard energy > 0.01 else { return }
+
+        let barCount = 32
+        let arcCx = w / 2
+        let arcCy = h * 0.92
+        let arcR = w * 0.4
+        let barW: Float = 4
+        let maxBarH: Float = 40
+
+        for i in 0..<barCount {
+            let t = Float(i) / Float(barCount - 1) - 0.5
+            let angle = t * 0.8 - Float.pi / 2
+            let val = (sin(Float(i) * 0.4 + geoPhase * 6) * 0.5 + 0.5) * energy * 2
+            let barH = val * maxBarH
+            guard barH > 1 else { continue }
+
+            let bx = arcCx + cos(angle) * arcR
+            let by = arcCy + sin(angle) * arcR
+
+            let line = [SIMD2(bx, by), SIMD2(bx, by - barH)]
+            let barAlpha = min(1.0, val * 0.8 + 0.1)
+            drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: line,
+                         lineWidth: barW, color: SIMD4(accentR, accentG, accentB, barAlpha), closed: false)
+        }
+    }
+
+    // MARK: - Landmark Lights
+
+    private func drawLandmarkLights(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, state: JammermanState, w: Float, h: Float) {
+        guard state.faceDetected else { return }
+        let energy = uniforms.energy
+        let faceRx = w * 0.19
+        let faceRy = h * 0.14
+
+        let keyPoints: [SIMD2<Float>] = [
+            SIMD2(faceCx, faceCy - faceRy * 0.5),                     // forehead
+            SIMD2(faceCx, faceCy + faceRy * 0.5),                     // chin
+            SIMD2(faceCx, faceCy + faceRy * 0.2),                     // nose tip
+            SIMD2(faceCx - faceRx * 0.58, faceCy - faceRy * 0.43),   // left eye
+            SIMD2(faceCx + faceRx * 0.58, faceCy - faceRy * 0.43),   // right eye
+            SIMD2(faceCx - faceRx * 0.58, faceCy - faceRy * 0.6),    // left brow
+            SIMD2(faceCx + faceRx * 0.58, faceCy - faceRy * 0.6),    // right brow
+            SIMD2(faceCx - faceRx * 0.3, faceCy + faceRy * 0.54),    // left mouth
+            SIMD2(faceCx + faceRx * 0.3, faceCy + faceRy * 0.54),    // right mouth
+        ]
+
+        let r: Float = 5 + energy * 14 + beatPulse * 18
+        let alpha = min(1.0, 0.25 + energy * 0.4 + beatPulse * 0.5)
+
+        for pt in keyPoints {
+            var params = GPUGradientParams(
+                center: pt, innerRadius: 0, outerRadius: r,
+                innerColor: SIMD4(accentR, accentG, accentB, alpha),
+                outerColor: SIMD4(accentR, accentG, accentB, 0))
+            encoder.setRenderPipelineState(gradientPipeline)
+            encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
+            encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 1)
+            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        }
+    }
+
+    // MARK: - Line Tessellation Utility
+
+    /// Converts a polyline into GPU LineVertex pairs with extruded normals
+    private func drawPolyline(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer,
+                              points: [SIMD2<Float>], lineWidth: Float, color: SIMD4<Float>, closed: Bool) {
+        guard points.count >= 2 else { return }
+
+        var vertices: [GPULineVertex] = []
+        vertices.reserveCapacity(points.count * 2 + (closed ? 2 : 0))
+
+        let count = points.count
+        for i in 0..<count {
+            let curr = points[i]
+            let next = points[(i + 1) % count]
+            let prev = points[(i - 1 + count) % count]
+
+            // Average direction for smooth normals at joints
+            let d1 = simd_normalize(next - curr)
+            let d0 = simd_normalize(curr - prev)
+            var tangent = simd_normalize(d0 + d1)
+            if simd_length(tangent) < 0.001 { tangent = d1 }
+            let normal = SIMD2<Float>(-tangent.y, tangent.x)
+
+            // Two vertices per point (extruded left and right)
+            vertices.append(GPULineVertex(position: curr, normal: normal, alpha: 1))
+            vertices.append(GPULineVertex(position: curr, normal: normal, alpha: 1))
+        }
+
+        // Close the loop
+        if closed && vertices.count >= 2 {
+            vertices.append(vertices[0])
+            vertices.append(vertices[1])
+        }
+
+        let bufSize = MemoryLayout<GPULineVertex>.stride * vertices.count
+        guard let vertBuf = device.makeBuffer(bytes: &vertices, length: bufSize, options: .storageModeShared) else { return }
+        var lw = lineWidth
+        var col = color
+
+        encoder.setRenderPipelineState(linePipeline)
+        encoder.setVertexBuffer(vertBuf, offset: 0, index: 0)
+        encoder.setVertexBuffer(uniformBuf, offset: 0, index: 1)
+        encoder.setVertexBytes(&lw, length: MemoryLayout<Float>.stride, index: 2)
+        encoder.setFragmentBytes(&col, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: vertices.count)
     }
 
     // MARK: - Accent Color
