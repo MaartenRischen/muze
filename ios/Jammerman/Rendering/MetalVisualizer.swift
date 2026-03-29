@@ -207,9 +207,6 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     func draw(in view: MTKView) {
         guard let coord = coordinator else { print("[Metal] draw: no coordinator"); return }
         drawCount += 1
-        if drawCount <= 3 || drawCount % 300 == 0 {
-            print("[Metal] draw #\(drawCount) size=\(view.drawableSize) drawable=\(view.currentDrawable != nil)")
-        }
         inflightSemaphore.wait()
 
         let w = Float(view.drawableSize.width)
@@ -218,6 +215,11 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
 
         let state = coord.state
         let engine = coord.audioEngine
+
+        if drawCount <= 3 || drawCount % 300 == 0 {
+            let e = state.faceDetected ? 0.1 + state.mouthOpenness * 0.4 : 0
+            print("[Metal] #\(drawCount) face=\(state.faceDetected) e=\(String(format:"%.2f",e)) bp=\(String(format:"%.2f",beatPulse)) p=\(particles.count) fp=\(faceParticles.count) r=\(rings.count) hg=\(String(format:"%.2f",haloGlow)) cx=\(String(format:"%.0f",faceCx)) cy=\(String(format:"%.0f",faceCy)) hand=\(state.handPresent)")
+        }
 
         // Update animation state
         updateAnimationState(state: state, engine: engine, w: w, h: h)
