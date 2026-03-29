@@ -146,19 +146,19 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             return
         }
 
-        // Premultiplied alpha additive blend (for glows — adds color without adding opacity)
+        // Additive glow blend: add RGB weighted by alpha, but DON'T accumulate alpha
+        // This keeps the MTKView transparent so the camera shows through,
+        // while glow effects add bright color on top
         func additivePipeline(vertex: String, fragment: String) -> MTLRenderPipelineState? {
             let desc = MTLRenderPipelineDescriptor()
             desc.vertexFunction = library.makeFunction(name: vertex)
             desc.fragmentFunction = library.makeFunction(name: fragment)
             desc.colorAttachments[0].pixelFormat = .bgra8Unorm
             desc.colorAttachments[0].isBlendingEnabled = true
-            // Premultiplied source-over: result = src + dst * (1 - srcAlpha)
-            // This correctly composites onto the transparent framebuffer
-            desc.colorAttachments[0].sourceRGBBlendFactor = .one
-            desc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-            desc.colorAttachments[0].sourceAlphaBlendFactor = .one
-            desc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+            desc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+            desc.colorAttachments[0].destinationRGBBlendFactor = .one
+            desc.colorAttachments[0].sourceAlphaBlendFactor = .zero
+            desc.colorAttachments[0].destinationAlphaBlendFactor = .one
             return try? device.makeRenderPipelineState(descriptor: desc)
         }
 
@@ -261,9 +261,8 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         // 6. Particles (all types packed into one buffer)
         drawParticles(encoder: encoder, uniformBuf: uniformBuf)
 
-        // 7. Face effects
+        // 7. Face effects (iris glow + landmark lights — no drawn oval)
         if state.faceDetected {
-            drawFaceContours(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
             drawIrisGlow(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
             drawLandmarkLights(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
         }

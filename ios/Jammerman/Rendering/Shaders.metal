@@ -94,8 +94,9 @@ fragment float4 particleFragment(ParticleVertexOut in [[stage_in]]) {
     float alpha = 1.0 - smoothstep(0.0, 1.0, dist);
     alpha *= alpha; // quadratic falloff for softer glow
     alpha *= in.life * in.life; // fade with life
+    alpha *= in.color.a;
 
-    return float4(in.color.rgb * alpha * in.color.a, alpha * in.color.a);
+    return float4(in.color.rgb, alpha);
 }
 
 // MARK: - Line Rendering (thick lines via screen-aligned quads)
@@ -137,7 +138,7 @@ fragment float4 lineFragment(LineVertexOut in [[stage_in]],
     // Soft edges for anti-aliasing
     float edgeFade = 1.0 - smoothstep(0.6, 1.0, abs(in.edge));
     float a = color.a * in.alpha * edgeFade;
-    return float4(color.rgb * a, a);
+    return float4(color.rgb, a);
 }
 
 // MARK: - Radial Gradient (for halos, iris glow, landmarks, explosion)
@@ -158,7 +159,8 @@ fragment float4 radialGradientFragment(QuadVertexOut in [[stage_in]],
 
     float t = saturate((dist - params.innerRadius) / max(params.outerRadius - params.innerRadius, 0.001));
     float4 color = mix(params.innerColor, params.outerColor, t);
-    return color;
+    // Output non-premultiplied — blend mode handles alpha weighting
+    return float4(color.rgb, color.a);
 }
 
 // MARK: - Vignette
@@ -185,7 +187,7 @@ fragment float4 beatFlashFragment(QuadVertexOut in [[stage_in]],
     if (uniforms.beatPulse < 0.4) discard_fragment();
     float flashAlpha = (uniforms.beatPulse - 0.4) * 0.18;
     float3 flashColor = uniforms.accentColor * 0.3 + 0.7;
-    return float4(flashColor * flashAlpha, flashAlpha);
+    return float4(flashColor, flashAlpha);
 }
 
 // MARK: - Trail Composite (sample trail texture, additive blend)
@@ -285,5 +287,5 @@ fragment float4 ellipseFragment(EllipseVertexOut in [[stage_in]]) {
 
     float a = ring * in.color.a;
     if (a < 0.001) discard_fragment();
-    return float4(in.color.rgb * a, a);
+    return float4(in.color.rgb, a);
 }
