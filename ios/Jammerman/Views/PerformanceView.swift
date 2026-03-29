@@ -395,6 +395,7 @@ struct SegTuningPanel: View {
     @State private var edgeHigh: Double = 0.85
     @State private var darkenAlpha: Double = 0.5
     @State private var flipX: Bool = false
+    @State private var feather: Double = 8
 
     var body: some View {
         VStack(spacing: 0) {
@@ -414,13 +415,14 @@ struct SegTuningPanel: View {
                 segSlider("Edge Low", value: $edgeLow, range: 0...0.5)
                 segSlider("Edge High", value: $edgeHigh, range: 0.5...1.0)
                 segSlider("Darken", value: $darkenAlpha, range: 0...1.0)
+                segSlider("Feather", value: $feather, range: 0...30)
                 Toggle("Flip X", isOn: $flipX)
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.7))
                     .tint(.orange)
 
                 // Current values display
-                Text("offset=(\(String(format:"%.2f",offsetX)),\(String(format:"%.2f",offsetY))) scale=(\(String(format:"%.2f",scaleX)),\(String(format:"%.2f",scaleY))) edge=\(String(format:"%.2f",edgeLow))-\(String(format:"%.2f",edgeHigh)) dark=\(String(format:"%.2f",darkenAlpha)) flip=\(flipX)")
+                Text("off=(\(String(format:"%.2f",offsetX)),\(String(format:"%.2f",offsetY))) sc=(\(String(format:"%.2f",scaleX)),\(String(format:"%.2f",scaleY))) edge=\(String(format:"%.2f",edgeLow))-\(String(format:"%.2f",edgeHigh)) dk=\(String(format:"%.2f",darkenAlpha)) fth=\(String(format:"%.0f",feather)) fx=\(flipX)")
                     .font(.system(size: 8, weight: .bold, design: .monospaced))
                     .foregroundStyle(.orange.opacity(0.6))
             }
@@ -438,6 +440,7 @@ struct SegTuningPanel: View {
         .onChange(of: edgeHigh) { _, _ in syncParams() }
         .onChange(of: darkenAlpha) { _, _ in syncParams() }
         .onChange(of: flipX) { _, _ in syncParams() }
+        .onChange(of: feather) { _, _ in syncParams() }
         .onAppear { loadParams() }
     }
 
@@ -466,6 +469,7 @@ struct SegTuningPanel: View {
         edgeHigh = Double(r.segParams.edgeHigh)
         darkenAlpha = Double(r.segParams.darkenAlpha)
         flipX = r.segParams.maskFlipX > 0.5
+        feather = Double(r.segParams.feather)
     }
 
     private func syncParams() {
@@ -475,7 +479,8 @@ struct SegTuningPanel: View {
             edgeLow: Float(edgeLow),
             edgeHigh: Float(edgeHigh),
             darkenAlpha: Float(darkenAlpha),
-            maskFlipX: flipX ? 1 : 0
+            maskFlipX: flipX ? 1 : 0,
+            feather: Float(feather)
         )
     }
 }

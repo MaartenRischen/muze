@@ -210,10 +210,11 @@ fragment float4 trailFadeFragment(QuadVertexOut in [[stage_in]],
 struct SegParams {
     float2 offset;       // UV offset for mask alignment
     float2 scale;        // UV scale
-    float edgeLow;       // smoothstep low threshold (feather start)
-    float edgeHigh;      // smoothstep high threshold (feather end)
+    float edgeLow;       // smoothstep low threshold
+    float edgeHigh;      // smoothstep high threshold
     float darkenAlpha;   // how dark the background gets
     float maskFlipX;     // 1.0 = flip X, 0.0 = no flip
+    float feather;       // blur/feather radius (in texels)
 };
 
 fragment float4 segDarkenFragment(QuadVertexOut in [[stage_in]],
@@ -226,7 +227,21 @@ fragment float4 segDarkenFragment(QuadVertexOut in [[stage_in]],
     if (params.maskFlipX > 0.5) uv.x = 1.0 - uv.x;
     uv = (uv - 0.5) * params.scale + 0.5 + params.offset;
 
-    float person = segMask.sample(s, uv).r;
+    // Feather: sample mask in a radius and average (9-tap box blur)
+    float2 texSize = float2(segMask.get_width(), segMask.get_height());
+    float2 texelSize = 1.0 / texSize;
+    float r = params.feather;
+    float sum = 0;
+    float count = 0;
+    for (float dy = -r; dy <= r; dy += r * 0.5) {
+        for (float dx = -r; dx <= r; dx += r * 0.5) {
+            float2 sampleUV = uv + float2(dx, dy) * texelSize;
+            sum += segMask.sample(s, sampleUV).r;
+            count += 1.0;
+        }
+    }
+    float person = sum / max(count, 1.0);
+
     float bgAlpha = (1.0 - smoothstep(params.edgeLow, params.edgeHigh, person)) * params.darkenAlpha;
     return float4(0, 0, 0, bgAlpha);
 }

@@ -43,11 +43,12 @@ struct GPULineVertex {
 
 struct GPUSegParams {
     var offset: SIMD2<Float> = .zero
-    var scale: SIMD2<Float> = SIMD2(1, 1)
-    var edgeLow: Float = 0.15
-    var edgeHigh: Float = 0.85
-    var darkenAlpha: Float = 0.5
-    var maskFlipX: Float = 0  // 0 or 1
+    var scale: SIMD2<Float> = SIMD2(0.63, 0.99)
+    var edgeLow: Float = 0.25
+    var edgeHigh: Float = 0.75
+    var darkenAlpha: Float = 0.65
+    var maskFlipX: Float = 0
+    var feather: Float = 8.0  // blur radius in UV-scaled pixels
 }
 
 struct GPUGradientParams {
