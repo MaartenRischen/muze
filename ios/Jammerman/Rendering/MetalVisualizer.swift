@@ -1295,53 +1295,56 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
 
     // MARK: - Arp Visualization (dual columns)
 
-    private func updateArpState(engine: AudioEngine, energy: Float, w: Float, h: Float) {
-        let n = 8
-        let arp1Idx = (engine.drumStep / 2) % n
-        let arp2Idx = engine.drumStep % n
+    /// Map a MIDI note to Y position within the arp column
+    private func arpNoteToY(note: Int, allNotes: [Int], topY: Float, botY: Float) -> Float {
+        guard allNotes.count > 1 else { return (topY + botY) / 2 }
+        let lo = Float(allNotes.first!)
+        let hi = Float(allNotes.last!)
+        let range = max(hi - lo, 1)
+        let t = (Float(note) - lo) / range
+        return botY - t * (botY - topY)
+    }
 
-        // Arp 1
-        if !engine.arpMuted {
-            if arp1Idx != arp1LastIdx {
-                arp1Flash = 1.0
-                arp1LastIdx = arp1Idx
-                let colOffset = min(w, h) * 0.18 + 50
-                let colX = faceCx - colOffset
-                let vH = min(Float(280), faceCy * 0.65)
-                let botY = faceCy + vH / 2
-                let sy = botY - (Float(arp1Idx) / Float(n - 1)) * vH
-                for _ in 0..<5 {
-                    let angle = Float.random(in: 0...(Float.pi * 2))
-                    let speed: Float = 1 + Float.random(in: 0...2.5)
-                    arp1Sparks.append(MetalArpSpark(
-                        x: colX, y: sy,
-                        vx: cos(angle) * speed, vy: sin(angle) * speed - 1,
-                        life: 1, decay: 0.025 + Float.random(in: 0...0.02),
-                        r: 74.0/255, g: 222.0/255, b: 128.0/255))
-                }
+    private func updateArpState(engine: AudioEngine, energy: Float, w: Float, h: Float) {
+        let colOffset = min(w, h) * 0.18 + 50 * displayScale
+        let vH = min(Float(280) * displayScale, faceCy * 0.65)
+        let topY = faceCy - vH / 2
+        let botY = faceCy + vH / 2
+
+        // Arp 1 — detect note change
+        let arp1Note = engine.arp1CurrentNote
+        if !engine.arpMuted && arp1Note != arp1LastIdx && arp1Note > 0 {
+            arp1Flash = 1.0
+            arp1LastIdx = arp1Note
+            let colX = faceCx - colOffset
+            let sy = arpNoteToY(note: arp1Note, allNotes: engine.arp1Notes, topY: topY, botY: botY)
+            for _ in 0..<5 {
+                let angle = Float.random(in: 0...(Float.pi * 2))
+                let speed: Float = 1 + Float.random(in: 0...2.5)
+                arp1Sparks.append(MetalArpSpark(
+                    x: colX, y: sy,
+                    vx: cos(angle) * speed, vy: sin(angle) * speed - 1,
+                    life: 1, decay: 0.025 + Float.random(in: 0...0.02),
+                    r: 74.0/255, g: 222.0/255, b: 128.0/255))
             }
         }
         arp1Flash *= 0.88
 
         // Arp 2
-        if !engine.arp2Muted {
-            if arp2Idx != arp2LastIdx {
-                arp2Flash = 1.0
-                arp2LastIdx = arp2Idx
-                let colOffset = min(w, h) * 0.18 + 50 * displayScale
-                let colX = faceCx + colOffset
-                let vH = min(Float(280) * displayScale, faceCy * 0.65)
-                let botY = faceCy + vH / 2
-                let sy = botY - (Float(arp2Idx) / Float(n - 1)) * vH
-                for _ in 0..<5 {
-                    let angle = Float.random(in: 0...(Float.pi * 2))
-                    let speed: Float = 1 + Float.random(in: 0...2.5)
-                    arp2Sparks.append(MetalArpSpark(
-                        x: colX, y: sy,
-                        vx: cos(angle) * speed, vy: sin(angle) * speed - 1,
-                        life: 1, decay: 0.025 + Float.random(in: 0...0.02),
-                        r: 52.0/255, g: 211.0/255, b: 153.0/255))
-                }
+        let arp2Note = engine.arp2CurrentNote
+        if !engine.arp2Muted && arp2Note != arp2LastIdx && arp2Note > 0 {
+            arp2Flash = 1.0
+            arp2LastIdx = arp2Note
+            let colX = faceCx + colOffset
+            let sy = arpNoteToY(note: arp2Note, allNotes: engine.arp2AllNotes, topY: topY, botY: botY)
+            for _ in 0..<5 {
+                let angle = Float.random(in: 0...(Float.pi * 2))
+                let speed: Float = 1 + Float.random(in: 0...2.5)
+                arp2Sparks.append(MetalArpSpark(
+                    x: colX, y: sy,
+                    vx: cos(angle) * speed, vy: sin(angle) * speed - 1,
+                    life: 1, decay: 0.025 + Float.random(in: 0...0.02),
+                    r: 52.0/255, g: 211.0/255, b: 153.0/255))
             }
         }
         arp2Flash *= 0.88
@@ -1374,33 +1377,35 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         let vH = min(Float(280) * displayScale, faceCy * 0.65)
         let topY = faceCy - vH / 2
         let botY = faceCy + vH / 2
-        let n = 8
-        // Use drum step to derive arp position (8th notes = drumStep/2, 16th = drumStep)
-        let arp1Idx = (engine.drumStep / 2) % n  // 8th note default
-        let arp2Idx = engine.drumStep % n          // 16th note default
 
+        // Draw a column showing actual notes, with the currently-playing note highlighted
         func drawColumn(colX: Float, flash: Float, sparks: [MetalArpSpark],
-                        colorR: Float, colorG: Float, colorB: Float, activeIdx: Int) {
-            let currentIdx = activeIdx
+                        colorR: Float, colorG: Float, colorB: Float,
+                        allNotes: [Int], currentNote: Int) {
+            guard !allNotes.isEmpty else { return }
+            let n = allNotes.count
+            let loNote = allNotes.first!
+            let hiNote = allNotes.last!
+            let noteRange = max(Float(hiNote - loNote), 1)
+
             // Faint vertical guide line
             let guideLine = [SIMD2<Float>(colX, topY), SIMD2<Float>(colX, botY)]
             drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: guideLine,
                          lineWidth: 1, color: SIMD4(colorR, colorG, colorB, 0.06), closed: false)
 
-            // Draw note dots as particles
             var dotParticles: [GPUParticle] = []
             for i in 0..<n {
-                let y = botY - (Float(i) / Float(n - 1)) * vH
-                let (r, g, b) = noteToColor(note: 48 + i * 3)
-                let isActive = (i == currentIdx)
+                let note = allNotes[i]
+                // Map note pitch to Y position: lowest = bottom, highest = top
+                let t = Float(note - loNote) / noteRange
+                let y = botY - t * vH
+                let (r, g, b) = noteToColor(note: note)
+                let isActive = (note == currentNote)
 
                 if isActive {
-                    let glowSize = (10 + flash * 16 + energy * 6) * displayScale
-                    // Active note glow (gradient)
+                    let glowSize = (12 + flash * 18 + energy * 8) * displayScale
                     var params = GPUGradientParams(
-                        center: SIMD2(colX, y),
-                        innerRadius: 0,
-                        outerRadius: glowSize,
+                        center: SIMD2(colX, y), innerRadius: 0, outerRadius: glowSize,
                         innerColor: SIMD4(r, g, b, 0.8 + flash * 0.2),
                         outerColor: SIMD4(r, g, b, 0))
                     encoder.setRenderPipelineState(gradientPipeline)
@@ -1409,34 +1414,26 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                     encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
 
                     // White-hot core
-                    let coreSize = (6 + flash * 6) * displayScale
                     dotParticles.append(GPUParticle(
-                        position: SIMD2(colX, y), size: coreSize,
+                        position: SIMD2(colX, y), size: (6 + flash * 6) * displayScale,
                         life: 1, color: SIMD4(1, 1, 1, 0.7 + flash * 0.3)))
 
-                    // Horizontal bar pulse
-                    let barHalf = 12 + flash * 8
+                    // Horizontal pulse bar
+                    let barHalf: Float = (14 + flash * 10) * displayScale
                     let barLine = [SIMD2<Float>(colX - barHalf, y), SIMD2<Float>(colX + barHalf, y)]
                     drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: barLine,
-                                 lineWidth: 2, color: SIMD4(r, g, b, 0.3 + flash * 0.4), closed: false)
+                                 lineWidth: 2, color: SIMD4(r, g, b, 0.4 + flash * 0.4), closed: false)
                 } else {
-                    let dist = Float(min(abs(i - currentIdx), min(abs(i - currentIdx + n), abs(i - currentIdx - n))))
-                    let prox = max(Float(0), 1 - dist / (Float(n) * 0.4))
-                    let a = 0.12 + prox * 0.2
-                    let sz = (1.5 + prox * 1.5) * 2 * displayScale
-
-                    // Outer glow dot
+                    let sz: Float = 3 * displayScale
                     dotParticles.append(GPUParticle(
-                        position: SIMD2(colX, y), size: (sz + 6) * displayScale / displayScale,
-                        life: 1, color: SIMD4(r, g, b, a * 0.25)))
-                    // Core dot
+                        position: SIMD2(colX, y), size: sz + 4,
+                        life: 1, color: SIMD4(r, g, b, 0.06)))
                     dotParticles.append(GPUParticle(
                         position: SIMD2(colX, y), size: sz,
-                        life: 1, color: SIMD4(r, g, b, a)))
+                        life: 1, color: SIMD4(r, g, b, 0.15)))
                 }
             }
 
-            // Sparks as particles
             for s in sparks {
                 let sz = 3 * s.life * displayScale
                 dotParticles.append(GPUParticle(
@@ -1460,11 +1457,13 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
 
         if !engine.arpMuted {
             drawColumn(colX: faceCx - colOffset, flash: arp1Flash, sparks: arp1Sparks,
-                       colorR: 74.0/255, colorG: 222.0/255, colorB: 128.0/255, activeIdx: arp1Idx)
+                       colorR: 74.0/255, colorG: 222.0/255, colorB: 128.0/255,
+                       allNotes: engine.arp1Notes, currentNote: engine.arp1CurrentNote)
         }
         if !engine.arp2Muted {
             drawColumn(colX: faceCx + colOffset, flash: arp2Flash, sparks: arp2Sparks,
-                       colorR: 52.0/255, colorG: 211.0/255, colorB: 153.0/255, activeIdx: arp2Idx)
+                       colorR: 52.0/255, colorG: 211.0/255, colorB: 153.0/255,
+                       allNotes: engine.arp2AllNotes, currentNote: engine.arp2CurrentNote)
         }
     }
 

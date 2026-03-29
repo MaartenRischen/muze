@@ -122,6 +122,9 @@ class AudioEngine: ObservableObject {
     @Published var arpPattern: String = "up-down"
     @Published var arpNoteValue: String = "8n"
     private var arpDirection: Int = 1
+    // Current arp state for visualizer
+    @Published var arp1CurrentNote: Int = 0    // MIDI note currently playing
+    @Published var arp1Notes: [Int] = []       // all available notes (sorted)
 
     // Arp 2 sequencer
     private var arp2Timer: Timer?
@@ -130,6 +133,8 @@ class AudioEngine: ObservableObject {
     @Published var arp2Pattern: String = "down"
     @Published var arp2NoteValue: String = "16n"
     private var arp2Direction: Int = 1
+    @Published var arp2CurrentNote: Int = 0
+    @Published var arp2AllNotes: [Int] = []
 
     // Drum sequencer
     private var drumTimer: Timer?
@@ -400,11 +405,13 @@ class AudioEngine: ObservableObject {
                     if localUseSoundFont {
                         let midiNote = UInt8(note)
                         self.midiQueue.enqueue(MidiEvent(type: 0x90, note: midiNote, velocity: 85, channel: 0, samplerIdx: 1))
-                        // Track for note-off at next step change
                         self.arpPendingNoteOff = midiNote
                     } else {
                         self.arpOsc.triggerNote(note)
                     }
+                    // Publish for visualizer
+                    let arpNote = note
+                    DispatchQueue.main.async { [weak self] in self?.arp1CurrentNote = arpNote }
                 }
             }
 
@@ -426,11 +433,12 @@ class AudioEngine: ObservableObject {
                     if localUseSoundFont {
                         let midiNote = UInt8(note)
                         self.midiQueue.enqueue(MidiEvent(type: 0x90, note: midiNote, velocity: 80, channel: 0, samplerIdx: 2))
-                        // Track for note-off at next step change
                         self.arp2PendingNoteOff = midiNote
                     } else {
                         self.arp2Osc.triggerNote(note)
                     }
+                    let arp2Note = note
+                    DispatchQueue.main.async { [weak self] in self?.arp2CurrentNote = arp2Note }
                 }
             }
 
@@ -1036,6 +1044,7 @@ class AudioEngine: ObservableObject {
 
     func updateArpNotes(_ notes: [String]) {
         arpNotes = notes.compactMap { noteNameToMidi($0) }
+        arp1Notes = arpNotes.sorted()
     }
 
     func setArpPattern(_ pattern: String) {
@@ -1054,6 +1063,7 @@ class AudioEngine: ObservableObject {
 
     func updateArp2Notes(_ notes: [String]) {
         arp2Notes = notes.compactMap { noteNameToMidi($0) }
+        arp2AllNotes = arp2Notes.sorted()
     }
 
     func setArp2Pattern(_ pattern: String) {
