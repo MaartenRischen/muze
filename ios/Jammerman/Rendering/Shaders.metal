@@ -210,11 +210,10 @@ fragment float4 trailFadeFragment(QuadVertexOut in [[stage_in]],
 fragment float4 segDarkenFragment(QuadVertexOut in [[stage_in]],
                                    texture2d<float> segMask [[texture(0)]]) {
     constexpr sampler s(filter::linear);
-    float2 uv = float2(1.0 - in.uv.x, in.uv.y); // mirror X for front camera
-    float person = segMask.sample(s, uv).r;
+    float person = segMask.sample(s, in.uv).r;
 
-    // Darken background (where person < 0.5), person area stays transparent
-    float bgAlpha = (1.0 - smoothstep(0.3, 0.7, person)) * 0.55;
+    // Smooth the mask edge for less blocky cutout
+    float bgAlpha = (1.0 - smoothstep(0.15, 0.85, person)) * 0.5;
     return float4(0, 0, 0, bgAlpha);
 }
 

@@ -276,7 +276,7 @@ class ARKitTracker: NSObject {
             defer { self.isSegmenting = false }
 
             let request = VNGeneratePersonSegmentationRequest()
-            request.qualityLevel = .fast
+            request.qualityLevel = .balanced
             request.outputPixelFormat = kCVPixelFormatType_OneComponent8
             let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right)
             do { try handler.perform([request]) } catch { return }
