@@ -265,7 +265,7 @@ class ARKitTracker: NSObject {
     #if !targetEnvironment(simulator)
     private func detectSegmentation(in frame: ARFrame) {
         segFrameCount += 1
-        guard segFrameCount % 6 == 0, !isSegmenting else { return }
+        guard segFrameCount % 3 == 0, !isSegmenting else { return }
         isSegmenting = true
 
         // Pass capturedImage directly — no copy (same approach as hand detection)
