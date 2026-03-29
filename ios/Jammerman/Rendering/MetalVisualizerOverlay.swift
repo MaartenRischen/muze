@@ -32,8 +32,9 @@ struct MetalVisualizerOverlay: UIViewRepresentable {
         let renderer = MetalVisualizer(device: device, coordinator: coordinator)
         mtkView.delegate = renderer
 
-        // Store renderer to prevent deallocation
+        // Store renderer to prevent deallocation + expose for dev UI
         objc_setAssociatedObject(mtkView, "renderer", renderer, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        coordinator.metalRenderer = renderer
 
         return mtkView
     }

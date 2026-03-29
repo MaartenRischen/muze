@@ -12,6 +12,7 @@ struct PerformanceView: View {
     @State private var showSynthPanel = false
     @State private var showMixer = false
     @State private var showTutorial = false
+    @State private var showSegTuning = false
     @State private var volumeChannel: String? = nil
     @State private var volumeSliderValue: Float = 0
 
@@ -107,10 +108,17 @@ struct PerformanceView: View {
                 TutorialView(isPresented: $showTutorial)
                     .transition(.opacity)
             }
+
+            // === SEG TUNING DEV PANEL ===
+            if showSegTuning {
+                SegTuningPanel(coordinator: coordinator, isPresented: $showSegTuning)
+                    .transition(.move(edge: .bottom))
+            }
         }
         .animation(.easeInOut(duration: 0.25), value: showSynthPanel)
         .animation(.easeInOut(duration: 0.25), value: showMixer)
         .animation(.easeInOut(duration: 0.2), value: showTutorial)
+        .animation(.easeInOut(duration: 0.2), value: showSegTuning)
         .onAppear { coordinator.start() }
         .onDisappear { coordinator.stop() }
         .statusBarHidden()
@@ -191,6 +199,15 @@ struct PerformanceView: View {
                     .foregroundStyle(.white.opacity(0.7))
                     .frame(width: 36, height: 36)
                     .background(.white.opacity(0.08))
+                    .clipShape(Circle())
+            }
+            // Seg tuning (dev)
+            Button { showSegTuning.toggle() } label: {
+                Text("SEG")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.orange.opacity(0.7))
+                    .frame(width: 36, height: 36)
+                    .background(.orange.opacity(0.08))
                     .clipShape(Circle())
             }
             // Help
@@ -361,6 +378,105 @@ struct InstToggleButton: View {
         .fullScreenCover(isPresented: $showDetail) {
             InstrumentDetailView(channel: channel, color: color, coordinator: coordinator, isPresented: $showDetail)
         }
+    }
+}
+
+// MARK: - Segmentation Tuning Dev Panel
+
+struct SegTuningPanel: View {
+    let coordinator: TrackingCoordinator
+    @Binding var isPresented: Bool
+
+    @State private var offsetX: Double = 0
+    @State private var offsetY: Double = 0
+    @State private var scaleX: Double = 1
+    @State private var scaleY: Double = 1
+    @State private var edgeLow: Double = 0.15
+    @State private var edgeHigh: Double = 0.85
+    @State private var darkenAlpha: Double = 0.5
+    @State private var flipX: Bool = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            VStack(spacing: 8) {
+                HStack {
+                    Text("SEG TUNING").font(.system(size: 13, weight: .black, design: .monospaced)).foregroundStyle(.orange)
+                    Spacer()
+                    Button { isPresented = false } label: {
+                        Image(systemName: "xmark").foregroundStyle(.white.opacity(0.6))
+                    }
+                }
+                segSlider("Offset X", value: $offsetX, range: -0.5...0.5)
+                segSlider("Offset Y", value: $offsetY, range: -0.5...0.5)
+                segSlider("Scale X", value: $scaleX, range: 0.5...2.0)
+                segSlider("Scale Y", value: $scaleY, range: 0.5...2.0)
+                segSlider("Edge Low", value: $edgeLow, range: 0...0.5)
+                segSlider("Edge High", value: $edgeHigh, range: 0.5...1.0)
+                segSlider("Darken", value: $darkenAlpha, range: 0...1.0)
+                Toggle("Flip X", isOn: $flipX)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .tint(.orange)
+
+                // Current values display
+                Text("offset=(\(String(format:"%.2f",offsetX)),\(String(format:"%.2f",offsetY))) scale=(\(String(format:"%.2f",scaleX)),\(String(format:"%.2f",scaleY))) edge=\(String(format:"%.2f",edgeLow))-\(String(format:"%.2f",edgeHigh)) dark=\(String(format:"%.2f",darkenAlpha)) flip=\(flipX)")
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.orange.opacity(0.6))
+            }
+            .padding(16)
+            .background(.black.opacity(0.9))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 8)
+            .padding(.bottom, 50)
+        }
+        .onChange(of: offsetX) { _, _ in syncParams() }
+        .onChange(of: offsetY) { _, _ in syncParams() }
+        .onChange(of: scaleX) { _, _ in syncParams() }
+        .onChange(of: scaleY) { _, _ in syncParams() }
+        .onChange(of: edgeLow) { _, _ in syncParams() }
+        .onChange(of: edgeHigh) { _, _ in syncParams() }
+        .onChange(of: darkenAlpha) { _, _ in syncParams() }
+        .onChange(of: flipX) { _, _ in syncParams() }
+        .onAppear { loadParams() }
+    }
+
+    private func segSlider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.5))
+                .frame(width: 62, alignment: .leading)
+            Slider(value: value, in: range)
+                .tint(.orange)
+            Text(String(format: "%.2f", value.wrappedValue))
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(.orange.opacity(0.6))
+                .frame(width: 36, alignment: .trailing)
+        }
+    }
+
+    private func loadParams() {
+        guard let r = coordinator.metalRenderer else { return }
+        offsetX = Double(r.segParams.offset.x)
+        offsetY = Double(r.segParams.offset.y)
+        scaleX = Double(r.segParams.scale.x)
+        scaleY = Double(r.segParams.scale.y)
+        edgeLow = Double(r.segParams.edgeLow)
+        edgeHigh = Double(r.segParams.edgeHigh)
+        darkenAlpha = Double(r.segParams.darkenAlpha)
+        flipX = r.segParams.maskFlipX > 0.5
+    }
+
+    private func syncParams() {
+        coordinator.metalRenderer?.segParams = GPUSegParams(
+            offset: SIMD2(Float(offsetX), Float(offsetY)),
+            scale: SIMD2(Float(scaleX), Float(scaleY)),
+            edgeLow: Float(edgeLow),
+            edgeHigh: Float(edgeHigh),
+            darkenAlpha: Float(darkenAlpha),
+            maskFlipX: flipX ? 1 : 0
+        )
     }
 }
 

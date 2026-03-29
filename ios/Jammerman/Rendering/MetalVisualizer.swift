@@ -41,6 +41,15 @@ struct GPULineVertex {
     var alpha: Float
 }
 
+struct GPUSegParams {
+    var offset: SIMD2<Float> = .zero
+    var scale: SIMD2<Float> = SIMD2(1, 1)
+    var edgeLow: Float = 0.15
+    var edgeHigh: Float = 0.85
+    var darkenAlpha: Float = 0.5
+    var maskFlipX: Float = 0  // 0 or 1
+}
+
 struct GPUGradientParams {
     var center: SIMD2<Float>
     var innerRadius: Float
@@ -98,9 +107,9 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private var handGlowRadius: Float = 8
     private var handGlowTarget: Float = 8
 
-    // Segmentation texture
+    // Segmentation texture + tunable params (public for dev UI)
     private var segTexture: MTLTexture?
-    private let textureLoader = MTKTextureLoader(device: MTLCreateSystemDefaultDevice()!)
+    var segParams = GPUSegParams()
 
     // Triple-buffered uniforms
     private var uniformBuffers: [MTLBuffer] = []
@@ -285,6 +294,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         if let segTex = segTexture {
             encoder.setRenderPipelineState(segDarkenPipeline)
             encoder.setFragmentTexture(segTex, index: 0)
+            encoder.setFragmentBytes(&segParams, length: MemoryLayout<GPUSegParams>.stride, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
 

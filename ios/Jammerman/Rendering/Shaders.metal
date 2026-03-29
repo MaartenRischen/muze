@@ -207,13 +207,27 @@ fragment float4 trailFadeFragment(QuadVertexOut in [[stage_in]],
 
 // MARK: - Person Segmentation Darken
 
-fragment float4 segDarkenFragment(QuadVertexOut in [[stage_in]],
-                                   texture2d<float> segMask [[texture(0)]]) {
-    constexpr sampler s(filter::linear);
-    float person = segMask.sample(s, in.uv).r;
+struct SegParams {
+    float2 offset;       // UV offset for mask alignment
+    float2 scale;        // UV scale
+    float edgeLow;       // smoothstep low threshold (feather start)
+    float edgeHigh;      // smoothstep high threshold (feather end)
+    float darkenAlpha;   // how dark the background gets
+    float maskFlipX;     // 1.0 = flip X, 0.0 = no flip
+};
 
-    // Smooth the mask edge for less blocky cutout
-    float bgAlpha = (1.0 - smoothstep(0.15, 0.85, person)) * 0.5;
+fragment float4 segDarkenFragment(QuadVertexOut in [[stage_in]],
+                                   texture2d<float> segMask [[texture(0)]],
+                                   constant SegParams &params [[buffer(0)]]) {
+    constexpr sampler s(filter::linear);
+
+    // Apply offset, scale, and optional X flip
+    float2 uv = in.uv;
+    if (params.maskFlipX > 0.5) uv.x = 1.0 - uv.x;
+    uv = (uv - 0.5) * params.scale + 0.5 + params.offset;
+
+    float person = segMask.sample(s, uv).r;
+    float bgAlpha = (1.0 - smoothstep(params.edgeLow, params.edgeHigh, person)) * params.darkenAlpha;
     return float4(0, 0, 0, bgAlpha);
 }
 
