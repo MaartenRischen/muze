@@ -268,7 +268,11 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             return
         }
 
-        // Clear to transparent
+        // === PRE-PASSES (before main encoder) ===
+        updateTrailTexture(cmdBuf: cmdBuf, uniformBuf: uniformBuf, state: state, w: w, h: h)
+        updateSegTexture(state: state)
+
+        // === MAIN RENDER PASS ===
         passDesc.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         passDesc.colorAttachments[0].loadAction = .clear
 
@@ -276,14 +280,6 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             inflightSemaphore.signal()
             return
         }
-
-        // === PRE-PASS: Update trail texture (offscreen) ===
-        updateTrailTexture(cmdBuf: cmdBuf, uniformBuf: uniformBuf, state: state, w: w, h: h)
-
-        // === PRE-PASS: Update segmentation texture ===
-        updateSegTexture(state: state)
-
-        // === MAIN RENDER PASS ===
 
         // 0. Background darken via segmentation (if available)
         if let segTex = segTexture {
