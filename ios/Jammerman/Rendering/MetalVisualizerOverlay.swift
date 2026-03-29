@@ -11,6 +11,7 @@ struct MetalVisualizerOverlay: UIViewRepresentable {
         guard let device = MTLCreateSystemDefaultDevice() else {
             fatalError("Metal not supported on this device")
         }
+        print("[Metal] Creating MTKView with device: \(device.name)")
 
         let mtkView = MTKView(frame: .zero, device: device)
         mtkView.preferredFramesPerSecond = 60

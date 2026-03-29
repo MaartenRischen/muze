@@ -134,53 +134,62 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         self.commandQueue = device.makeCommandQueue()!
         self.coordinator = coordinator
         super.init()
+        print("[Metal] Initializing MetalVisualizer on \(device.name)")
         buildPipelines()
         buildBuffers()
+        print("[Metal] Init complete — pipelines: particle=\(particlePipeline != nil) line=\(linePipeline != nil) gradient=\(gradientPipeline != nil) ellipse=\(ellipsePipeline != nil) vignette=\(vignettePipeline != nil) flash=\(beatFlashPipeline != nil)")
     }
 
     // MARK: - Pipeline Setup
 
+    private var drawCount = 0
+
     private func buildPipelines() {
         guard let library = device.makeDefaultLibrary() else {
-            print("[Metal] Failed to create default library")
+            print("[Metal] FATAL: Failed to create default library — .metal file not in bundle?")
             return
         }
+        print("[Metal] Library loaded with \(library.functionNames)")
 
-        // Premultiplied source-over: result = src + dst * (1 - srcAlpha)
-        // Effects must output low alpha to avoid accumulating to opaque
-        func additivePipeline(vertex: String, fragment: String) -> MTLRenderPipelineState? {
+        // Log errors instead of silently failing with try?
+        func makePipeline(_ desc: MTLRenderPipelineDescriptor, name: String) -> MTLRenderPipelineState? {
+            do {
+                let state = try device.makeRenderPipelineState(descriptor: desc)
+                return state
+            } catch {
+                print("[Metal] PIPELINE ERROR (\(name)): \(error)")
+                return nil
+            }
+        }
+
+        func makeDesc(vertex: String, fragment: String, additive: Bool) -> MTLRenderPipelineDescriptor {
             let desc = MTLRenderPipelineDescriptor()
             desc.vertexFunction = library.makeFunction(name: vertex)
             desc.fragmentFunction = library.makeFunction(name: fragment)
+            if desc.vertexFunction == nil { print("[Metal] MISSING vertex function: \(vertex)") }
+            if desc.fragmentFunction == nil { print("[Metal] MISSING fragment function: \(fragment)") }
             desc.colorAttachments[0].pixelFormat = .bgra8Unorm
             desc.colorAttachments[0].isBlendingEnabled = true
-            desc.colorAttachments[0].sourceRGBBlendFactor = .one
-            desc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-            desc.colorAttachments[0].sourceAlphaBlendFactor = .one
-            desc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-            return try? device.makeRenderPipelineState(descriptor: desc)
+            if additive {
+                desc.colorAttachments[0].sourceRGBBlendFactor = .one
+                desc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+                desc.colorAttachments[0].sourceAlphaBlendFactor = .one
+                desc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+            } else {
+                desc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+                desc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+                desc.colorAttachments[0].sourceAlphaBlendFactor = .one
+                desc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+            }
+            return desc
         }
 
-        // Alpha blend descriptor (for vignette, darkening)
-        func alphaPipeline(vertex: String, fragment: String) -> MTLRenderPipelineState? {
-            let desc = MTLRenderPipelineDescriptor()
-            desc.vertexFunction = library.makeFunction(name: vertex)
-            desc.fragmentFunction = library.makeFunction(name: fragment)
-            desc.colorAttachments[0].pixelFormat = .bgra8Unorm
-            desc.colorAttachments[0].isBlendingEnabled = true
-            desc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-            desc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-            desc.colorAttachments[0].sourceAlphaBlendFactor = .one
-            desc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-            return try? device.makeRenderPipelineState(descriptor: desc)
-        }
-
-        particlePipeline = additivePipeline(vertex: "particleVertex", fragment: "particleFragment")
-        ellipsePipeline = additivePipeline(vertex: "ellipseVertex", fragment: "ellipseFragment")
-        gradientPipeline = additivePipeline(vertex: "fullscreenQuadVertex", fragment: "radialGradientFragment")
-        linePipeline = additivePipeline(vertex: "lineVertex", fragment: "lineFragment")
-        vignettePipeline = alphaPipeline(vertex: "fullscreenQuadVertex", fragment: "vignetteFragment")
-        beatFlashPipeline = additivePipeline(vertex: "fullscreenQuadVertex", fragment: "beatFlashFragment")
+        particlePipeline = makePipeline(makeDesc(vertex: "particleVertex", fragment: "particleFragment", additive: true), name: "particle")
+        ellipsePipeline = makePipeline(makeDesc(vertex: "ellipseVertex", fragment: "ellipseFragment", additive: true), name: "ellipse")
+        gradientPipeline = makePipeline(makeDesc(vertex: "fullscreenQuadVertex", fragment: "radialGradientFragment", additive: true), name: "gradient")
+        linePipeline = makePipeline(makeDesc(vertex: "lineVertex", fragment: "lineFragment", additive: true), name: "line")
+        vignettePipeline = makePipeline(makeDesc(vertex: "fullscreenQuadVertex", fragment: "vignetteFragment", additive: false), name: "vignette")
+        beatFlashPipeline = makePipeline(makeDesc(vertex: "fullscreenQuadVertex", fragment: "beatFlashFragment", additive: true), name: "beatFlash")
     }
 
     private func buildBuffers() {
@@ -196,7 +205,11 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     func draw(in view: MTKView) {
-        guard let coord = coordinator else { return }
+        guard let coord = coordinator else { print("[Metal] draw: no coordinator"); return }
+        drawCount += 1
+        if drawCount <= 3 || drawCount % 300 == 0 {
+            print("[Metal] draw #\(drawCount) size=\(view.drawableSize) drawable=\(view.currentDrawable != nil)")
+        }
         inflightSemaphore.wait()
 
         let w = Float(view.drawableSize.width)
