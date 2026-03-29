@@ -120,6 +120,9 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     // Waveform ring points (recomputed each frame)
     private var ringPoints: [SIMD2<Float>] = []
 
+    // Display scale (retina multiplier — sizes in points need to be × this)
+    private var displayScale: Float = 3.0
+
     // Accent color
     private var accentR: Float = 0.13, accentG: Float = 0.83, accentB: Float = 0.93
     private var cachedMode = ""
@@ -202,7 +205,9 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
 
     // MARK: - MTKViewDelegate
 
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        displayScale = Float(view.contentScaleFactor)
+    }
 
     func draw(in view: MTKView) {
         guard let coord = coordinator else { print("[Metal] draw: no coordinator"); return }
@@ -523,25 +528,25 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         for p in particles {
             let a = p.life * p.life * 0.5
             gpuParticles.append(GPUParticle(
-                position: SIMD2(p.x, p.y), size: max(p.size * 3, 2),
+                position: SIMD2(p.x, p.y), size: max(p.size * 3 * displayScale, 4),
                 life: p.life, color: SIMD4(p.r, p.g, p.b, a)))
         }
         for p in faceParticles {
             let a = p.life * p.life * 0.6
             gpuParticles.append(GPUParticle(
-                position: SIMD2(p.x, p.y), size: max(p.size * 2.5, 1.5),
+                position: SIMD2(p.x, p.y), size: max(p.size * 2.5 * displayScale, 3),
                 life: p.life, color: SIMD4(p.r, p.g, p.b, a)))
         }
         for n in constellationNotes {
             let a = n.life * n.life * 0.6
             gpuParticles.append(GPUParticle(
-                position: SIMD2(n.x, n.y), size: n.size * (2 + n.brightness),
+                position: SIMD2(n.x, n.y), size: n.size * (2 + n.brightness) * displayScale,
                 life: n.life, color: SIMD4(accentR, accentG, accentB, a)))
         }
         for p in burstParticles {
             let a = p.life * p.life * 0.5
             gpuParticles.append(GPUParticle(
-                position: SIMD2(p.x, p.y), size: max(p.size * 2, 1),
+                position: SIMD2(p.x, p.y), size: max(p.size * 2 * displayScale, 3),
                 life: p.life, color: SIMD4(p.r, p.g, p.b, a)))
         }
 
@@ -568,7 +573,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             gpuEllipses.append(GPUEllipse(
                 center: SIMD2(ring.cx, ring.cy),
                 radii: SIMD2(r * rxScale, r * ryScale),
-                lineWidth: ring.width * ring.alpha + 0.5,
+                lineWidth: (ring.width * ring.alpha + 0.5) * displayScale,
                 color: SIMD4(accentR, accentG, accentB, ring.alpha)))
         }
 
@@ -936,7 +941,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
 
         let bufSize = MemoryLayout<GPULineVertex>.stride * vertices.count
         guard let vertBuf = device.makeBuffer(bytes: &vertices, length: bufSize, options: .storageModeShared) else { return }
-        var lw = lineWidth
+        var lw = lineWidth * displayScale
         var col = color
 
         encoder.setRenderPipelineState(linePipeline)
