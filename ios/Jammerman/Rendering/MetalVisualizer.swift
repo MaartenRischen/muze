@@ -82,6 +82,22 @@ struct MetalConstellationNote {
     var x: Float, y: Float, life: Float, decay: Float, size: Float, brightness: Float
 }
 
+struct MetalBurstRing {
+    var x: Float, y: Float, radius: Float, maxRadius: Float, alpha: Float
+    var r: Float, g: Float, b: Float, speed: Float
+}
+
+struct MetalArpSpark {
+    var x: Float, y: Float, vx: Float, vy: Float
+    var life: Float, decay: Float
+    var r: Float, g: Float, b: Float
+}
+
+struct MetalContourSnapshot {
+    var points: [SIMD2<Float>]
+    var opacity: Float
+}
+
 // MARK: - Metal Visualizer
 
 class MetalVisualizer: NSObject, MTKViewDelegate {
@@ -141,6 +157,22 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private var haloRays: [MetalHaloRay] = []
     private var rings: [MetalRing] = []  // shockwaves + halo rings combined
     private var lastMelodyNote: Int?
+    private var lastBurstNote: Int?
+    private var burstRings: [MetalBurstRing] = []
+
+    // Arp visualization state
+    private var arp1LastIdx: Int = -1
+    private var arp1Flash: Float = 0
+    private var arp1Sparks: [MetalArpSpark] = []
+    private var arp2LastIdx: Int = -1
+    private var arp2Flash: Float = 0
+    private var arp2Sparks: [MetalArpSpark] = []
+
+    // Ghost trail (contour snapshots)
+    private var contourSnapshots: [MetalContourSnapshot] = []
+    private let maxSnapshots = 4
+    private var lastHeadYaw: Float = 0
+    private var lastHeadPitch: Float = 0
 
     // Waveform ring points (recomputed each frame)
     private var ringPoints: [SIMD2<Float>] = []
@@ -333,6 +365,12 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         // 9. Connection web
         drawConnectionWeb(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
 
+        // 9b. Arp visualization columns
+        drawArpViz(encoder: encoder, uniformBuf: uniformBuf, engine: engine, w: w, h: h)
+
+        // 9c. Ghost trails (contour snapshots)
+        drawContourTrails(encoder: encoder, uniformBuf: uniformBuf)
+
         // 10. Beat flash
         if beatPulse > 0.4 {
             encoder.setRenderPipelineState(beatFlashPipeline)
@@ -432,7 +470,11 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         updateParticles(energy: energy, w: w, h: h)
         updateFaceParticles(state: state, energy: energy, w: w, h: h)
         updateConstellation(state: state, w: w, h: h)
+        updateBurstParticles(state: state, w: w, h: h)
         updateRings()
+        updateBurstRings()
+        updateArpState(engine: engine, energy: energy, w: w, h: h)
+        updateContourSnapshots(state: state, w: w, h: h)
     }
 
     // MARK: - Particle Updates
@@ -607,7 +649,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     }
 
     private func drawRings(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer) {
-        guard !rings.isEmpty else { return }
+        guard !rings.isEmpty || !burstRings.isEmpty else { return }
 
         var gpuEllipses: [GPUEllipse] = []
         for ring in rings {
@@ -620,7 +662,17 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                 lineWidth: (ring.width * ring.alpha + 0.5) * displayScale,
                 color: SIMD4(accentR, accentG, accentB, ring.alpha)))
         }
+        // Burst rings (note-colored expanding circles)
+        for ring in burstRings {
+            guard ring.alpha > 0.01 else { continue }
+            gpuEllipses.append(GPUEllipse(
+                center: SIMD2(ring.x, ring.y),
+                radii: SIMD2(ring.radius, ring.radius),
+                lineWidth: (2 * ring.alpha + 0.5) * displayScale,
+                color: SIMD4(ring.r, ring.g, ring.b, ring.alpha)))
+        }
 
+        guard !gpuEllipses.isEmpty else { return }
         let bufSize = MemoryLayout<GPUEllipse>.stride * gpuEllipses.count
         guard let ellipseBuf = device.makeBuffer(bytes: &gpuEllipses, length: bufSize, options: .storageModeShared) else { return }
 
@@ -1124,6 +1176,310 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         encoder.setVertexBytes(&lw, length: MemoryLayout<Float>.stride, index: 2)
         encoder.setFragmentBytes(&col, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: vertices.count)
+    }
+
+    // MARK: - Burst Particles (note change explosions)
+
+    private func noteToColor(note: Int) -> (Float, Float, Float) {
+        let nrm = max(Float(0), min(Float(1), Float(note - 36) / 36.0))
+        var r: Float, g: Float, b: Float
+        if nrm < 0.33 {
+            let t = nrm / 0.33
+            r = (60 + t * 40) / 255; g = (100 + t * 80) / 255; b = (200 + t * 55) / 255
+        } else if nrm < 0.66 {
+            let t = (nrm - 0.33) / 0.33
+            r = (100 + t * 130) / 255; g = (180 + t * 20) / 255; b = (255 - t * 180) / 255
+        } else {
+            let t = (nrm - 0.66) / 0.34
+            r = (230 + t * 25) / 255; g = (200 - t * 60) / 255; b = (75 - t * 40) / 255
+        }
+        return (r, g, b)
+    }
+
+    private func updateBurstParticles(state: JammermanState, w: Float, h: Float) {
+        // Trigger burst on melody note change
+        if let note = state.melodyNote, note != lastBurstNote {
+            let prevNote = lastBurstNote
+            lastBurstNote = note
+            if let prev = prevNote {
+                let interval = abs(note - prev)
+                guard interval > 0 else { return }
+                let cx = state.handX * w
+                let cy = state.handY * h
+                let (r, g, b) = noteToColor(note: note)
+                let count = min(20, max(5, Int(Float(interval) * 1.7)))
+                let burstSpeed: Float = 1.5 + Float(interval) * 0.5
+
+                for i in 0..<count {
+                    if burstParticles.count >= maxBurstParticles { burstParticles.removeFirst() }
+                    let angle = Float(i) / Float(count) * Float.pi * 2 + Float.random(in: 0...0.4)
+                    let speed = burstSpeed * (0.6 + Float.random(in: 0...0.8))
+                    burstParticles.append(MetalParticle(
+                        x: cx, y: cy,
+                        vx: cos(angle) * speed, vy: sin(angle) * speed,
+                        life: 1, decay: 0.014 + Float.random(in: 0...0.012),
+                        size: 1.5 + Float(interval) * 0.35 + Float.random(in: 0...1.5),
+                        r: r, g: g, b: b))
+                }
+                // Expanding ring
+                let ringMax = min(Float(60), 15 + Float(interval) * 5)
+                burstRings.append(MetalBurstRing(
+                    x: cx, y: cy, radius: 0, maxRadius: ringMax, alpha: 0.6,
+                    r: r, g: g, b: b, speed: ringMax / 24))
+            }
+        }
+        if state.melodyNote == nil { lastBurstNote = nil }
+
+        // Physics update for burst particles
+        var i = 0
+        while i < burstParticles.count {
+            burstParticles[i].x += burstParticles[i].vx
+            burstParticles[i].y += burstParticles[i].vy
+            burstParticles[i].vy += -0.02  // gravity
+            burstParticles[i].vx *= 0.97
+            burstParticles[i].vy *= 0.97
+            burstParticles[i].life -= burstParticles[i].decay
+            if burstParticles[i].life <= 0 {
+                burstParticles.swapAt(i, burstParticles.count - 1)
+                burstParticles.removeLast()
+            } else { i += 1 }
+        }
+    }
+
+    private func updateBurstRings() {
+        var i = 0
+        while i < burstRings.count {
+            burstRings[i].radius += burstRings[i].speed
+            burstRings[i].alpha *= 0.94
+            if burstRings[i].alpha < 0.01 || burstRings[i].radius > burstRings[i].maxRadius {
+                burstRings.swapAt(i, burstRings.count - 1)
+                burstRings.removeLast()
+            } else { i += 1 }
+        }
+    }
+
+    // MARK: - Arp Visualization (dual columns)
+
+    private func updateArpState(engine: AudioEngine, energy: Float, w: Float, h: Float) {
+        let n = 8
+        let currentIdx = Int(geoPhase * 4) % n
+
+        // Arp 1
+        if !engine.arpMuted {
+            if currentIdx != arp1LastIdx {
+                arp1Flash = 1.0
+                arp1LastIdx = currentIdx
+                let colOffset = min(w, h) * 0.18 + 50
+                let colX = faceCx - colOffset
+                let vH = min(Float(280), faceCy * 0.65)
+                let botY = faceCy + vH / 2
+                let sy = botY - (Float(currentIdx) / Float(n - 1)) * vH
+                for _ in 0..<5 {
+                    let angle = Float.random(in: 0...(Float.pi * 2))
+                    let speed: Float = 1 + Float.random(in: 0...2.5)
+                    arp1Sparks.append(MetalArpSpark(
+                        x: colX, y: sy,
+                        vx: cos(angle) * speed, vy: sin(angle) * speed - 1,
+                        life: 1, decay: 0.025 + Float.random(in: 0...0.02),
+                        r: 74.0/255, g: 222.0/255, b: 128.0/255))
+                }
+            }
+        }
+        arp1Flash *= 0.88
+
+        // Arp 2
+        if !engine.arp2Muted {
+            if currentIdx != arp2LastIdx {
+                arp2Flash = 1.0
+                arp2LastIdx = currentIdx
+                let colOffset = min(w, h) * 0.18 + 50
+                let colX = faceCx + colOffset
+                let vH = min(Float(280), faceCy * 0.65)
+                let botY = faceCy + vH / 2
+                let sy = botY - (Float(currentIdx) / Float(n - 1)) * vH
+                for _ in 0..<5 {
+                    let angle = Float.random(in: 0...(Float.pi * 2))
+                    let speed: Float = 1 + Float.random(in: 0...2.5)
+                    arp2Sparks.append(MetalArpSpark(
+                        x: colX, y: sy,
+                        vx: cos(angle) * speed, vy: sin(angle) * speed - 1,
+                        life: 1, decay: 0.025 + Float.random(in: 0...0.02),
+                        r: 52.0/255, g: 211.0/255, b: 153.0/255))
+                }
+            }
+        }
+        arp2Flash *= 0.88
+
+        // Update sparks
+        func updateSparks(_ sparks: inout [MetalArpSpark]) {
+            var si = 0
+            while si < sparks.count {
+                sparks[si].x += sparks[si].vx
+                sparks[si].y += sparks[si].vy
+                sparks[si].vx *= 0.95
+                sparks[si].vy *= 0.95
+                sparks[si].life -= sparks[si].decay
+                if sparks[si].life <= 0 {
+                    sparks.swapAt(si, sparks.count - 1)
+                    sparks.removeLast()
+                } else { si += 1 }
+            }
+            if sparks.count > 60 { sparks.removeAll(keepingCapacity: true) }
+        }
+        updateSparks(&arp1Sparks)
+        updateSparks(&arp2Sparks)
+    }
+
+    private func drawArpViz(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, engine: AudioEngine, w: Float, h: Float) {
+        let energy = uniforms.energy
+        let baseR = min(w, h) * 0.18
+        let radius = baseR + energy * 80 + beatPulse * 30
+        let colOffset = radius + 50
+        let vH = min(Float(280), faceCy * 0.65)
+        let topY = faceCy - vH / 2
+        let botY = faceCy + vH / 2
+        let n = 8
+        let currentIdx = Int(geoPhase * 4) % n
+
+        func drawColumn(colX: Float, flash: Float, sparks: [MetalArpSpark],
+                        colorR: Float, colorG: Float, colorB: Float) {
+            // Faint vertical guide line
+            let guideLine = [SIMD2<Float>(colX, topY), SIMD2<Float>(colX, botY)]
+            drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: guideLine,
+                         lineWidth: 1, color: SIMD4(colorR, colorG, colorB, 0.06), closed: false)
+
+            // Draw note dots as particles
+            var dotParticles: [GPUParticle] = []
+            for i in 0..<n {
+                let y = botY - (Float(i) / Float(n - 1)) * vH
+                let (r, g, b) = noteToColor(note: 48 + i * 3)
+                let isActive = (i == currentIdx)
+
+                if isActive {
+                    let glowSize = (10 + flash * 16 + energy * 6) * displayScale
+                    // Active note glow (gradient)
+                    var params = GPUGradientParams(
+                        center: SIMD2(colX, y),
+                        innerRadius: 0,
+                        outerRadius: glowSize,
+                        innerColor: SIMD4(r, g, b, 0.8 + flash * 0.2),
+                        outerColor: SIMD4(r, g, b, 0))
+                    encoder.setRenderPipelineState(gradientPipeline)
+                    encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
+                    encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 1)
+                    encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+
+                    // White-hot core
+                    let coreSize = (6 + flash * 6) * displayScale
+                    dotParticles.append(GPUParticle(
+                        position: SIMD2(colX, y), size: coreSize,
+                        life: 1, color: SIMD4(1, 1, 1, 0.7 + flash * 0.3)))
+
+                    // Horizontal bar pulse
+                    let barHalf = 12 + flash * 8
+                    let barLine = [SIMD2<Float>(colX - barHalf, y), SIMD2<Float>(colX + barHalf, y)]
+                    drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: barLine,
+                                 lineWidth: 2, color: SIMD4(r, g, b, 0.3 + flash * 0.4), closed: false)
+                } else {
+                    let dist = Float(min(abs(i - currentIdx), min(abs(i - currentIdx + n), abs(i - currentIdx - n))))
+                    let prox = max(Float(0), 1 - dist / (Float(n) * 0.4))
+                    let a = 0.12 + prox * 0.2
+                    let sz = (1.5 + prox * 1.5) * 2 * displayScale
+
+                    // Outer glow dot
+                    dotParticles.append(GPUParticle(
+                        position: SIMD2(colX, y), size: (sz + 6) * displayScale / displayScale,
+                        life: 1, color: SIMD4(r, g, b, a * 0.25)))
+                    // Core dot
+                    dotParticles.append(GPUParticle(
+                        position: SIMD2(colX, y), size: sz,
+                        life: 1, color: SIMD4(r, g, b, a)))
+                }
+            }
+
+            // Sparks as particles
+            for s in sparks {
+                let sz = 3 * s.life * displayScale
+                dotParticles.append(GPUParticle(
+                    position: SIMD2(s.x, s.y), size: sz,
+                    life: s.life, color: SIMD4(s.r, s.g, s.b, s.life * s.life)))
+            }
+
+            // Submit dot particles
+            if !dotParticles.isEmpty {
+                var pts = dotParticles
+                let bufSize = MemoryLayout<GPUParticle>.stride * pts.count
+                if let buf = device.makeBuffer(bytes: &pts, length: bufSize, options: .storageModeShared) {
+                    encoder.setRenderPipelineState(particlePipeline)
+                    encoder.setVertexBuffer(buf, offset: 0, index: 0)
+                    encoder.setVertexBuffer(uniformBuf, offset: 0, index: 1)
+                    encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4,
+                                           instanceCount: pts.count)
+                }
+            }
+        }
+
+        if !engine.arpMuted {
+            drawColumn(colX: faceCx - colOffset, flash: arp1Flash, sparks: arp1Sparks,
+                       colorR: 74.0/255, colorG: 222.0/255, colorB: 128.0/255)
+        }
+        if !engine.arp2Muted {
+            drawColumn(colX: faceCx + colOffset, flash: arp2Flash, sparks: arp2Sparks,
+                       colorR: 52.0/255, colorG: 211.0/255, colorB: 153.0/255)
+        }
+    }
+
+    // MARK: - Ghost Trails (contour snapshots on head rotation)
+
+    private func updateContourSnapshots(state: JammermanState, w: Float, h: Float) {
+        let yaw = state.headYaw
+        let pitch = state.headPitch
+
+        let yawDelta = abs(yaw - lastHeadYaw)
+        let pitchDelta = abs(pitch - lastHeadPitch)
+        let moving = yawDelta > 0.012 || pitchDelta > 0.012
+
+        lastHeadYaw = yaw
+        lastHeadPitch = pitch
+
+        // Generate face oval points from current face position
+        if moving && state.faceDetected {
+            let faceRx = w * 0.19
+            let faceRy = h * 0.14
+            var oval: [SIMD2<Float>] = []
+            for i in 0..<32 {
+                let a = Float(i) / 32.0 * Float.pi * 2
+                oval.append(SIMD2(faceCx + cos(a) * faceRx, faceCy + sin(a) * faceRy))
+            }
+            contourSnapshots.append(MetalContourSnapshot(points: oval, opacity: 0.3))
+            while contourSnapshots.count > maxSnapshots {
+                contourSnapshots.removeFirst()
+            }
+        }
+
+        var i = 0
+        while i < contourSnapshots.count {
+            contourSnapshots[i].opacity *= 0.88
+            if contourSnapshots[i].opacity < 0.01 {
+                contourSnapshots.swapAt(i, contourSnapshots.count - 1)
+                contourSnapshots.removeLast()
+            } else { i += 1 }
+        }
+    }
+
+    private func drawContourTrails(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer) {
+        guard !contourSnapshots.isEmpty else { return }
+
+        for snap in contourSnapshots {
+            guard snap.opacity > 0.005, snap.points.count >= 2 else { continue }
+
+            // Thin bright line
+            drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: snap.points,
+                         lineWidth: 1.5, color: SIMD4(accentR, accentG, accentB, snap.opacity * 0.5), closed: true)
+            // Wide dim glow
+            drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: snap.points,
+                         lineWidth: 5, color: SIMD4(accentR, accentG, accentB, snap.opacity * 0.15), closed: true)
+        }
     }
 
     // MARK: - Accent Color
