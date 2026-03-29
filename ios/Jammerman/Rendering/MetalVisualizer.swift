@@ -688,19 +688,21 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     }
 
     private func drawHaloGradients(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, w: Float, h: Float) {
-        guard haloGlow > 0.01 else { return }
+        guard faceCy > 0 else { return }
 
-        // Halo sits well above the head, 2x bigger than before
-        let headTopY = faceCy - h * 0.22  // higher up
-        let haloCy = headTopY - min(w, h) * 0.12
-        let haloR = min(w, h) * 0.32  // 2x bigger
+        // Halo sits above the head like a real halo
+        let headTopY = faceCy - h * 0.15
+        let haloCy = headTopY - 40 * displayScale
+        let haloR = min(w, h) * 0.25
 
-        // Ambient glow
+        let glow = max(haloGlow, 0.15)  // always some ambient glow when face detected
+
+        // Ambient glow — always visible, pulses with beat
         var params = GPUGradientParams(
             center: SIMD2(faceCx, haloCy),
             innerRadius: 0,
-            outerRadius: haloR * 3.0 + haloGlow * 150,
-            innerColor: SIMD4(accentR, accentG, accentB, min(0.4, haloGlow * 0.3 + haloFlash * 0.2)),
+            outerRadius: haloR + glow * 200,
+            innerColor: SIMD4(accentR, accentG, accentB, 0.15 + glow * 0.25 + haloFlash * 0.2),
             outerColor: SIMD4(accentR, accentG, accentB, 0))
 
         encoder.setRenderPipelineState(gradientPipeline)
@@ -708,10 +710,17 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 1)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
 
-        // Flash burst
+        // Brighter inner ring
+        params.outerRadius = haloR * 0.6 + glow * 80
+        params.innerColor = SIMD4(accentR, accentG, accentB, 0.25 + glow * 0.3)
+        params.outerColor = SIMD4(accentR, accentG, accentB, 0)
+        encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+
+        // Flash burst on beat
         if haloFlash > 0.1 {
-            params.outerRadius = haloR * 2.0 + haloFlash * 80
-            params.innerColor = SIMD4(1, 1, 1, haloFlash * 0.35)
+            params.outerRadius = haloR * 1.5 + haloFlash * 100
+            params.innerColor = SIMD4(1, 1, 1, haloFlash * 0.4)
             params.outerColor = SIMD4(1, 1, 1, 0)
             encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
