@@ -86,6 +86,21 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private var vignettePipeline: MTLRenderPipelineState!
     private var beatFlashPipeline: MTLRenderPipelineState!
     private var ellipsePipeline: MTLRenderPipelineState!
+    private var trailFadePipeline: MTLRenderPipelineState!
+    private var trailCompositePipeline: MTLRenderPipelineState!
+    private var segDarkenPipeline: MTLRenderPipelineState!
+
+    // Trail offscreen textures (ping-pong)
+    private var trailTextureA: MTLTexture?
+    private var trailTextureB: MTLTexture?
+    private var trailUseA = true
+    private var prevHandPos: SIMD2<Float>?
+    private var handGlowRadius: Float = 8
+    private var handGlowTarget: Float = 8
+
+    // Segmentation texture
+    private var segTexture: MTLTexture?
+    private let textureLoader = MTKTextureLoader(device: MTLCreateSystemDefaultDevice()!)
 
     // Triple-buffered uniforms
     private var uniformBuffers: [MTLBuffer] = []
@@ -193,6 +208,12 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         linePipeline = makePipeline(makeDesc(vertex: "lineVertex", fragment: "lineFragment", additive: true), name: "line")
         vignettePipeline = makePipeline(makeDesc(vertex: "fullscreenQuadVertex", fragment: "vignetteFragment", additive: false), name: "vignette")
         beatFlashPipeline = makePipeline(makeDesc(vertex: "fullscreenQuadVertex", fragment: "beatFlashFragment", additive: true), name: "beatFlash")
+        trailCompositePipeline = makePipeline(makeDesc(vertex: "fullscreenQuadVertex", fragment: "trailCompositeFragment", additive: true), name: "trailComposite")
+        segDarkenPipeline = makePipeline(makeDesc(vertex: "fullscreenQuadVertex", fragment: "segDarkenFragment", additive: false), name: "segDarken")
+
+        // Trail fade uses standard alpha blend writing to offscreen texture
+        let fadePipeDesc = makeDesc(vertex: "fullscreenQuadVertex", fragment: "trailFadeFragment", additive: false)
+        trailFadePipeline = makePipeline(fadePipeDesc, name: "trailFade")
     }
 
     private func buildBuffers() {
@@ -221,10 +242,6 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         let state = coord.state
         let engine = coord.audioEngine
 
-        if drawCount <= 3 || drawCount % 300 == 0 {
-            let e = state.faceDetected ? 0.1 + state.mouthOpenness * 0.4 : 0
-            print("[Metal] #\(drawCount) face=\(state.faceDetected) e=\(String(format:"%.2f",e)) bp=\(String(format:"%.2f",beatPulse)) p=\(particles.count) fp=\(faceParticles.count) r=\(rings.count) hg=\(String(format:"%.2f",haloGlow)) cx=\(String(format:"%.0f",faceCx)) cy=\(String(format:"%.0f",faceCy)) hand=\(state.handPresent)")
-        }
 
         // Update animation state
         updateAnimationState(state: state, engine: engine, w: w, h: h)
@@ -260,9 +277,22 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             return
         }
 
-        // === RENDER ALL EFFECTS (back to front) ===
+        // === PRE-PASS: Update trail texture (offscreen) ===
+        updateTrailTexture(cmdBuf: cmdBuf, uniformBuf: uniformBuf, state: state, w: w, h: h)
 
-        // 1. Mode geometry (faint background patterns)
+        // === PRE-PASS: Update segmentation texture ===
+        updateSegTexture(state: state)
+
+        // === MAIN RENDER PASS ===
+
+        // 0. Background darken via segmentation (if available)
+        if let segTex = segTexture {
+            encoder.setRenderPipelineState(segDarkenPipeline)
+            encoder.setFragmentTexture(segTex, index: 0)
+            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        }
+
+        // 1. Mode geometry
         drawModeGeometry(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
 
         // 2. Waveform ring
@@ -277,26 +307,33 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         // 5. Frequency arc
         drawFrequencyArc(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
 
-        // 6. Particles (all types packed into one buffer)
+        // 6. Particles
         drawParticles(encoder: encoder, uniformBuf: uniformBuf)
 
-        // 7. Face effects (iris glow + landmark lights — no drawn oval)
+        // 7. Hand trail composite (from offscreen texture)
+        if let trailTex = trailUseA ? trailTextureA : trailTextureB {
+            encoder.setRenderPipelineState(trailCompositePipeline)
+            encoder.setFragmentTexture(trailTex, index: 0)
+            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        }
+
+        // 8. Face effects
         if state.faceDetected {
             drawIrisGlow(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
             drawLandmarkLights(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
         }
 
-        // 8. Connection web (hand to face)
+        // 9. Connection web
         drawConnectionWeb(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h)
 
-        // 9. Beat flash
+        // 10. Beat flash
         if beatPulse > 0.4 {
             encoder.setRenderPipelineState(beatFlashPipeline)
             encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
 
-        // 10. Vignette (always last)
+        // 11. Vignette
         encoder.setRenderPipelineState(vignettePipeline)
         encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
@@ -903,6 +940,136 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 1)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
+    }
+
+    // MARK: - Hand Trail (offscreen texture with persistence)
+
+    private func ensureTrailTextures(w: Int, h: Int) {
+        if trailTextureA == nil || trailTextureA!.width != w || trailTextureA!.height != h {
+            let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: w, height: h, mipmapped: false)
+            desc.usage = [.renderTarget, .shaderRead]
+            desc.storageMode = .private
+            trailTextureA = device.makeTexture(descriptor: desc)
+            trailTextureB = device.makeTexture(descriptor: desc)
+            prevHandPos = nil
+        }
+    }
+
+    private func updateTrailTexture(cmdBuf: MTLCommandBuffer, uniformBuf: MTLBuffer, state: JammermanState, w: Float, h: Float) {
+        let iw = Int(w), ih = Int(h)
+        guard iw > 0, ih > 0 else { return }
+        ensureTrailTextures(w: iw, h: ih)
+
+        let src = trailUseA ? trailTextureA! : trailTextureB!
+        let dst = trailUseA ? trailTextureB! : trailTextureA!
+
+        // Pass 1: Fade — read src, write to dst with alpha decay
+        let fadePass = MTLRenderPassDescriptor()
+        fadePass.colorAttachments[0].texture = dst
+        fadePass.colorAttachments[0].loadAction = .clear
+        fadePass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        fadePass.colorAttachments[0].storeAction = .store
+
+        if let fadeEnc = cmdBuf.makeRenderCommandEncoder(descriptor: fadePass) {
+            fadeEnc.setRenderPipelineState(trailFadePipeline)
+            fadeEnc.setFragmentTexture(src, index: 0)
+            fadeEnc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+
+            // Pass 2: Draw new trail segment (same encoder, additive)
+            if state.handPresent {
+                let px = state.handX * w
+                let py = state.handY * h
+
+                handGlowTarget = state.handOpen ? 20 * displayScale : 8 * displayScale
+                handGlowRadius += (handGlowTarget - handGlowRadius) * 0.3
+
+                if let prev = prevHandPos {
+                    let dx = px - prev.x, dy = py - prev.y
+                    if dx * dx + dy * dy > 1 {
+                        // Draw glowing line from prev to current
+                        let line = [prev, SIMD2(px, py)]
+                        // Core bright line
+                        var col = SIMD4<Float>(accentR, accentG, accentB, 0.8)
+                        var lw = 3 * displayScale
+                        fadeEnc.setRenderPipelineState(linePipeline)
+
+                        // Build line vertices inline
+                        var verts = buildLineVertices(points: line, closed: false)
+                        let bufSize = MemoryLayout<GPULineVertex>.stride * verts.count
+                        if let vBuf = device.makeBuffer(bytes: &verts, length: bufSize, options: .storageModeShared) {
+                            fadeEnc.setVertexBuffer(vBuf, offset: 0, index: 0)
+                            fadeEnc.setVertexBuffer(uniformBuf, offset: 0, index: 1)
+                            fadeEnc.setVertexBytes(&lw, length: 4, index: 2)
+                            fadeEnc.setFragmentBytes(&col, length: 16, index: 0)
+                            fadeEnc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: verts.count)
+                        }
+
+                        // Wider glow line
+                        lw = handGlowRadius
+                        col = SIMD4(accentR, accentG, accentB, 0.15)
+                        if let vBuf = device.makeBuffer(bytes: &verts, length: bufSize, options: .storageModeShared) {
+                            fadeEnc.setVertexBytes(&lw, length: 4, index: 2)
+                            fadeEnc.setFragmentBytes(&col, length: 16, index: 0)
+                            fadeEnc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: verts.count)
+                        }
+                    }
+                }
+                prevHandPos = SIMD2(px, py)
+            } else {
+                prevHandPos = nil
+            }
+
+            fadeEnc.endEncoding()
+        }
+
+        trailUseA.toggle()
+    }
+
+    /// Build line vertices without drawing (for offscreen trail pass)
+    private func buildLineVertices(points: [SIMD2<Float>], closed: Bool) -> [GPULineVertex] {
+        guard points.count >= 2 else { return [] }
+        var vertices: [GPULineVertex] = []
+        vertices.reserveCapacity(points.count * 2 + (closed ? 2 : 0))
+        let count = points.count
+        for i in 0..<count {
+            let curr = points[i]
+            let next = points[(i + 1) % count]
+            let prev = points[(i - 1 + count) % count]
+            let d1 = simd_normalize(next - curr)
+            let d0 = simd_normalize(curr - prev)
+            var tangent = simd_normalize(d0 + d1)
+            if simd_length(tangent) < 0.001 { tangent = d1 }
+            let normal = SIMD2<Float>(-tangent.y, tangent.x)
+            vertices.append(GPULineVertex(position: curr, normal: normal, alpha: 1))
+            vertices.append(GPULineVertex(position: curr, normal: normal, alpha: 1))
+        }
+        if closed && vertices.count >= 2 {
+            vertices.append(vertices[0])
+            vertices.append(vertices[1])
+        }
+        return vertices
+    }
+
+    // MARK: - Person Segmentation (GPU texture from CGImage mask)
+
+    private func updateSegTexture(state: JammermanState) {
+        guard let maskCG = state.segmentationMask else {
+            segTexture = nil
+            return
+        }
+        // Only recreate if dimensions changed or texture is nil
+        let mw = maskCG.width, mh = maskCG.height
+        if segTexture == nil || segTexture!.width != mw || segTexture!.height != mh {
+            let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r8Unorm, width: mw, height: mh, mipmapped: false)
+            desc.usage = .shaderRead
+            segTexture = device.makeTexture(descriptor: desc)
+        }
+        guard let tex = segTexture,
+              let data = maskCG.dataProvider?.data,
+              let bytes = CFDataGetBytePtr(data) else { return }
+        let bytesPerRow = maskCG.bytesPerRow
+        tex.replace(region: MTLRegionMake2D(0, 0, mw, mh), mipmapLevel: 0,
+                    withBytes: bytes, bytesPerRow: bytesPerRow)
     }
 
     // MARK: - Line Tessellation Utility

@@ -55,6 +55,11 @@ class ARKitTracker: NSObject {
     private var cachedCamera: ARCamera?
     #endif
 
+    // Lightweight person segmentation via Vision (async, every ~15 frames)
+    private var segFrameCount = 0
+    private var isSegmenting = false
+    private let segQueue = DispatchQueue(label: "com.jammerman.seg", qos: .utility)
+
     /// Whether ARKit face tracking is available on this device
     static var isSupported: Bool {
         #if !targetEnvironment(simulator)
@@ -255,6 +260,55 @@ class ARKitTracker: NSObject {
             handOpen: open
         )
     }
+    // MARK: - Person Segmentation (Vision, low priority, no pixel buffer copy)
+
+    #if !targetEnvironment(simulator)
+    private func detectSegmentation(in frame: ARFrame) {
+        segFrameCount += 1
+        guard segFrameCount % 15 == 0, !isSegmenting else { return }
+        isSegmenting = true
+
+        // Pass capturedImage directly — no copy (same approach as hand detection)
+        let pixelBuffer = frame.capturedImage
+
+        segQueue.async { [weak self] in
+            guard let self else { return }
+            defer { self.isSegmenting = false }
+
+            let request = VNGeneratePersonSegmentationRequest()
+            request.qualityLevel = .fast
+            request.outputPixelFormat = kCVPixelFormatType_OneComponent8
+            let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right)
+            do { try handler.perform([request]) } catch { return }
+
+            guard let result = request.results?.first else { return }
+            let maskBuf = result.pixelBuffer
+
+            // Convert mask to CGImage via byte copy (tiny buffer, ~256x192)
+            CVPixelBufferLockBaseAddress(maskBuf, .readOnly)
+            defer { CVPixelBufferUnlockBaseAddress(maskBuf, .readOnly) }
+
+            let mw = CVPixelBufferGetWidth(maskBuf)
+            let mh = CVPixelBufferGetHeight(maskBuf)
+            let bpr = CVPixelBufferGetBytesPerRow(maskBuf)
+            guard let base = CVPixelBufferGetBaseAddress(maskBuf) else { return }
+
+            let data = Data(bytes: base, count: bpr * mh)
+            guard let provider = CGDataProvider(data: data as CFData) else { return }
+            let cs = CGColorSpaceCreateDeviceGray()
+            guard let img = CGImage(width: mw, height: mh, bitsPerComponent: 8, bitsPerPixel: 8,
+                                    bytesPerRow: bpr, space: cs,
+                                    bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+                                    provider: provider, decode: nil,
+                                    shouldInterpolate: true, intent: .defaultIntent) else { return }
+
+            DispatchQueue.main.async { [weak self] in
+                self?.delegate?.arKitTracker(self!, didUpdateSegmentation: img)
+            }
+        }
+    }
+    #endif
+
     // Vision face detection on ARFrame for precise contour landmarks
     private var isDetectingVisionFace = false
     private let visionQueue = DispatchQueue(label: "com.jammerman.visionface", qos: .userInitiated)
@@ -313,6 +367,9 @@ extension ARKitTracker: ARSessionDelegate {
 
             // Hand detection — async, every 4th frame (~15fps)
             detectHand(in: frame)
+
+            // Person segmentation — async, every 15th frame (~2fps), .utility priority
+            detectSegmentation(in: frame)
         }
     }
 
