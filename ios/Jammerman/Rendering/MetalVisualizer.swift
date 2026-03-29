@@ -146,17 +146,19 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             return
         }
 
-        // Additive blend descriptor (for particles, glows, etc.)
+        // Premultiplied alpha additive blend (for glows — adds color without adding opacity)
         func additivePipeline(vertex: String, fragment: String) -> MTLRenderPipelineState? {
             let desc = MTLRenderPipelineDescriptor()
             desc.vertexFunction = library.makeFunction(name: vertex)
             desc.fragmentFunction = library.makeFunction(name: fragment)
             desc.colorAttachments[0].pixelFormat = .bgra8Unorm
             desc.colorAttachments[0].isBlendingEnabled = true
+            // Premultiplied source-over: result = src + dst * (1 - srcAlpha)
+            // This correctly composites onto the transparent framebuffer
             desc.colorAttachments[0].sourceRGBBlendFactor = .one
-            desc.colorAttachments[0].destinationRGBBlendFactor = .one
+            desc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
             desc.colorAttachments[0].sourceAlphaBlendFactor = .one
-            desc.colorAttachments[0].destinationAlphaBlendFactor = .one
+            desc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
             return try? device.makeRenderPipelineState(descriptor: desc)
         }
 
@@ -769,29 +771,31 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         default: modeIdx = 1
         }
 
-        let alpha: Float = 0.03
+        let alpha: Float = 0.02
         let color = SIMD4<Float>(accentR, accentG, accentB, alpha)
-        let cx = w / 2, cy = h / 2
+        let cx = w / 2, cy = h * 0.38
 
         switch modeIdx {
-        case 0: // Angular shards — radiating lines from center
-            for i in 0..<18 {
-                let angle = Float(i) / 18.0 * Float.pi * 2 + geoPhase
-                let len = min(w, h) * 0.4 + sin(geoPhase * 3 + Float(i)) * 40
+        case 0: // Angular shards — few radiating lines
+            for i in 0..<8 {
+                let angle = Float(i) / 8.0 * Float.pi * 2 + geoPhase
+                let len = min(w, h) * 0.3 + sin(geoPhase * 3 + Float(i)) * 30
                 let line = [SIMD2(cx, cy), SIMD2(cx + cos(angle) * len, cy + sin(angle) * len)]
                 drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: line,
                              lineWidth: 0.5, color: color, closed: false)
             }
-        case 1: // Hex lattice — hexagonal grid
-            let spacing: Float = 60
-            let cols = Int(w / spacing) + 2
-            let rows = Int(h / spacing) + 2
-            for row in 0..<rows {
-                for col in 0..<cols {
-                    let hx = Float(col) * spacing + (row % 2 == 0 ? 0 : spacing * 0.5) - spacing
-                    let hy = Float(row) * spacing * 0.866 - spacing
-                    // Small hexagon
-                    let hexR: Float = 8 + sin(geoPhase * 2 + Float(row + col)) * 3
+        case 1: // Hex lattice — just a few rings around center (not full grid!)
+            for ring in 1...3 {
+                for i in 0..<(6 * ring) {
+                    let side = i / ring
+                    let pos = i % ring
+                    let dirs: [(Float, Float)] = [(1,0),(0.5,0.866),(-0.5,0.866),(-1,0),(-0.5,-0.866),(0.5,-0.866)]
+                    let d1 = dirs[side % 6]
+                    let d2 = dirs[(side + 1) % 6]
+                    let t = Float(pos) / Float(ring)
+                    let hx = cx + (d1.0 * Float(ring) + (d2.0 - d1.0) * Float(pos)) * 50
+                    let hy = cy + (d1.1 * Float(ring) + (d2.1 - d1.1) * Float(pos)) * 50
+                    let hexR: Float = 6 + sin(geoPhase * 2 + Float(ring + i) * 0.3) * 2
                     var hex: [SIMD2<Float>] = []
                     for s in 0..<6 {
                         let a = Float(s) / 6.0 * Float.pi * 2 + geoPhase * 0.5
@@ -802,14 +806,14 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                 }
             }
         default: // Flowing curves — orbiting ellipses
-            for i in 0..<6 {
-                let angle = Float(i) / 6.0 * Float.pi * 2 + geoPhase * 0.8
-                let dist = min(w, h) * (0.15 + Float(i) * 0.05)
+            for i in 0..<4 {
+                let angle = Float(i) / 4.0 * Float.pi * 2 + geoPhase * 0.8
+                let dist = min(w, h) * (0.12 + Float(i) * 0.04)
                 var curve: [SIMD2<Float>] = []
                 for j in 0..<24 {
                     let t = Float(j) / 24.0 * Float.pi * 2
-                    let rx = dist * (0.6 + sin(geoPhase + Float(i)) * 0.3)
-                    let ry = dist * (0.3 + cos(geoPhase * 0.7 + Float(i)) * 0.2)
+                    let rx = dist * (0.6 + sin(geoPhase + Float(i)) * 0.2)
+                    let ry = dist * (0.3 + cos(geoPhase * 0.7 + Float(i)) * 0.15)
                     curve.append(SIMD2(cx + cos(t + angle) * rx, cy + sin(t + angle) * ry))
                 }
                 drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: curve,
