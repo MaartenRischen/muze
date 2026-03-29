@@ -342,6 +342,15 @@ class AudioEngine: ObservableObject {
                 if sixteenthStep == self.lastDrumStep { continue }
                 self.lastDrumStep = sixteenthStep
 
+                // Always update UI drum step (drives arp viz even when beat is muted)
+                let pendingStep = sixteenthStep
+                if self._pendingDrumStep != pendingStep {
+                    self._pendingDrumStep = pendingStep
+                    DispatchQueue.main.async { [weak self] in
+                        self?.drumStep = pendingStep
+                    }
+                }
+
                 if !localBeatMuted && localDrumPattern.count >= 3 {
                     guard localDrumPattern[0].count > 0 else { continue }
                     let step = sixteenthStep % localDrumPattern[0].count
@@ -368,14 +377,6 @@ class AudioEngine: ObservableObject {
                             let vel: Float = (localDrumVelocity.count > 2 && hatStep < localDrumVelocity[2].count) ? localDrumVelocity[2][hatStep] : 0.5
                             self.hatOsc.trigger(velocity: vel)
                             self.midiQueue.enqueue(MidiEvent(type: 0x90, note: SoundFontManager.gmClosedHat, velocity: UInt8(vel * 127), channel: 9, samplerIdx: 0))
-                        }
-                    }
-                    // Update UI drum step (weak self, only if changed)
-                    let pendingStep = sixteenthStep
-                    if self._pendingDrumStep != pendingStep {
-                        self._pendingDrumStep = pendingStep
-                        DispatchQueue.main.async { [weak self] in
-                            self?.drumStep = pendingStep
                         }
                     }
                 }
