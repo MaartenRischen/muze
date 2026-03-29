@@ -261,17 +261,45 @@ fragment float4 segDarkenFragment(QuadVertexOut in [[stage_in]],
     return float4(0, 0, 0, bgAlpha);
 }
 
-// MARK: - Person Segmentation Cutout (destinationOut equivalent)
+// MARK: - Person Segmentation Cutout (erases drawn content where person is)
 
 fragment float4 segCutoutFragment(QuadVertexOut in [[stage_in]],
-                                   texture2d<float> segMask [[texture(0)]]) {
+                                   texture2d<float> segMask [[texture(0)]],
+                                   constant SegParams &params [[buffer(0)]]) {
     constexpr sampler s(filter::linear);
-    float2 uv = float2(1.0 - in.uv.x, in.uv.y); // mirror X
-    float person = segMask.sample(s, uv).r;
 
-    // Output person alpha — used with destinationOut-like blend to erase person area
-    float cutout = smoothstep(0.3, 0.7, person);
-    return float4(cutout, cutout, cutout, cutout);
+    float2 uv = in.uv;
+    if (params.maskFlipX > 0.5) uv.x = 1.0 - uv.x;
+    uv = (uv - 0.5) * params.scale + 0.5 + params.offset;
+
+    // Feather
+    float2 texSize = float2(segMask.get_width(), segMask.get_height());
+    float2 texelSize = 1.0 / texSize;
+    float r = abs(params.feather);
+    float sum = 0;
+    float count = 0;
+    if (r > 0.5) {
+        float step = max(r * 0.5, 1.0);
+        for (float dy = -r; dy <= r; dy += step) {
+            for (float dx = -r; dx <= r; dx += step) {
+                sum += segMask.sample(s, uv + float2(dx, dy) * texelSize).r;
+                count += 1.0;
+            }
+        }
+        sum /= max(count, 1.0);
+    } else {
+        sum = segMask.sample(s, uv).r;
+    }
+    float person;
+    if (params.feather < 0) {
+        person = smoothstep(0.0, 1.0, sum * (1.0 + params.feather * 0.03));
+    } else {
+        person = sum;
+    }
+
+    // Output: alpha = 1-person. With dest*srcAlpha blend, this erases where person is.
+    float keep = 1.0 - smoothstep(params.edgeLow, params.edgeHigh, person);
+    return float4(0, 0, 0, keep);
 }
 
 // MARK: - Ellipse/Ring (for shockwaves, halo rings)

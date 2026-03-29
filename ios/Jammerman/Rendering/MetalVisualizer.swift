@@ -115,6 +115,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private var trailFadePipeline: MTLRenderPipelineState!
     private var trailCompositePipeline: MTLRenderPipelineState!
     private var segDarkenPipeline: MTLRenderPipelineState!
+    private var segCutoutPipeline: MTLRenderPipelineState!
 
     // Trail offscreen textures (ping-pong)
     private var trailTextureA: MTLTexture?
@@ -256,6 +257,20 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         // Trail fade uses standard alpha blend writing to offscreen texture
         let fadePipeDesc = makeDesc(vertex: "fullscreenQuadVertex", fragment: "trailFadeFragment", additive: false)
         trailFadePipeline = makePipeline(fadePipeDesc, name: "trailFade")
+
+        // Seg cutout: multiplies existing content by the mask alpha
+        // Where person=1 → output alpha=0 → dest*0 = erased (halo removed from person)
+        // Where person=0 → output alpha=1 → dest*1 = kept (halo stays in background)
+        let cutoutDesc = MTLRenderPipelineDescriptor()
+        cutoutDesc.vertexFunction = library.makeFunction(name: "fullscreenQuadVertex")
+        cutoutDesc.fragmentFunction = library.makeFunction(name: "segCutoutFragment")
+        cutoutDesc.colorAttachments[0].pixelFormat = .bgra8Unorm
+        cutoutDesc.colorAttachments[0].isBlendingEnabled = true
+        cutoutDesc.colorAttachments[0].sourceRGBBlendFactor = .zero
+        cutoutDesc.colorAttachments[0].destinationRGBBlendFactor = .sourceAlpha
+        cutoutDesc.colorAttachments[0].sourceAlphaBlendFactor = .zero
+        cutoutDesc.colorAttachments[0].destinationAlphaBlendFactor = .sourceAlpha
+        segCutoutPipeline = makePipeline(cutoutDesc, name: "segCutout")
     }
 
     private func buildBuffers() {
@@ -337,8 +352,15 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         // 3. Rings (shockwaves, halo rings)
         drawRings(encoder: encoder, uniformBuf: uniformBuf)
 
-        // === SEGMENTATION CUTOUT (darkens bg, person stays bright) ===
+        // === SEGMENTATION: cutout person from behind-effects, then darken bg ===
         if let segTex = segTexture {
+            // Step 1: Erase halo/ring/mode-geo where the person is (so they appear BEHIND)
+            encoder.setRenderPipelineState(segCutoutPipeline)
+            encoder.setFragmentTexture(segTex, index: 0)
+            encoder.setFragmentBytes(&segParams, length: MemoryLayout<GPUSegParams>.stride, index: 0)
+            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+
+            // Step 2: Darken the background area
             encoder.setRenderPipelineState(segDarkenPipeline)
             encoder.setFragmentTexture(segTex, index: 0)
             encoder.setFragmentBytes(&segParams, length: MemoryLayout<GPUSegParams>.stride, index: 0)
@@ -690,18 +712,19 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private func drawHaloGradients(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, w: Float, h: Float) {
         guard faceCy > 0 else { return }
 
-        // Halo sits well above the head — faceCy tracks the nose, head top is ~25% of screen height above
-        let haloCy = faceCy - h * 0.25  // well above head
-        let haloR = min(w, h) * 0.5  // large — covers head width and then some
+        // Halo: big glowing disc behind the head
+        // faceCy = nose position. Head center is ~12% of h above nose. Halo center above that.
+        let haloCy = faceCy - h * 0.18
+        let haloR = w * 0.7  // massive — wider than the screen
 
         let glow = max(haloGlow, 0.15)  // always some ambient glow when face detected
 
-        // Ambient glow — always visible, pulses with beat
+        // Outer soft glow — massive, always visible
         var params = GPUGradientParams(
             center: SIMD2(faceCx, haloCy),
             innerRadius: 0,
-            outerRadius: haloR + glow * 200,
-            innerColor: SIMD4(accentR, accentG, accentB, 0.15 + glow * 0.25 + haloFlash * 0.2),
+            outerRadius: haloR,
+            innerColor: SIMD4(accentR, accentG, accentB, 0.3 + glow * 0.3 + haloFlash * 0.2),
             outerColor: SIMD4(accentR, accentG, accentB, 0))
 
         encoder.setRenderPipelineState(gradientPipeline)
@@ -709,17 +732,16 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 1)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
 
-        // Brighter inner ring
-        params.outerRadius = haloR * 0.6 + glow * 80
-        params.innerColor = SIMD4(accentR, accentG, accentB, 0.25 + glow * 0.3)
-        params.outerColor = SIMD4(accentR, accentG, accentB, 0)
+        // Brighter inner core
+        params.outerRadius = haloR * 0.4
+        params.innerColor = SIMD4(accentR, accentG, accentB, 0.4 + glow * 0.4)
         encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
 
-        // Flash burst on beat
-        if haloFlash > 0.1 {
-            params.outerRadius = haloR * 1.5 + haloFlash * 100
-            params.innerColor = SIMD4(1, 1, 1, haloFlash * 0.4)
+        // White-hot flash on beat
+        if haloFlash > 0.05 {
+            params.outerRadius = haloR * 0.8 + haloFlash * 150
+            params.innerColor = SIMD4(1, 1, 1, haloFlash * 0.5)
             params.outerColor = SIMD4(1, 1, 1, 0)
             encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
