@@ -690,10 +690,9 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private func drawHaloGradients(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, w: Float, h: Float) {
         guard faceCy > 0 else { return }
 
-        // Halo sits above the head like a real halo
-        let headTopY = faceCy - h * 0.15
-        let haloCy = headTopY - 40 * displayScale
-        let haloR = min(w, h) * 0.25
+        // Halo sits well above the head — faceCy tracks the nose, head top is ~25% of screen height above
+        let haloCy = faceCy - h * 0.25  // well above head
+        let haloR = min(w, h) * 0.5  // large — covers head width and then some
 
         let glow = max(haloGlow, 0.15)  // always some ambient glow when face detected
 
