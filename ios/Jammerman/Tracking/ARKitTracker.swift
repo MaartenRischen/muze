@@ -55,8 +55,7 @@ class ARKitTracker: NSObject {
     private var cachedCamera: ARCamera?
     #endif
 
-    // Lightweight person segmentation via Vision (async, every ~15 frames)
-    private var segFrameCount = 0
+    // Lightweight person segmentation via Vision (async, as fast as possible)
     private var isSegmenting = false
     private let segQueue = DispatchQueue(label: "com.jammerman.seg", qos: .userInitiated)
 
@@ -264,8 +263,7 @@ class ARKitTracker: NSObject {
 
     #if !targetEnvironment(simulator)
     private func detectSegmentation(in frame: ARFrame) {
-        segFrameCount += 1
-        guard segFrameCount % 3 == 0, !isSegmenting else { return }
+        guard !isSegmenting else { return }  // process as fast as possible, guard prevents stacking
         isSegmenting = true
 
         // Pass capturedImage directly — no copy (same approach as hand detection)
@@ -276,7 +274,7 @@ class ARKitTracker: NSObject {
             defer { self.isSegmenting = false }
 
             let request = VNGeneratePersonSegmentationRequest()
-            request.qualityLevel = .balanced
+            request.qualityLevel = .fast
             request.outputPixelFormat = kCVPixelFormatType_OneComponent8
             let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right)
             do { try handler.perform([request]) } catch { return }
