@@ -326,16 +326,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             return
         }
 
-        // Sync seg params from tunable VFX params
-        let sp = vfxParams
-        segParams.darkenAlpha = sp.segDarkenAlpha
-        segParams.feather = sp.segFeather
-        segParams.scale = SIMD2(sp.segScaleX, sp.segScaleY)
-        segParams.edgeLow = sp.segEdgeLow
-        segParams.edgeHigh = sp.segEdgeHigh
-
-        // === PRE-PASSES (before main encoder) ===
-        updateTrailTexture(cmdBuf: cmdBuf, uniformBuf: uniformBuf, state: state, w: w, h: h)
+        // === PRE-PASSES ===
         updateSegTexture(state: state)
 
         // === MAIN RENDER PASS ===
@@ -347,59 +338,30 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             return
         }
 
-        let p = vfxParams
+        // === 1. HALO — giant solid color field behind person ===
+        if faceCy > 0 {
+            let haloCy = faceCy - h * 0.12
+            // Huge radius — fills most of the screen
+            let haloR = max(w, h) * 1.5
 
-        // === BEHIND PERSON ===
-        if p.modeGeoEnabled { drawModeGeometry(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h) }
-        if p.haloEnabled { drawHaloGradients(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h) }
-        if p.ringEnabled { drawWaveformRing(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h) }
-        drawRings(encoder: encoder, uniformBuf: uniformBuf)
+            var params = GPUGradientParams(
+                center: SIMD2(faceCx, haloCy),
+                innerRadius: 0,
+                outerRadius: haloR,
+                innerColor: SIMD4(accentR, accentG, accentB, 0.8),
+                outerColor: SIMD4(accentR, accentG, accentB, 0.1))
 
-        // === SEGMENTATION CUTOUT + DARKEN ===
-        if p.segEnabled, let segTex = segTexture {
+            encoder.setRenderPipelineState(gradientPipeline)
+            encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
+            encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 1)
+            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        }
+
+        // === 2. SEGMENTATION CUTOUT — erase halo where person is ===
+        if let segTex = segTexture {
             encoder.setRenderPipelineState(segCutoutPipeline)
             encoder.setFragmentTexture(segTex, index: 0)
             encoder.setFragmentBytes(&segParams, length: MemoryLayout<GPUSegParams>.stride, index: 0)
-            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
-
-            encoder.setRenderPipelineState(segDarkenPipeline)
-            encoder.setFragmentTexture(segTex, index: 0)
-            encoder.setFragmentBytes(&segParams, length: MemoryLayout<GPUSegParams>.stride, index: 0)
-            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
-        }
-
-        // === IN FRONT OF PERSON ===
-        if p.freqArcEnabled { drawFrequencyArc(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h) }
-        if p.particlesEnabled { drawParticles(encoder: encoder, uniformBuf: uniformBuf) }
-
-        if p.trailEnabled, let trailTex = trailUseA ? trailTextureA : trailTextureB {
-            encoder.setRenderPipelineState(trailCompositePipeline)
-            encoder.setFragmentTexture(trailTex, index: 0)
-            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
-        }
-
-        if state.faceDetected {
-            if p.irisEnabled { drawIrisGlow(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h) }
-            if p.landmarksEnabled { drawLandmarkLights(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h) }
-        }
-
-        if p.connectionWebEnabled { drawConnectionWeb(encoder: encoder, uniformBuf: uniformBuf, state: state, w: w, h: h) }
-        if p.arpVizEnabled { drawArpViz(encoder: encoder, uniformBuf: uniformBuf, engine: engine, w: w, h: h) }
-
-        // 9c. Ghost trails (contour snapshots)
-        if p.ghostTrailsEnabled { drawContourTrails(encoder: encoder, uniformBuf: uniformBuf) }
-
-        // 10. Beat flash
-        if p.burstEnabled, beatPulse > 0.4 {
-            encoder.setRenderPipelineState(beatFlashPipeline)
-            encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 0)
-            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
-        }
-
-        // 11. Vignette
-        if p.vignetteEnabled {
-            encoder.setRenderPipelineState(vignettePipeline)
-            encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
 
@@ -486,15 +448,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             updateAccentColor()
         }
 
-        // Update particles
-        updateParticles(energy: energy, w: w, h: h)
-        updateFaceParticles(state: state, energy: energy, w: w, h: h)
-        updateConstellation(state: state, w: w, h: h)
-        if vfxParams.burstEnabled { updateBurstParticles(state: state, w: w, h: h) }
-        updateRings()
-        if vfxParams.burstEnabled { updateBurstRings() }
-        updateArpState(engine: engine, energy: energy, w: w, h: h)
-        if vfxParams.ghostTrailsEnabled { updateContourSnapshots(state: state, w: w, h: h) }
+        // All particle/ring/trail updates bypassed — adding effects back one by one
     }
 
     // MARK: - Particle Updates

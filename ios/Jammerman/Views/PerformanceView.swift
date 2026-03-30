@@ -42,29 +42,7 @@ struct PerformanceView: View {
                 Spacer()
             }
 
-            // === VFX TOGGLES (left side) ===
-            HStack {
-                VStack(spacing: 5) {
-                    Spacer()
-                    VfxToggle(label: "RING", icon: "◎", param: coordinator.vfxParams, keyPath: \.ringEnabled, color: .cyan, coordinator: coordinator)
-                    VfxToggle(label: "HALO", icon: "☀", param: coordinator.vfxParams, keyPath: \.haloEnabled, color: .yellow, coordinator: coordinator)
-                    VfxToggle(label: "IRIS", icon: "◉", param: coordinator.vfxParams, keyPath: \.irisEnabled, color: .white, coordinator: coordinator)
-                    VfxToggle(label: "PTS", icon: "✦", param: coordinator.vfxParams, keyPath: \.particlesEnabled, color: .cyan, coordinator: coordinator)
-                    VfxToggle(label: "ARP", icon: "▮", param: coordinator.vfxParams, keyPath: \.arpVizEnabled, color: .green, coordinator: coordinator)
-                    VfxToggle(label: "TRAIL", icon: "〰", param: coordinator.vfxParams, keyPath: \.trailEnabled, color: .purple, coordinator: coordinator)
-                    VfxToggle(label: "SEG", icon: "◐", param: coordinator.vfxParams, keyPath: \.segEnabled, color: .orange, coordinator: coordinator)
-                    VfxToggle(label: "ARC", icon: "⌒", param: coordinator.vfxParams, keyPath: \.freqArcEnabled, color: .pink, coordinator: coordinator)
-                    VfxToggle(label: "GEO", icon: "⬡", param: coordinator.vfxParams, keyPath: \.modeGeoEnabled, color: .teal, coordinator: coordinator)
-                    VfxToggle(label: "WEB", icon: "⟡", param: coordinator.vfxParams, keyPath: \.connectionWebEnabled, color: .mint, coordinator: coordinator)
-                    VfxToggle(label: "LMRK", icon: "✧", param: coordinator.vfxParams, keyPath: \.landmarksEnabled, color: .indigo, coordinator: coordinator)
-                    VfxToggle(label: "VIG", icon: "◓", param: coordinator.vfxParams, keyPath: \.vignetteEnabled, color: .gray, coordinator: coordinator)
-                    VfxToggle(label: "BOOM", icon: "✸", param: coordinator.vfxParams, keyPath: \.burstEnabled, color: .red, coordinator: coordinator)
-                    VfxToggle(label: "GHOST", icon: "👻", param: coordinator.vfxParams, keyPath: \.ghostTrailsEnabled, color: .white, coordinator: coordinator)
-                    Spacer()
-                }
-                .padding(.leading, 4)
-                Spacer()
-            }
+            // === VFX TOGGLES (left side) — stripped, adding back one by one ===
 
             // === INSTRUMENT TOGGLES (right side) ===
             HStack {
