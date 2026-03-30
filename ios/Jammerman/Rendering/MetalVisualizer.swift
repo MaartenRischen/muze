@@ -145,6 +145,9 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private var lastDrumStep: Int = -1
     private var haloGlow: Float = 0
     private var haloFlash: Float = 0
+    private var haloBreath: Float = 0       // slow sine for organic pulse
+    private var haloBassHeat: Float = 0     // bass-driven warm color shift
+    private var haloEnergyWhite: Float = 0  // energy-driven white-out
     private var geoPhase: Float = 0
     private var ringRotation: Float = 0
     private var lastBass: Float = 0
@@ -338,23 +341,9 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             return
         }
 
-        // === 1. HALO — giant solid color field behind person ===
+        // === 1. HALO — wide aura, soft fade, beat-reactive, color-shifting ===
         if faceCy > 0 {
-            let haloCy = faceCy - h * 0.12
-            // Huge radius — fills most of the screen
-            let haloR = max(w, h) * 1.5
-
-            var params = GPUGradientParams(
-                center: SIMD2(faceCx, haloCy),
-                innerRadius: 0,
-                outerRadius: haloR,
-                innerColor: SIMD4(accentR, accentG, accentB, 0.8),
-                outerColor: SIMD4(accentR, accentG, accentB, 0.1))
-
-            encoder.setRenderPipelineState(gradientPipeline)
-            encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
-            encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 1)
-            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+            drawHalo(encoder: encoder, uniformBuf: uniformBuf, w: w, h: h)
         }
 
         // === 2. SEGMENTATION CUTOUT — erase halo where person is ===
@@ -417,6 +406,17 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         haloGlow += (energy * 0.8 + beatPulse * 1.0 - haloGlow) * 0.15
         if beatPulse > 0.7 { haloFlash = 1.0 }
         haloFlash *= 0.82
+
+        // Organic breathing (slow sine ~0.3 Hz)
+        haloBreath = (sin(Float(CACurrentMediaTime()) * 1.9) + 1) * 0.5
+
+        // Bass-driven warm shift (bass spikes → heat rises, decays slowly)
+        let bassTarget: Float = bass > 0.15 ? min(1, bass * 3) : 0
+        haloBassHeat += (bassTarget - haloBassHeat) * 0.08
+        haloBassHeat = max(0, haloBassHeat * 0.995)
+
+        // Energy-driven white-out (high energy → center goes white)
+        haloEnergyWhite += (energy * 1.5 - haloEnergyWhite) * 0.1
 
         // Halo rays → rings for now (simplified)
         if beatPulse > 0.8 && rings.count < 20 {
@@ -661,6 +661,86 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         encoder.setVertexBuffer(uniformBuf, offset: 0, index: 1)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4,
                                instanceCount: gpuEllipses.count)
+    }
+
+    // MARK: - Halo (wide aura, soft fade, beat-reactive, color-shifting)
+
+    private func drawHalo(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, w: Float, h: Float) {
+        let glow = max(haloGlow, 0.08)             // always some ambient
+        let flash = haloFlash
+        let breath = haloBreath
+        let heat = haloBassHeat
+        let white = min(1.0, haloEnergyWhite)
+
+        // Center slightly above face (behind the head)
+        let cx = faceCx
+        let cy = faceCy - h * 0.14
+
+        // Base radius: wide — about 70% of screen width, pulses with beat
+        let baseR = w * 0.7
+        let pulseR = baseR + beatPulse * w * 0.15 + breath * w * 0.03
+
+        // --- Color mixing ---
+        // Accent color is the base
+        var r = accentR, g = accentG, b = accentB
+
+        // Bass heat: shift toward warm (orange/red tint)
+        r = r + heat * (1.0 - r) * 0.6
+        g = g - heat * g * 0.3
+        b = b - heat * b * 0.5
+
+        // Energy white-out: blend toward white as energy rises
+        r = r + white * (1.0 - r) * 0.4
+        g = g + white * (1.0 - g) * 0.4
+        b = b + white * (1.0 - b) * 0.4
+
+        encoder.setRenderPipelineState(gradientPipeline)
+
+        // Layer 1: Outermost soft glow — very wide, low alpha, always present
+        // This creates the "atmosphere" around the person
+        let outerR = pulseR * 1.6
+        let outerAlpha: Float = 0.06 + glow * 0.06 + breath * 0.02
+        var params = GPUGradientParams(
+            center: SIMD2(cx, cy),
+            innerRadius: 0,
+            outerRadius: outerR,
+            innerColor: SIMD4(r, g, b, outerAlpha),
+            outerColor: SIMD4(r, g, b, 0))
+        encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
+        encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 1)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+
+        // Layer 2: Main aura — medium spread, core of the visible halo
+        let mainAlpha: Float = 0.12 + glow * 0.18 + beatPulse * 0.08
+        params.outerRadius = pulseR
+        params.innerColor = SIMD4(r, g, b, mainAlpha)
+        params.outerColor = SIMD4(r, g, b, 0)
+        encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+
+        // Layer 3: Inner glow — tighter, brighter, more reactive
+        let innerR = pulseR * 0.5
+        let innerAlpha: Float = 0.15 + glow * 0.25 + beatPulse * 0.15
+        // Inner is slightly more white/bright
+        let ir = r + (1.0 - r) * 0.2
+        let ig = g + (1.0 - g) * 0.2
+        let ib = b + (1.0 - b) * 0.2
+        params.outerRadius = innerR
+        params.innerColor = SIMD4(ir, ig, ib, innerAlpha)
+        params.outerColor = SIMD4(r, g, b, 0)
+        encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+
+        // Layer 4: Beat flash — white-hot expansion on strong beat
+        if flash > 0.05 {
+            let flashR = pulseR * (0.6 + flash * 0.5)
+            let flashAlpha = flash * 0.35
+            params.outerRadius = flashR
+            params.innerColor = SIMD4(1, 1, 1, flashAlpha)
+            params.outerColor = SIMD4(r, g, b, 0)
+            encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
+            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        }
     }
 
     private func drawHaloGradients(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, w: Float, h: Float) {
