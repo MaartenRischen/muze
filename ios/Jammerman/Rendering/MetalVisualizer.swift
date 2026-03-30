@@ -326,6 +326,14 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             return
         }
 
+        // Sync seg params from tunable VFX params
+        let sp = vfxParams
+        segParams.darkenAlpha = sp.segDarkenAlpha
+        segParams.feather = sp.segFeather
+        segParams.scale = SIMD2(sp.segScaleX, sp.segScaleY)
+        segParams.edgeLow = sp.segEdgeLow
+        segParams.edgeHigh = sp.segEdgeHigh
+
         // === PRE-PASSES (before main encoder) ===
         updateTrailTexture(cmdBuf: cmdBuf, uniformBuf: uniformBuf, state: state, w: w, h: h)
         updateSegTexture(state: state)
@@ -379,19 +387,21 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         if p.arpVizEnabled { drawArpViz(encoder: encoder, uniformBuf: uniformBuf, engine: engine, w: w, h: h) }
 
         // 9c. Ghost trails (contour snapshots)
-        drawContourTrails(encoder: encoder, uniformBuf: uniformBuf)
+        if p.ghostTrailsEnabled { drawContourTrails(encoder: encoder, uniformBuf: uniformBuf) }
 
         // 10. Beat flash
-        if beatPulse > 0.4 {
+        if p.burstEnabled, beatPulse > 0.4 {
             encoder.setRenderPipelineState(beatFlashPipeline)
             encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
 
         // 11. Vignette
-        encoder.setRenderPipelineState(vignettePipeline)
-        encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 0)
-        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        if p.vignetteEnabled {
+            encoder.setRenderPipelineState(vignettePipeline)
+            encoder.setFragmentBuffer(uniformBuf, offset: 0, index: 0)
+            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        }
 
         encoder.endEncoding()
 
@@ -480,11 +490,11 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         updateParticles(energy: energy, w: w, h: h)
         updateFaceParticles(state: state, energy: energy, w: w, h: h)
         updateConstellation(state: state, w: w, h: h)
-        updateBurstParticles(state: state, w: w, h: h)
+        if vfxParams.burstEnabled { updateBurstParticles(state: state, w: w, h: h) }
         updateRings()
-        updateBurstRings()
+        if vfxParams.burstEnabled { updateBurstRings() }
         updateArpState(engine: engine, energy: energy, w: w, h: h)
-        updateContourSnapshots(state: state, w: w, h: h)
+        if vfxParams.ghostTrailsEnabled { updateContourSnapshots(state: state, w: w, h: h) }
     }
 
     // MARK: - Particle Updates
@@ -495,9 +505,12 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         let cx = faceCx
         let cy = faceCy - min(w, h) * 0.14 * 0.5
 
-        let spawnCount = energy > 0.02 ? min(5, Int(energy * 12 + beatPulse * 4)) : 0
+        let pp = vfxParams
+        let maxParts = pp.particleCount
+        let spawnRate = pp.particleSpawnRate
+        let spawnCount = energy > 0.02 ? min(Int(spawnRate / 2), Int(energy * spawnRate + beatPulse * 4)) : 0
         for _ in 0..<spawnCount {
-            guard particles.count < maxParticles else { break }
+            guard particles.count < maxParts else { break }
             let angle = Float.random(in: 0...(Float.pi * 2))
             particles.append(MetalParticle(
                 x: cx + cos(angle) * radius, y: cy + sin(angle) * radius,
@@ -617,20 +630,23 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     // MARK: - GPU Drawing
 
     private func drawParticles(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer) {
+        let pp = vfxParams
+        let sizeMult = pp.particleSize
+        let alphaMult = pp.particleAlpha
         // Pack all particle types into one GPU buffer
         var gpuParticles: [GPUParticle] = []
         gpuParticles.reserveCapacity(particles.count + faceParticles.count + constellationNotes.count + burstParticles.count)
 
         for p in particles {
-            let a = p.life * p.life * 0.5
+            let a = p.life * p.life * 0.5 * alphaMult
             gpuParticles.append(GPUParticle(
-                position: SIMD2(p.x, p.y), size: max(p.size * 3 * displayScale, 4),
+                position: SIMD2(p.x, p.y), size: max(p.size * sizeMult * displayScale, 4),
                 life: p.life, color: SIMD4(p.r, p.g, p.b, a)))
         }
         for p in faceParticles {
-            let a = p.life * p.life * 0.6
+            let a = p.life * p.life * 0.6 * alphaMult
             gpuParticles.append(GPUParticle(
-                position: SIMD2(p.x, p.y), size: max(p.size * 2.5 * displayScale, 3),
+                position: SIMD2(p.x, p.y), size: max(p.size * sizeMult * 0.83 * displayScale, 3),
                 life: p.life, color: SIMD4(p.r, p.g, p.b, a)))
         }
         for n in constellationNotes {
@@ -642,7 +658,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         for p in burstParticles {
             let a = p.life * p.life * 0.5
             gpuParticles.append(GPUParticle(
-                position: SIMD2(p.x, p.y), size: max(p.size * 2 * displayScale, 3),
+                position: SIMD2(p.x, p.y), size: max(p.size * pp.burstSize * displayScale, 3),
                 life: p.life, color: SIMD4(p.r, p.g, p.b, a)))
         }
 
@@ -695,20 +711,20 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
 
     private func drawHaloGradients(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, w: Float, h: Float) {
         guard faceCy > 0 else { return }
+        let p = vfxParams
 
         // Halo: big glowing disc behind the head
-        // faceCy = nose position. Head center is ~12% of h above nose. Halo center above that.
-        let haloCy = faceCy - h * 0.18
-        let haloR = w * 0.7  // massive — wider than the screen
+        let haloCy = faceCy - h * p.haloOffsetY
+        let haloR = w * p.haloSize
 
-        let glow = max(haloGlow, 0.15)  // always some ambient glow when face detected
+        let glow = max(haloGlow, 0.15)
 
         // Outer soft glow — massive, always visible
         var params = GPUGradientParams(
             center: SIMD2(faceCx, haloCy),
             innerRadius: 0,
             outerRadius: haloR,
-            innerColor: SIMD4(accentR, accentG, accentB, 0.3 + glow * 0.3 + haloFlash * 0.2),
+            innerColor: SIMD4(accentR, accentG, accentB, p.haloAlpha + glow * p.haloAlpha + haloFlash * p.haloFlashAlpha * 0.4),
             outerColor: SIMD4(accentR, accentG, accentB, 0))
 
         encoder.setRenderPipelineState(gradientPipeline)
@@ -718,14 +734,14 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
 
         // Brighter inner core
         params.outerRadius = haloR * 0.4
-        params.innerColor = SIMD4(accentR, accentG, accentB, 0.4 + glow * 0.4)
+        params.innerColor = SIMD4(accentR, accentG, accentB, p.haloInnerAlpha + glow * p.haloInnerAlpha)
         encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
 
         // White-hot flash on beat
         if haloFlash > 0.05 {
             params.outerRadius = haloR * 0.8 + haloFlash * 150
-            params.innerColor = SIMD4(1, 1, 1, haloFlash * 0.5)
+            params.innerColor = SIMD4(1, 1, 1, haloFlash * p.haloFlashAlpha)
             params.outerColor = SIMD4(1, 1, 1, 0)
             encoder.setFragmentBytes(&params, length: MemoryLayout<GPUGradientParams>.stride, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
@@ -733,13 +749,14 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     }
 
     private func drawIrisGlow(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, state: JammermanState, w: Float, h: Float) {
+        let p = vfxParams
         let faceW = w * 0.38
         let faceH = h * 0.28
         let eyeY = faceCy - faceH * 0.12
         let spacing = faceW * 0.22
-        let pulseScale: Float = 1.0 + uniforms.energy * 1.2 + beatPulse * 1.8
-        let r = 10 * pulseScale
-        let baseAlpha = min(0.5, 0.2 + uniforms.energy * 0.2 + beatPulse * 0.15)
+        let pulseScale: Float = 1.0 + uniforms.energy * 1.2 + beatPulse * p.irisPulse
+        let r = p.irisSize * pulseScale
+        let baseAlpha = min(p.irisAlpha, 0.2 + uniforms.energy * 0.2 + beatPulse * 0.15)
 
         for eyeX in [faceCx - spacing, faceCx + spacing] {
             var params = GPUGradientParams(
@@ -761,7 +778,8 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private func computeRingPoints(cx: Float, cy: Float, radius: Float, energy: Float, w: Float, h: Float) {
         ringPoints.removeAll(keepingCapacity: true)
         let segments = 128
-        let wobbleAmount = energy * 40 + beatPulse * 25
+        let wobbleMult = vfxParams.ringWobble
+        let wobbleAmount = (energy * 40 + beatPulse * 25) * wobbleMult
         for i in 0...segments {
             let t = Float(i) / Float(segments)
             let angle = t * Float.pi * 2 + ringRotation * Float.pi / 180
@@ -773,8 +791,9 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     }
 
     private func drawWaveformRing(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, w: Float, h: Float) {
+        let p = vfxParams
         let energy = uniforms.energy
-        let baseR = min(w, h) * 0.18
+        let baseR = min(w, h) * p.ringRadius
         let radius = baseR + energy * 80 + beatPulse * 30
         let cx = faceCx
         let cy = faceCy - min(w, h) * 0.14 * 0.5
@@ -782,12 +801,15 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         computeRingPoints(cx: cx, cy: cy, radius: radius, energy: energy, w: w, h: h)
         guard ringPoints.count > 2 else { return }
 
-        // Multi-pass neon glow
+        // Multi-pass neon glow (widths scale from ringGlowWidth → ringCoreWidth)
+        let gw = p.ringGlowWidth
+        let cw = p.ringCoreWidth
+        let ca = p.ringAlpha
         let passes: [(Float, Float, SIMD4<Float>)] = [
-            (14, 0.05 + beatPulse * 0.03,  SIMD4(accentR, accentG, accentB, 1)),
-            (6,  0.12 + beatPulse * 0.05,  SIMD4(accentR, accentG, accentB, 1)),
-            (2.5, 0.25 + energy * 0.15,    SIMD4(accentR, accentG, accentB, 1)),
-            (1,  0.5 + energy * 0.2,       SIMD4(1, 1, 1, 1)),
+            (gw,      0.05 + beatPulse * 0.03,  SIMD4(accentR, accentG, accentB, 1)),
+            (gw*0.43, 0.12 + beatPulse * 0.05,  SIMD4(accentR, accentG, accentB, 1)),
+            (gw*0.18, 0.25 + energy * 0.15,     SIMD4(accentR, accentG, accentB, 1)),
+            (cw,      ca + energy * 0.2,         SIMD4(1, 1, 1, 1)),
         ]
 
         for (lineWidth, alpha, baseColor) in passes {
@@ -885,11 +907,12 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             SIMD2(faceCx, faceCy),                    // nose
         ]
 
-        let webAlpha: Float = 0.15 + energy * 0.15 + beatPulse * 0.1
+        let wp = vfxParams
+        let webAlpha: Float = wp.webAlpha + energy * 0.15 + beatPulse * 0.1
         for target in targets {
             let line = [SIMD2(handScreenX, handScreenY), target]
             drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: line,
-                         lineWidth: 1.5, color: SIMD4(accentR, accentG, accentB, webAlpha), closed: false)
+                         lineWidth: wp.webLineWidth, color: SIMD4(accentR, accentG, accentB, webAlpha), closed: false)
         }
     }
 
@@ -904,7 +927,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         default: modeIdx = 1
         }
 
-        let alpha: Float = 0.02
+        let alpha = vfxParams.modeGeoAlpha
         let color = SIMD4<Float>(accentR, accentG, accentB, alpha)
         let cx = w / 2, cy = h * 0.38
 
@@ -960,13 +983,14 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private func drawFrequencyArc(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, w: Float, h: Float) {
         let energy = uniforms.energy
         guard energy > 0.01 else { return }
+        let fp = vfxParams
 
         let barCount = 32
         let arcCx = w / 2
-        let arcCy = h * 0.92
-        let arcR = w * 0.4
-        let barW: Float = 4
-        let maxBarH: Float = 40
+        let arcCy = h * fp.freqArcY
+        let arcR = w * fp.freqArcRadius
+        let barW = fp.freqArcBarWidth
+        let maxBarH = fp.freqArcHeight
 
         for i in 0..<barCount {
             let t = Float(i) / Float(barCount - 1) - 0.5
@@ -1005,8 +1029,9 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             SIMD2(faceCx + faceRx * 0.3, faceCy + faceRy * 0.54),    // right mouth
         ]
 
-        let r: Float = 5 + energy * 12 + beatPulse * 15
-        let alpha = min(0.4, 0.15 + energy * 0.15 + beatPulse * 0.2)
+        let lp = vfxParams
+        let r = lp.landmarkSize + energy * 12 + beatPulse * 15
+        let alpha = min(lp.landmarkAlpha, 0.15 + energy * 0.15 + beatPulse * 0.2)
 
         for pt in keyPoints {
             var params = GPUGradientParams(
@@ -1064,11 +1089,12 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                 if let prev = prevHandPos {
                     let dx = px - prev.x, dy = py - prev.y
                     if dx * dx + dy * dy > 4 {
+                        let tp = vfxParams
                         // Draw glowing line from prev to current
                         let line = [prev, SIMD2(px, py)]
                         // Core bright line
-                        var col = SIMD4<Float>(accentR, accentG, accentB, 0.9)
-                        var lw = 4 * displayScale
+                        var col = SIMD4<Float>(accentR, accentG, accentB, tp.trailCoreAlpha)
+                        var lw = tp.trailCoreWidth * displayScale
                         fadeEnc.setRenderPipelineState(linePipeline)
 
                         // Build line vertices inline
@@ -1083,8 +1109,8 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                         }
 
                         // Wider glow line
-                        lw = handGlowRadius * 2
-                        col = SIMD4(accentR, accentG, accentB, 0.3)
+                        lw = handGlowRadius * tp.trailGlowMult
+                        col = SIMD4(accentR, accentG, accentB, tp.trailGlowAlpha)
                         if let vBuf = device.makeBuffer(bytes: &verts, length: bufSize, options: .storageModeShared) {
                             fadeEnc.setVertexBytes(&lw, length: 4, index: 2)
                             fadeEnc.setFragmentBytes(&col, length: 16, index: 0)
@@ -1354,11 +1380,12 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     }
 
     private func drawArpViz(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer, engine: AudioEngine, w: Float, h: Float) {
+        let ap = vfxParams
         let energy = uniforms.energy
         let baseR = min(w, h) * 0.18
         let radius = baseR + energy * 80 + beatPulse * 30
         let colOffset = radius + 50 * displayScale
-        let vH = min(Float(280) * displayScale, faceCy * 0.65)
+        let vH = min(ap.arpColumnHeight * displayScale, faceCy * 0.65)
         let topY = faceCy - vH / 2
         let botY = faceCy + vH / 2
 
@@ -1387,7 +1414,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                 let isActive = (note == currentNote)
 
                 if isActive {
-                    let glowSize = (12 + flash * 18 + energy * 8) * displayScale
+                    let glowSize = (ap.arpGlowSize + flash * 18 + energy * 8) * displayScale
                     var params = GPUGradientParams(
                         center: SIMD2(colX, y), innerRadius: 0, outerRadius: glowSize,
                         innerColor: SIMD4(r, g, b, 0.8 + flash * 0.2),
@@ -1408,7 +1435,7 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                     drawPolyline(encoder: encoder, uniformBuf: uniformBuf, points: barLine,
                                  lineWidth: 2, color: SIMD4(r, g, b, 0.4 + flash * 0.4), closed: false)
                 } else {
-                    let sz: Float = 3 * displayScale
+                    let sz: Float = ap.arpDotSize * displayScale
                     dotParticles.append(GPUParticle(
                         position: SIMD2(colX, y), size: sz + 4,
                         life: 1, color: SIMD4(r, g, b, 0.06)))
@@ -1474,14 +1501,14 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                 oval.append(SIMD2(faceCx + cos(a) * faceRx, faceCy + sin(a) * faceRy))
             }
             contourSnapshots.append(MetalContourSnapshot(points: oval, opacity: 0.3))
-            while contourSnapshots.count > maxSnapshots {
+            while contourSnapshots.count > vfxParams.ghostCount {
                 contourSnapshots.removeFirst()
             }
         }
 
         var i = 0
         while i < contourSnapshots.count {
-            contourSnapshots[i].opacity *= 0.88
+            contourSnapshots[i].opacity *= vfxParams.ghostDecay
             if contourSnapshots[i].opacity < 0.01 {
                 contourSnapshots.swapAt(i, contourSnapshots.count - 1)
                 contourSnapshots.removeLast()

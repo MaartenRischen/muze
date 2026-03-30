@@ -24,6 +24,9 @@ struct MetalVisualizerOverlay: UIViewRepresentable {
         mtkView.backgroundColor = .clear
         mtkView.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
 
+        // Pass touches through to SwiftUI buttons underneath
+        mtkView.isUserInteractionEnabled = false
+
         // Needed for blending
         mtkView.colorPixelFormat = .bgra8Unorm
         mtkView.framebufferOnly = false

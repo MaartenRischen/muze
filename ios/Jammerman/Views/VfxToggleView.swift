@@ -88,6 +88,11 @@ struct VfxDetailView: View {
                         case "SEG":   segParams
                         case "ARC":   arcParams
                         case "GEO":   geoParams
+                        case "WEB":   webParams
+                        case "LMRK":  landmarkParams
+                        case "VIG":   vignetteParams
+                        case "BOOM":  burstParams
+                        case "GHOST": ghostParams
                         default: Text("No params").foregroundStyle(.white.opacity(0.3))
                         }
                     }
@@ -102,66 +107,90 @@ struct VfxDetailView: View {
     // MARK: - Per-Effect Param Sections
 
     @ViewBuilder private var ringParams: some View {
-        pSlider("Radius", val: $param.ringRadius, range: 0.05...0.5, fmt: "%.2f")
-        pSlider("Wobble", val: $param.ringWobble, range: 0...3, fmt: "%.1f")
-        pSlider("Glow Width", val: $param.ringGlowWidth, range: 2...30, fmt: "%.0f")
-        pSlider("Core Width", val: $param.ringCoreWidth, range: 0.2...4, fmt: "%.1f")
-        pSlider("Core Alpha", val: $param.ringAlpha, range: 0.1...1, fmt: "%.2f")
+        pSlider("Radius", val: $param.ringRadius, range: 0.02...0.6, fmt: "%.2f")
+        pSlider("Wobble", val: $param.ringWobble, range: 0...5, fmt: "%.1f")
+        pSlider("Glow Width", val: $param.ringGlowWidth, range: 1...50, fmt: "%.0f")
+        pSlider("Core Width", val: $param.ringCoreWidth, range: 0.1...8, fmt: "%.1f")
+        pSlider("Core Alpha", val: $param.ringAlpha, range: 0...1, fmt: "%.2f")
     }
 
     @ViewBuilder private var haloParams: some View {
-        pSlider("Offset Y", val: $param.haloOffsetY, range: 0.05...0.4, fmt: "%.2f")
-        pSlider("Size", val: $param.haloSize, range: 0.2...1.5, fmt: "%.2f")
-        pSlider("Ambient Alpha", val: $param.haloAlpha, range: 0.05...0.8, fmt: "%.2f")
-        pSlider("Inner Alpha", val: $param.haloInnerAlpha, range: 0.1...1, fmt: "%.2f")
-        pSlider("Flash Alpha", val: $param.haloFlashAlpha, range: 0.1...1, fmt: "%.2f")
+        pSlider("Offset Y", val: $param.haloOffsetY, range: 0...0.6, fmt: "%.2f")
+        pSlider("Size", val: $param.haloSize, range: 0.05...3.0, fmt: "%.2f")
+        pSlider("Ambient Alpha", val: $param.haloAlpha, range: 0...1, fmt: "%.2f")
+        pSlider("Inner Alpha", val: $param.haloInnerAlpha, range: 0...1, fmt: "%.2f")
+        pSlider("Flash Alpha", val: $param.haloFlashAlpha, range: 0...1, fmt: "%.2f")
     }
 
     @ViewBuilder private var irisParams: some View {
-        pSlider("Size", val: $param.irisSize, range: 2...30, fmt: "%.0f")
-        pSlider("Alpha", val: $param.irisAlpha, range: 0.1...1, fmt: "%.2f")
-        pSlider("Beat Pulse", val: $param.irisPulse, range: 0...4, fmt: "%.1f")
+        pSlider("Size", val: $param.irisSize, range: 1...50, fmt: "%.0f")
+        pSlider("Alpha", val: $param.irisAlpha, range: 0...1, fmt: "%.2f")
+        pSlider("Beat Pulse", val: $param.irisPulse, range: 0...6, fmt: "%.1f")
     }
 
     @ViewBuilder private var particleParams: some View {
-        pSliderInt("Max Count", val: $param.particleCount, range: 10...200)
-        pSlider("Size Mult", val: $param.particleSize, range: 0.5...8, fmt: "%.1f")
-        pSlider("Alpha", val: $param.particleAlpha, range: 0.1...1, fmt: "%.2f")
-        pSlider("Spawn Rate", val: $param.particleSpawnRate, range: 1...30, fmt: "%.0f")
+        pSliderInt("Max Count", val: $param.particleCount, range: 5...500)
+        pSlider("Size Mult", val: $param.particleSize, range: 0.2...12, fmt: "%.1f")
+        pSlider("Alpha", val: $param.particleAlpha, range: 0...1, fmt: "%.2f")
+        pSlider("Spawn Rate", val: $param.particleSpawnRate, range: 1...60, fmt: "%.0f")
     }
 
     @ViewBuilder private var arpParams: some View {
-        pSlider("Glow Size", val: $param.arpGlowSize, range: 4...30, fmt: "%.0f")
-        pSlider("Dot Size", val: $param.arpDotSize, range: 1...8, fmt: "%.1f")
-        pSlider("Column Height", val: $param.arpColumnHeight, range: 100...500, fmt: "%.0f")
+        pSlider("Glow Size", val: $param.arpGlowSize, range: 2...60, fmt: "%.0f")
+        pSlider("Dot Size", val: $param.arpDotSize, range: 0.5...15, fmt: "%.1f")
+        pSlider("Column Height", val: $param.arpColumnHeight, range: 50...800, fmt: "%.0f")
     }
 
     @ViewBuilder private var trailParams: some View {
-        pSlider("Core Width", val: $param.trailCoreWidth, range: 1...12, fmt: "%.1f")
-        pSlider("Glow Mult", val: $param.trailGlowMult, range: 0.5...5, fmt: "%.1f")
-        pSlider("Core Alpha", val: $param.trailCoreAlpha, range: 0.1...1, fmt: "%.2f")
-        pSlider("Glow Alpha", val: $param.trailGlowAlpha, range: 0.05...0.8, fmt: "%.2f")
-        pSlider("Decay", val: $param.trailDecay, range: 0.9...0.999, fmt: "%.3f")
+        pSlider("Core Width", val: $param.trailCoreWidth, range: 0.5...20, fmt: "%.1f")
+        pSlider("Glow Mult", val: $param.trailGlowMult, range: 0.2...8, fmt: "%.1f")
+        pSlider("Core Alpha", val: $param.trailCoreAlpha, range: 0...1, fmt: "%.2f")
+        pSlider("Glow Alpha", val: $param.trailGlowAlpha, range: 0...1, fmt: "%.2f")
+        pSlider("Decay", val: $param.trailDecay, range: 0.8...0.999, fmt: "%.3f")
     }
 
     @ViewBuilder private var segParams: some View {
         pSlider("Darken", val: $param.segDarkenAlpha, range: 0...1, fmt: "%.2f")
-        pSlider("Feather", val: $param.segFeather, range: -30...30, fmt: "%.0f")
-        pSlider("Scale X", val: $param.segScaleX, range: 0.3...2, fmt: "%.2f")
-        pSlider("Scale Y", val: $param.segScaleY, range: 0.3...2, fmt: "%.2f")
+        pSlider("Feather", val: $param.segFeather, range: -60...60, fmt: "%.0f")
+        pSlider("Scale X", val: $param.segScaleX, range: 0.2...3, fmt: "%.2f")
+        pSlider("Scale Y", val: $param.segScaleY, range: 0.2...3, fmt: "%.2f")
         pSlider("Edge Low", val: $param.segEdgeLow, range: 0...0.5, fmt: "%.2f")
         pSlider("Edge High", val: $param.segEdgeHigh, range: 0.5...1, fmt: "%.2f")
     }
 
     @ViewBuilder private var arcParams: some View {
-        pSlider("Bar Width", val: $param.freqArcBarWidth, range: 1...12, fmt: "%.0f")
-        pSlider("Max Height", val: $param.freqArcHeight, range: 10...100, fmt: "%.0f")
-        pSlider("Arc Radius", val: $param.freqArcRadius, range: 0.1...0.6, fmt: "%.2f")
-        pSlider("Y Position", val: $param.freqArcY, range: 0.7...0.98, fmt: "%.2f")
+        pSlider("Bar Width", val: $param.freqArcBarWidth, range: 1...20, fmt: "%.0f")
+        pSlider("Max Height", val: $param.freqArcHeight, range: 5...200, fmt: "%.0f")
+        pSlider("Arc Radius", val: $param.freqArcRadius, range: 0.05...0.8, fmt: "%.2f")
+        pSlider("Y Position", val: $param.freqArcY, range: 0.5...1.0, fmt: "%.2f")
     }
 
     @ViewBuilder private var geoParams: some View {
-        pSlider("Alpha", val: $param.modeGeoAlpha, range: 0.005...0.1, fmt: "%.3f")
+        pSlider("Alpha", val: $param.modeGeoAlpha, range: 0...0.2, fmt: "%.3f")
+    }
+
+    @ViewBuilder private var webParams: some View {
+        pSlider("Alpha", val: $param.webAlpha, range: 0...0.6, fmt: "%.2f")
+        pSlider("Line Width", val: $param.webLineWidth, range: 0.5...6, fmt: "%.1f")
+    }
+
+    @ViewBuilder private var landmarkParams: some View {
+        pSlider("Size", val: $param.landmarkSize, range: 1...30, fmt: "%.0f")
+        pSlider("Alpha", val: $param.landmarkAlpha, range: 0...1, fmt: "%.2f")
+    }
+
+    @ViewBuilder private var vignetteParams: some View {
+        pSlider("Strength", val: $param.vignetteStrength, range: 0...1, fmt: "%.2f")
+    }
+
+    @ViewBuilder private var burstParams: some View {
+        pSliderInt("Count", val: $param.burstCount, range: 3...50)
+        pSlider("Size Mult", val: $param.burstSize, range: 0.5...6, fmt: "%.1f")
+    }
+
+    @ViewBuilder private var ghostParams: some View {
+        pSliderInt("Max Snapshots", val: $param.ghostCount, range: 1...12)
+        pSlider("Decay", val: $param.ghostDecay, range: 0.7...0.98, fmt: "%.2f")
     }
 
     // MARK: - Slider Helpers

@@ -55,6 +55,11 @@ struct PerformanceView: View {
                     VfxToggle(label: "SEG", icon: "◐", param: coordinator.vfxParams, keyPath: \.segEnabled, color: .orange, coordinator: coordinator)
                     VfxToggle(label: "ARC", icon: "⌒", param: coordinator.vfxParams, keyPath: \.freqArcEnabled, color: .pink, coordinator: coordinator)
                     VfxToggle(label: "GEO", icon: "⬡", param: coordinator.vfxParams, keyPath: \.modeGeoEnabled, color: .teal, coordinator: coordinator)
+                    VfxToggle(label: "WEB", icon: "⟡", param: coordinator.vfxParams, keyPath: \.connectionWebEnabled, color: .mint, coordinator: coordinator)
+                    VfxToggle(label: "LMRK", icon: "✧", param: coordinator.vfxParams, keyPath: \.landmarksEnabled, color: .indigo, coordinator: coordinator)
+                    VfxToggle(label: "VIG", icon: "◓", param: coordinator.vfxParams, keyPath: \.vignetteEnabled, color: .gray, coordinator: coordinator)
+                    VfxToggle(label: "BOOM", icon: "✸", param: coordinator.vfxParams, keyPath: \.burstEnabled, color: .red, coordinator: coordinator)
+                    VfxToggle(label: "GHOST", icon: "👻", param: coordinator.vfxParams, keyPath: \.ghostTrailsEnabled, color: .white, coordinator: coordinator)
                     Spacer()
                 }
                 .padding(.leading, 4)
