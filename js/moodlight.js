@@ -147,14 +147,17 @@ MUZE.MoodLight = {
     let rawEnergy = 0;
     let bassEnergy = 0;
 
-    // Waveform-based overall energy
+    // Waveform-based overall energy — sample every 4th value (still ~500 points for 2048-sample
+    // waveform, plenty for an amplitude average, but 4× less work per frame on mobile).
     const waveform = MUZE.Audio.getWaveform ? MUZE.Audio.getWaveform() : null;
     if (waveform) {
       let sum = 0;
-      for (let i = 0; i < waveform.length; i++) {
+      let count = 0;
+      for (let i = 0; i < waveform.length; i += 4) {
         sum += Math.abs(waveform[i]);
+        count++;
       }
-      rawEnergy = sum / waveform.length;
+      rawEnergy = count > 0 ? sum / count : 0;
     }
 
     // FFT-based bass energy (bins 1-6 ≈ 0-250Hz for kick detection)

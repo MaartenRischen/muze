@@ -45,6 +45,13 @@ class GyroscopeManager: ObservableObject {
         reverbMod = 0
     }
 
+    deinit {
+        // Core Motion keeps consuming power until explicitly stopped, even after release.
+        if motionManager.isDeviceMotionActive {
+            motionManager.stopDeviceMotionUpdates()
+        }
+    }
+
     private func processMotion(_ motion: CMDeviceMotion) {
         let attitude = motion.attitude
 

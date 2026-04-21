@@ -121,14 +121,16 @@ MUZE.LoopRecorder = {
     this._state = 'counting';
     this._updateUI();
     const beatMs = 60000 / Tone.Transport.bpm.value;
-    // Play 4 clicks as count-in
+    // Track count-in timers so cancel mid-count-in doesn't leave ghost hats firing 2s later.
+    this._countInTimers = this._countInTimers || [];
     for (let i = 0; i < 4; i++) {
-      setTimeout(() => {
+      this._countInTimers.push(setTimeout(() => {
+        if (this._state !== 'counting') return;
         MUZE.Audio.triggerDrum('hat', 0.3);
-      }, i * beatMs);
+      }, i * beatMs));
     }
-    // Start actual recording after count-in
-    setTimeout(() => {
+    this._countInTimers.push(setTimeout(() => {
+      if (this._state !== 'counting') return;
       this._state = 'recording';
       this._loopDuration = this._getLoopMs();
       this._startTime = performance.now();
@@ -139,10 +141,17 @@ MUZE.LoopRecorder = {
       this._autoStopTimer = setTimeout(() => {
         if (this._state === 'recording') this._stopRecording();
       }, this._loopDuration);
-    }, 4 * beatMs);
+    }, 4 * beatMs));
+  },
+
+  _clearCountInTimers() {
+    if (!this._countInTimers) return;
+    for (const id of this._countInTimers) clearTimeout(id);
+    this._countInTimers = [];
   },
 
   _stopRecording() {
+    this._clearCountInTimers();
     clearTimeout(this._autoStopTimer);
     this.recordNoteOff(); // close any open note
     if (this._layers[0].length === 0) {
@@ -211,6 +220,8 @@ MUZE.LoopRecorder = {
   },
 
   _clearAll() {
+    this._clearCountInTimers();
+    clearTimeout(this._autoStopTimer);
     if (this._playbackPart) { this._playbackPart.stop(); this._playbackPart.dispose(); this._playbackPart = null; }
     this._layers = [];
     this._state = 'empty';

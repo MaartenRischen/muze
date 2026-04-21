@@ -96,8 +96,11 @@ MUZE.BgBlur = {
 
   activate() {
     this._active = true;
-    // Don't blur video yet — wait until first successful render
+    // Don't blur video yet — wait until first successful render. Cap retries at 50 (~10s) so a
+    // failed camera init doesn't leak a forever-polling setTimeout.
+    let attempts = 0;
     const check = () => {
+      if (!this._active) return;
       const v = MUZE.Camera.video;
       if (v && v.videoWidth) {
         this._w = v.videoWidth;
@@ -106,7 +109,11 @@ MUZE.BgBlur = {
         this._bgCanvas.height = this._h;
         this._tmpCanvas.width = this._w;
         this._tmpCanvas.height = this._h;
-      } else setTimeout(check, 200);
+      } else if (++attempts < 50) {
+        setTimeout(check, 200);
+      } else {
+        console.warn('[bgblur] video never became ready — giving up');
+      }
     };
     check();
   },

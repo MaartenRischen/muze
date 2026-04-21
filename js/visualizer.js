@@ -132,8 +132,16 @@ MUZE.Visualizer = {
     // Create offscreen trail canvas for light painting persistence
     this._trailCanvas = document.createElement('canvas');
     this._trailCtx = this._trailCanvas.getContext('2d');
+    this._ringPoints = [];  // reused across frames — see _drawWaveformRing
     this._resize();
-    window.addEventListener('resize', () => this._resize());
+    // Keep handler reference so destroy() (or re-init) can cleanly detach
+    this._onResize = () => this._resize();
+    window.addEventListener('resize', this._onResize);
+  },
+
+  destroy() {
+    if (this._onResize) window.removeEventListener('resize', this._onResize);
+    this._onResize = null;
   },
 
   _resize() {
@@ -395,16 +403,17 @@ MUZE.Visualizer = {
     // Ring rotation: 0.5 degrees per frame (~30 deg/sec at 60fps)
     const rotationRad = (this._ringRotationFrame * 0.5) * (Math.PI / 180);
 
-    // Pre-compute points on the ring (with rotation applied)
-    const points = new Array(len);
+    // Pre-compute points on the ring (with rotation applied) into reused buffer — avoids GC churn.
+    const points = this._ringPoints;
+    if (points.length !== len) points.length = len;
     for (let i = 0; i < len; i++) {
       const angle = (i / len) * Math.PI * 2 - Math.PI / 2 + rotationRad;
       const amp = sw[i] * 40;
       const r = radius + amp;
-      points[i] = {
-        x: cx + Math.cos(angle) * r,
-        y: cy + Math.sin(angle) * r
-      };
+      let p = points[i];
+      if (!p) { p = { x: 0, y: 0 }; points[i] = p; }
+      p.x = cx + Math.cos(angle) * r;
+      p.y = cy + Math.sin(angle) * r;
     }
 
     // Helper: build smooth Bezier ring path from points array

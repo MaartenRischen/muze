@@ -69,6 +69,13 @@ class CameraManager: NSObject, ObservableObject {
             }
         }
     }
+
+    deinit {
+        // Synchronously tear down — session keeps running (and drains battery) until actually stopped.
+        if captureSession.isRunning {
+            captureSession.stopRunning()
+        }
+    }
 }
 
 extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {

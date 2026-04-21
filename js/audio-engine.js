@@ -162,9 +162,10 @@ MUZE.Audio = {
     });
     this._padSub.volume.value = -14; // increased sub presence
 
-    // Chorus insert for pad (enhanced: slightly higher rate for shimmer)
-    this._padChorus = new Tone.Chorus({ frequency: 1.2, delayTime: 4.0, depth: 0.35, wet: 0.5 });
-    // Chorus starts lazily when channel is unmuted (saves ~5% CPU per idle chorus)
+    // Chorus insert for pad. Tone.Chorus LFO only modulates once .start() is called —
+    // channels default to mute=false so we must start here. mixer.toggleMute will .stop()/.start()
+    // on subsequent mute changes.
+    this._padChorus = new Tone.Chorus({ frequency: 1.2, delayTime: 4.0, depth: 0.35, wet: 0.5 }).start();
 
     // (Removed: _padDetune2 — single pad layer + sub is enough, saves 3 FMSynth voices)
 
@@ -190,8 +191,8 @@ MUZE.Audio = {
 
     // (Removed: _arpPingPong — shared delay bus handles stereo width)
 
-    // Chorus insert for arp (shimmer, controlled by head roll like pad)
-    this._arpChorus = new Tone.Chorus({ frequency: 1.2, delayTime: 4.0, depth: 0.35, wet: 0.4 });
+    // Chorus insert for arp (shimmer, controlled by head roll like pad). Must .start() — see pad comment.
+    this._arpChorus = new Tone.Chorus({ frequency: 1.2, delayTime: 4.0, depth: 0.35, wet: 0.4 }).start();
 
     this.leadSynth.connect(this._arpFilter);
     this._arpFilter.connect(this._arpChorus);
@@ -204,7 +205,7 @@ MUZE.Audio = {
       envelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: 0.3 },
     });
     this._arp2Filter = new Tone.Filter({ frequency: 1800, type: 'lowpass', rolloff: -24, Q: 4 });
-    this._arp2Chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.3, wet: 0.35 });
+    this._arp2Chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.3, wet: 0.35 }).start();
     this.leadSynth2.connect(this._arp2Filter);
     this._arp2Filter.connect(this._arp2Chorus);
     this._createChannelStrip('arp2', this._arp2Chorus);
@@ -637,6 +638,9 @@ MUZE.Audio = {
       const accent = (this[p.idx] % 4 === 0) ? 0.7 : 0.4 + Math.random() * 0.1;
       synth.triggerAttackRelease(note, noteVal, time, accent);
       if (filter && (filterTick++ & 1) === 0) {
+        // Cancel any in-flight ramps before scheduling a new one — prevents overlapping
+        // exponentialRampToValueAtTime from fighting each other at high note rates.
+        filter.frequency.cancelScheduledValues(time);
         filter.frequency.setValueAtTime(5000, time);
         filter.frequency.exponentialRampToValueAtTime(1400, time + 0.12);
       }
@@ -734,14 +738,20 @@ MUZE.Audio = {
       node._reverbSendPre = node.reverbSend.gain.value;
       node.reverbSend.gain.rampTo(0.9, 0.05);
     }
-    // Use setTimeout for reliable wall-clock timing (Transport time drifts with BPM changes)
-    setTimeout(() => {
+    // setTimeout + visibilitychange watchdog: if tab is backgrounded, setTimeout throttles to 1s+,
+    // so we also listen for visibility-change to restore the moment tab resumes.
+    const restore = () => {
       for (const ch of MUZE.Mixer.CHANNEL_ORDER) {
         const node = self._nodes[ch];
         if (!node || node._reverbSendPre === undefined) continue;
         node.reverbSend.gain.rampTo(node._reverbSendPre, 1.5);
+        node._reverbSendPre = undefined;
       }
-    }, 200);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+    const onVis = () => { if (document.visibilityState === 'visible') restore(); };
+    document.addEventListener('visibilitychange', onVis);
+    setTimeout(restore, 200);
   },
 
   tapeStop() {
@@ -751,16 +761,23 @@ MUZE.Audio = {
     [self.padSynth, self._padSub, self.leadSynth, self.melodySynth].forEach(s => {
       if (s) { s.set({ detune: 0 }); s.set({ detune: -2400 }); }
     });
-    // Use setTimeout for reliable wall-clock timing (Transport slows to 20 BPM so scheduleOnce is unreliable)
-    setTimeout(() => {
+    // Use setTimeout + visibility watchdog. Transport slows to 20 BPM so scheduleOnce is unreliable,
+    // and backgrounded tabs throttle setTimeout to 1s+ — watchdog restores on tab resume.
+    let restored = false;
+    const restore = () => {
+      if (restored) return;
+      restored = true;
       Tone.Transport.bpm.rampTo(orig, 0.15);
       [self.padSynth, self._padSub, self.leadSynth, self.melodySynth].forEach(s => {
         if (s) s.set({ detune: 0 });
       });
-      // Restore pad detuning
       self.padSynth.set({ detune: 5 });
       self._padSub.set({ detune: 0 });
-    }, 500);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+    const onVis = () => { if (document.visibilityState === 'visible') restore(); };
+    document.addEventListener('visibilitychange', onVis);
+    setTimeout(restore, 500);
   },
 
   // ============================================================

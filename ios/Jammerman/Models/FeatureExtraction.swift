@@ -123,7 +123,9 @@ class HandExtractor {
     private var lastOpen: Bool?
 
     func extract(landmarks: [[Landmark]]) -> HandFeatures {
-        guard let lm = landmarks.first, !lm.isEmpty else {
+        guard let lm = landmarks.first, lm.count >= 21 else {
+            // Vision can return a partial skeleton (e.g. 1 point) when the hand is mostly occluded.
+            // Need indices 0, 8, 9, 12, 16, 20 — demand the full 21-landmark hand.
             return HandFeatures(handPresent: false, handX: 0.5, handY: 0.5, handOpen: true)
         }
 

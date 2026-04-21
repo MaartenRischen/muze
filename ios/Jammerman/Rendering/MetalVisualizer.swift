@@ -135,6 +135,20 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private var currentBuffer = 0
     private let inflightSemaphore = DispatchSemaphore(value: 3)
 
+    // Triple-buffered geometry pools — avoids per-frame makeBuffer(bytes:) allocations.
+    // Each type has 3 slots (one per in-flight frame). Within a frame, uploads append via a
+    // write cursor; uploads return a byte offset used by setVertexBuffer.
+    private var particleBuffers: [MTLBuffer] = []
+    private var ellipseBuffers: [MTLBuffer] = []
+    private var lineBuffers: [MTLBuffer] = []
+    private var particleWriteOffset = 0
+    private var ellipseWriteOffset = 0
+    private var lineWriteOffset = 0
+    // Sizes chosen to cover worst-case: multiple particle draws, trail + waveform + ring polylines.
+    private let maxParticlesPerFrame = 512
+    private let maxEllipsesPerFrame = 128
+    private let maxLineVertsPerFrame = 16384
+
     // Animation state
     private var uniforms = VisualizerUniforms()
     private var startTime = CACurrentMediaTime()
@@ -194,14 +208,21 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
     private let maxFaceParticles = 60
     private let maxBurstParticles = 80
 
-    init(device: MTLDevice, coordinator: TrackingCoordinator) {
+    init?(device: MTLDevice, coordinator: TrackingCoordinator) {
+        guard let queue = device.makeCommandQueue() else {
+            print("[Metal] FATAL: makeCommandQueue failed")
+            return nil
+        }
         self.device = device
-        self.commandQueue = device.makeCommandQueue()!
+        self.commandQueue = queue
         self.coordinator = coordinator
         super.init()
         print("[Metal] Initializing MetalVisualizer on \(device.name)")
         buildPipelines()
-        buildBuffers()
+        guard buildBuffers() else {
+            print("[Metal] FATAL: buildBuffers failed")
+            return nil
+        }
         print("[Metal] Init complete — pipelines: particle=\(particlePipeline != nil) line=\(linePipeline != nil) gradient=\(gradientPipeline != nil) ellipse=\(ellipsePipeline != nil) vignette=\(vignettePipeline != nil) flash=\(beatFlashPipeline != nil)")
     }
 
@@ -277,12 +298,88 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         segCutoutPipeline = makePipeline(cutoutDesc, name: "segCutout")
     }
 
-    private func buildBuffers() {
+    @discardableResult
+    private func buildBuffers() -> Bool {
         // Triple-buffered uniform buffers
         for _ in 0..<3 {
-            let buf = device.makeBuffer(length: MemoryLayout<VisualizerUniforms>.stride, options: .storageModeShared)!
+            guard let buf = device.makeBuffer(length: MemoryLayout<VisualizerUniforms>.stride, options: .storageModeShared) else { return false }
             uniformBuffers.append(buf)
         }
+        // Triple-buffered geometry pools (one buffer per in-flight frame).
+        let particleBytes = maxParticlesPerFrame * MemoryLayout<GPUParticle>.stride
+        let ellipseBytes = maxEllipsesPerFrame * MemoryLayout<GPUEllipse>.stride
+        let lineBytes = maxLineVertsPerFrame * MemoryLayout<GPULineVertex>.stride
+        for _ in 0..<3 {
+            guard let p = device.makeBuffer(length: particleBytes, options: .storageModeShared),
+                  let e = device.makeBuffer(length: ellipseBytes, options: .storageModeShared),
+                  let l = device.makeBuffer(length: lineBytes, options: .storageModeShared) else { return false }
+            particleBuffers.append(p)
+            ellipseBuffers.append(e)
+            lineBuffers.append(l)
+        }
+        return true
+    }
+
+    // MARK: - Geometry pool uploads (avoid per-frame makeBuffer)
+
+    private func appendParticles(_ src: [GPUParticle]) -> (buffer: MTLBuffer, offset: Int, count: Int)? {
+        let count = src.count
+        guard count > 0 else { return nil }
+        let stride = MemoryLayout<GPUParticle>.stride
+        let bytes = stride * count
+        let capacityBytes = maxParticlesPerFrame * stride
+        guard particleWriteOffset + bytes <= capacityBytes else {
+            print("[Metal] particle pool full (\(particleWriteOffset + bytes) > \(capacityBytes)), dropping \(count)")
+            return nil
+        }
+        let buf = particleBuffers[currentBuffer]
+        let offset = particleWriteOffset
+        src.withUnsafeBufferPointer { ptr in
+            guard let base = ptr.baseAddress else { return }
+            (buf.contents() + offset).copyMemory(from: base, byteCount: bytes)
+        }
+        particleWriteOffset += bytes
+        return (buf, offset, count)
+    }
+
+    private func appendEllipses(_ src: [GPUEllipse]) -> (buffer: MTLBuffer, offset: Int, count: Int)? {
+        let count = src.count
+        guard count > 0 else { return nil }
+        let stride = MemoryLayout<GPUEllipse>.stride
+        let bytes = stride * count
+        let capacityBytes = maxEllipsesPerFrame * stride
+        guard ellipseWriteOffset + bytes <= capacityBytes else {
+            print("[Metal] ellipse pool full, dropping \(count)")
+            return nil
+        }
+        let buf = ellipseBuffers[currentBuffer]
+        let offset = ellipseWriteOffset
+        src.withUnsafeBufferPointer { ptr in
+            guard let base = ptr.baseAddress else { return }
+            (buf.contents() + offset).copyMemory(from: base, byteCount: bytes)
+        }
+        ellipseWriteOffset += bytes
+        return (buf, offset, count)
+    }
+
+    private func appendLineVertices(_ src: [GPULineVertex]) -> (buffer: MTLBuffer, offset: Int, count: Int)? {
+        let count = src.count
+        guard count > 0 else { return nil }
+        let stride = MemoryLayout<GPULineVertex>.stride
+        let bytes = stride * count
+        let capacityBytes = maxLineVertsPerFrame * stride
+        guard lineWriteOffset + bytes <= capacityBytes else {
+            print("[Metal] line pool full, dropping \(count)")
+            return nil
+        }
+        let buf = lineBuffers[currentBuffer]
+        let offset = lineWriteOffset
+        src.withUnsafeBufferPointer { ptr in
+            guard let base = ptr.baseAddress else { return }
+            (buf.contents() + offset).copyMemory(from: base, byteCount: bytes)
+        }
+        lineWriteOffset += bytes
+        return (buf, offset, count)
     }
 
     // MARK: - MTKViewDelegate
@@ -295,6 +392,12 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
         guard let coord = coordinator else { print("[Metal] draw: no coordinator"); return }
         drawCount += 1
         inflightSemaphore.wait()
+
+        // Reset geometry pool cursors for this frame (buffer[currentBuffer] is safe to overwrite —
+        // the semaphore guarantees its previous contents are no longer in flight on the GPU).
+        particleWriteOffset = 0
+        ellipseWriteOffset = 0
+        lineWriteOffset = 0
 
         let w = Float(view.drawableSize.width)
         let h = Float(view.drawableSize.height)
@@ -616,16 +719,13 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                 life: p.life, color: SIMD4(p.r, p.g, p.b, a)))
         }
 
-        guard !gpuParticles.isEmpty else { return }
-
-        let bufSize = MemoryLayout<GPUParticle>.stride * gpuParticles.count
-        guard let particleBuf = device.makeBuffer(bytes: &gpuParticles, length: bufSize, options: .storageModeShared) else { return }
+        guard let upload = appendParticles(gpuParticles) else { return }
 
         encoder.setRenderPipelineState(particlePipeline)
-        encoder.setVertexBuffer(particleBuf, offset: 0, index: 0)
+        encoder.setVertexBuffer(upload.buffer, offset: upload.offset, index: 0)
         encoder.setVertexBuffer(uniformBuf, offset: 0, index: 1)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4,
-                               instanceCount: gpuParticles.count)
+                               instanceCount: upload.count)
     }
 
     private func drawRings(encoder: MTLRenderCommandEncoder, uniformBuf: MTLBuffer) {
@@ -652,15 +752,13 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                 color: SIMD4(ring.r, ring.g, ring.b, ring.alpha)))
         }
 
-        guard !gpuEllipses.isEmpty else { return }
-        let bufSize = MemoryLayout<GPUEllipse>.stride * gpuEllipses.count
-        guard let ellipseBuf = device.makeBuffer(bytes: &gpuEllipses, length: bufSize, options: .storageModeShared) else { return }
+        guard let upload = appendEllipses(gpuEllipses) else { return }
 
         encoder.setRenderPipelineState(ellipsePipeline)
-        encoder.setVertexBuffer(ellipseBuf, offset: 0, index: 0)
+        encoder.setVertexBuffer(upload.buffer, offset: upload.offset, index: 0)
         encoder.setVertexBuffer(uniformBuf, offset: 0, index: 1)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4,
-                               instanceCount: gpuEllipses.count)
+                               instanceCount: upload.count)
     }
 
     // MARK: - Halo (wide aura, soft fade, beat-reactive, color-shifting)
@@ -1131,24 +1229,21 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                         var lw = tp.trailCoreWidth * displayScale
                         fadeEnc.setRenderPipelineState(linePipeline)
 
-                        // Build line vertices inline
-                        var verts = buildLineVertices(points: line, closed: false)
-                        let bufSize = MemoryLayout<GPULineVertex>.stride * verts.count
-                        if let vBuf = device.makeBuffer(bytes: &verts, length: bufSize, options: .storageModeShared) {
-                            fadeEnc.setVertexBuffer(vBuf, offset: 0, index: 0)
+                        // Build line vertices inline; upload once and reuse for both core + glow passes.
+                        let verts = buildLineVertices(points: line, closed: false)
+                        if let upload = appendLineVertices(verts) {
+                            fadeEnc.setVertexBuffer(upload.buffer, offset: upload.offset, index: 0)
                             fadeEnc.setVertexBuffer(uniformBuf, offset: 0, index: 1)
                             fadeEnc.setVertexBytes(&lw, length: 4, index: 2)
                             fadeEnc.setFragmentBytes(&col, length: 16, index: 0)
-                            fadeEnc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: verts.count)
-                        }
+                            fadeEnc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: upload.count)
 
-                        // Wider glow line
-                        lw = handGlowRadius * tp.trailGlowMult
-                        col = SIMD4(accentR, accentG, accentB, tp.trailGlowAlpha)
-                        if let vBuf = device.makeBuffer(bytes: &verts, length: bufSize, options: .storageModeShared) {
+                            // Wider glow line (same vertex buffer, different width + color)
+                            lw = handGlowRadius * tp.trailGlowMult
+                            col = SIMD4(accentR, accentG, accentB, tp.trailGlowAlpha)
                             fadeEnc.setVertexBytes(&lw, length: 4, index: 2)
                             fadeEnc.setFragmentBytes(&col, length: 16, index: 0)
-                            fadeEnc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: verts.count)
+                            fadeEnc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: upload.count)
                         }
                     }
                 }
@@ -1244,17 +1339,16 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
             vertices.append(vertices[1])
         }
 
-        let bufSize = MemoryLayout<GPULineVertex>.stride * vertices.count
-        guard let vertBuf = device.makeBuffer(bytes: &vertices, length: bufSize, options: .storageModeShared) else { return }
+        guard let upload = appendLineVertices(vertices) else { return }
         var lw = lineWidth * displayScale
         var col = color
 
         encoder.setRenderPipelineState(linePipeline)
-        encoder.setVertexBuffer(vertBuf, offset: 0, index: 0)
+        encoder.setVertexBuffer(upload.buffer, offset: upload.offset, index: 0)
         encoder.setVertexBuffer(uniformBuf, offset: 0, index: 1)
         encoder.setVertexBytes(&lw, length: MemoryLayout<Float>.stride, index: 2)
         encoder.setFragmentBytes(&col, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
-        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: vertices.count)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: upload.count)
     }
 
     // MARK: - Burst Particles (note change explosions)
@@ -1486,17 +1580,13 @@ class MetalVisualizer: NSObject, MTKViewDelegate {
                     life: s.life, color: SIMD4(s.r, s.g, s.b, s.life * s.life)))
             }
 
-            // Submit dot particles
-            if !dotParticles.isEmpty {
-                var pts = dotParticles
-                let bufSize = MemoryLayout<GPUParticle>.stride * pts.count
-                if let buf = device.makeBuffer(bytes: &pts, length: bufSize, options: .storageModeShared) {
-                    encoder.setRenderPipelineState(particlePipeline)
-                    encoder.setVertexBuffer(buf, offset: 0, index: 0)
-                    encoder.setVertexBuffer(uniformBuf, offset: 0, index: 1)
-                    encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4,
-                                           instanceCount: pts.count)
-                }
+            // Submit dot particles via pooled buffer
+            if let upload = appendParticles(dotParticles) {
+                encoder.setRenderPipelineState(particlePipeline)
+                encoder.setVertexBuffer(upload.buffer, offset: upload.offset, index: 0)
+                encoder.setVertexBuffer(uniformBuf, offset: 0, index: 1)
+                encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4,
+                                       instanceCount: upload.count)
             }
         }
 

@@ -201,12 +201,21 @@ class AudioEngine: ObservableObject {
 
     // Sidechain removed — was causing pad to go silent
 
-    // Thread-safe drum step for UI (written from audio thread, read from main)
+    // Audio-thread → main-thread UI state (written from audio thread, read from main drain timer).
+    // Int stores/loads are atomic on ARM64 and the drain timer samples at 2ms — visibility is fine.
+    // Previously these went via DispatchQueue.main.async from the render callback, which is not
+    // real-time safe (dispatch_async takes a lock).
     private var _pendingDrumStep: Int = -1
+    private var _pendingArp1Note: Int = -1
+    private var _pendingArp2Note: Int = -1
 
     // Arp note-off tracking (avoid DispatchQueue.main.asyncAfter from audio thread)
     private var arpPendingNoteOff: UInt8? = nil
     private var arp2PendingNoteOff: UInt8? = nil
+    // Interruption observers
+    private var interruptionObserver: NSObjectProtocol?
+    private var routeChangeObserver: NSObjectProtocol?
+    private var wasInterrupted = false
 
     // Reverb parameters
     @Published var reverbWetDry: Float = 35        // 0-100%
@@ -252,6 +261,16 @@ class AudioEngine: ObservableObject {
         setupAudioSession()
         buildGraph()
         setupDefaultDrumPattern()
+        registerInterruptionHandlers()
+    }
+
+    deinit {
+        if let obs = interruptionObserver { NotificationCenter.default.removeObserver(obs) }
+        if let obs = routeChangeObserver { NotificationCenter.default.removeObserver(obs) }
+        midiDrainTimer?.invalidate()
+        chordAdvanceTimer?.invalidate()
+        riserTimer?.invalidate()
+        engine.stop()
     }
 
     // MARK: - Audio Session
@@ -267,6 +286,51 @@ class AudioEngine: ObservableObject {
             try session.setActive(true)
         } catch {
             print("Audio session error: \(error)")
+        }
+    }
+
+    private func registerInterruptionHandlers() {
+        let nc = NotificationCenter.default
+        interruptionObserver = nc.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let info = note.userInfo,
+                  let rawType = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: rawType) else { return }
+            switch type {
+            case .began:
+                self.wasInterrupted = self.isPlaying
+                if self.engine.isRunning { self.engine.pause() }
+            case .ended:
+                let opts = AVAudioSession.InterruptionOptions(rawValue: (info[AVAudioSessionInterruptionOptionKey] as? UInt) ?? 0)
+                if opts.contains(.shouldResume) && self.wasInterrupted {
+                    do {
+                        try AVAudioSession.sharedInstance().setActive(true)
+                        try self.engine.start()
+                    } catch {
+                        print("Resume after interruption failed: \(error)")
+                    }
+                }
+                self.wasInterrupted = false
+            @unknown default: break
+            }
+        }
+        routeChangeObserver = nc.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let info = note.userInfo,
+                  let rawReason = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  let reason = AVAudioSession.RouteChangeReason(rawValue: rawReason) else { return }
+            // Pause on unplug (old-device-unavailable); engine keeps running otherwise
+            if reason == .oldDeviceUnavailable && self.engine.isRunning {
+                self.engine.pause()
+            }
         }
     }
 
@@ -347,14 +411,8 @@ class AudioEngine: ObservableObject {
                 if sixteenthStep == self.lastDrumStep { continue }
                 self.lastDrumStep = sixteenthStep
 
-                // Always update UI drum step (drives arp viz even when beat is muted)
-                let pendingStep = sixteenthStep
-                if self._pendingDrumStep != pendingStep {
-                    self._pendingDrumStep = pendingStep
-                    DispatchQueue.main.async { [weak self] in
-                        self?.drumStep = pendingStep
-                    }
-                }
+                // Publish UI drum step via atomic Int store; main thread drain timer picks it up.
+                self._pendingDrumStep = sixteenthStep
 
                 if !localBeatMuted && localDrumPattern.count >= 3 {
                     guard localDrumPattern[0].count > 0 else { continue }
@@ -409,9 +467,8 @@ class AudioEngine: ObservableObject {
                     } else {
                         self.arpOsc.triggerNote(note)
                     }
-                    // Publish for visualizer
-                    let arpNote = note
-                    DispatchQueue.main.async { [weak self] in self?.arp1CurrentNote = arpNote }
+                    // Publish for visualizer via atomic Int store (drain timer picks it up).
+                    self._pendingArp1Note = note
                 }
             }
 
@@ -437,8 +494,7 @@ class AudioEngine: ObservableObject {
                     } else {
                         self.arp2Osc.triggerNote(note)
                     }
-                    let arp2Note = note
-                    DispatchQueue.main.async { [weak self] in self?.arp2CurrentNote = arp2Note }
+                    self._pendingArp2Note = note
                 }
             }
 
@@ -728,6 +784,13 @@ class AudioEngine: ObservableObject {
                 sampler?.stopNote(event.note, onChannel: event.channel)
             }
         }
+        // Drain UI state from audio thread — only publishes on change to avoid @Published churn
+        let ds = _pendingDrumStep
+        if ds >= 0 && ds != drumStep { drumStep = ds }
+        let a1 = _pendingArp1Note
+        if a1 >= 0 && a1 != arp1CurrentNote { arp1CurrentNote = a1 }
+        let a2 = _pendingArp2Note
+        if a2 >= 0 && a2 != arp2CurrentNote { arp2CurrentNote = a2 }
     }
 
     // Convert note value string to beat divisor (e.g. "8n" = 2 per beat)

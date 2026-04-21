@@ -32,7 +32,10 @@ struct MetalVisualizerOverlay: UIViewRepresentable {
         mtkView.framebufferOnly = false
 
         // Create the renderer and set as delegate
-        let renderer = MetalVisualizer(device: device, coordinator: coordinator)
+        guard let renderer = MetalVisualizer(device: device, coordinator: coordinator) else {
+            print("[Metal] renderer init failed — returning bare MTKView (no visuals)")
+            return mtkView
+        }
         mtkView.delegate = renderer
 
         // Store renderer to prevent deallocation + expose for dev UI
