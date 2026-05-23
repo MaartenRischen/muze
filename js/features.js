@@ -865,18 +865,45 @@ MUZE.Vibes = {
 
   init() {
     const btn = document.getElementById('perf-vibe-btn');
-    if (!btn) return;
-    btn.addEventListener('click', () => {
-      this._idx = (this._idx + 1) % this.LIST.length;
-      this.apply(this._idx);
-      btn.textContent = this.LIST[this._idx].name;
-    });
+    if (btn) {
+      btn.addEventListener('click', () => {
+        this._idx = (this._idx + 1) % this.LIST.length;
+        this.apply(this._idx);
+        btn.textContent = this.LIST[this._idx].name;
+      });
+    }
+    const surprise = document.getElementById('perf-surprise-btn');
+    if (surprise) surprise.addEventListener('click', () => this.surprise());
+  },
+
+  // Build and apply a fully random combo — endless variety beyond the
+  // curated list. Keeps grooves to the 16-step set for tight playback.
+  surprise() {
+    const C = MUZE.Config, M = MUZE.Music;
+    const scaleKeys = Object.keys(M.EXTRA_SCALES);
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const v = {
+      name: 'Surprise',
+      preset: pick(C.PRESETS).name,
+      scale: Math.random() < 0.85 ? pick(scaleKeys) : null,
+      key: Math.floor(Math.random() * 12),
+      groove: Math.floor(Math.random() * Math.min(12, C.RHYTHM_PATTERNS.length)),
+      progression: Math.random() < 0.7 ? Math.floor(Math.random() * C.PROGRESSIONS.length) : -1,
+    };
+    this._applyVibeObject(v);
+    this._idx = -1; // not a list item
+    const btn = document.getElementById('perf-vibe-btn');
+    if (btn) btn.textContent = '\u{1F3B2} ' + v.preset;
   },
 
   apply(idx) {
     const v = this.LIST[idx];
     if (!v) return;
+    this._applyVibeObject(v);
+    this._idx = idx;
+  },
 
+  _applyVibeObject(v) {
     // 1. Base preset (bpm, key, synths, volumes, sends, swing, arp pattern)
     const pIdx = MUZE.Config.PRESETS.findIndex(p => p.name === v.preset);
     if (pIdx >= 0) MUZE.Audio.applyPreset(pIdx);
@@ -916,14 +943,13 @@ MUZE.Vibes = {
     }
 
     MUZE.Loop._currentPadKey = null; // force pad retrigger
-    this._idx = idx;
     this._syncLabels(v);
   },
 
   // Reflect the new state across the Perform tab controls
   _syncLabels(v) {
     const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-    set('perf-vibe-btn', v.name);
+    // The vibe button label is set by the caller (curated name vs 🎲 Surprise)
     set('perf-preset-btn', v.preset);
     set('perf-scale-btn', v.scale || 'Modal (face)');
     set('scale-val', v.scale || 'modal');
