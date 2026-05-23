@@ -4,6 +4,9 @@
 
 window.MUZE = {};
 
+// Single source of truth for the displayed app version (shown in #build-version).
+MUZE.VERSION = 'v5.2.0';
+
 const SAMPLE_BASE = 'https://ffwbirepsanifejscguz.supabase.co/storage/v1/object/public/Samples/';
 
 MUZE.Config = Object.freeze({
@@ -50,6 +53,12 @@ MUZE.Config = Object.freeze({
     { name: 'Minimal', kick:[1,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0], snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], hat:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0] },
     { name: 'Trap', kick:[1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0], snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], hat:[1,0,1,1,1,0,1,1,1,0,1,1,1,0,1,1] },
     { name: 'Halftime', kick:[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], snare:[0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
+    { name: 'House',     kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], hat:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0] },
+    { name: 'Boom Bap',  kick:[1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0], snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
+    { name: 'Liquid DnB',kick:[1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0], snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], hat:[1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,0] },
+    { name: 'Dembow',    kick:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], snare:[0,0,0,1,0,0,1,0,0,0,0,1,0,0,1,0], hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
+    { name: 'Afrobeat',  kick:[1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0], snare:[0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0], hat:[1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1] },
+    { name: 'UK Garage', kick:[1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0], snare:[0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0], hat:[1,0,1,1,0,1,1,0,1,0,1,1,0,1,1,0] },
   ],
 
   // Arpeggio pattern types and note values
@@ -72,6 +81,12 @@ MUZE.Config = Object.freeze({
     'melodic minor':  { accent: '#a78bfa', rgb: '167,139,250' },
     'phrygian dom':   { accent: '#f97316', rgb: '249,115,22' },
     'hirajoshi':      { accent: '#ec4899', rgb: '236,72,153' },
+    'in-sen':         { accent: '#6366f1', rgb: '99,102,241' },
+    'iwato':          { accent: '#7c3aed', rgb: '124,58,237' },
+    'egyptian':       { accent: '#eab308', rgb: '234,179,8' },
+    'hungarian min':  { accent: '#dc2626', rgb: '220,38,38' },
+    'double harm':    { accent: '#db2777', rgb: '219,39,119' },
+    'ukrainian':      { accent: '#14b8a6', rgb: '20,184,166' },
   },
 
   // Root note names for selector
@@ -182,6 +197,84 @@ MUZE.Config = Object.freeze({
       arpPattern: 'up-up-down', rhythmPattern: 4, swing: 15,
       reverbDecay: 1.8, delayFeedback: 0.3,
       padReverb: 0.3, padDelay: 0.2, arpReverb: 0.25, arpDelay: 0.25,
+    },
+    {
+      name: 'Cinematic',
+      bpm: 70,
+      rootOffset: 8, // G#/Ab — dark, filmic
+      padVolume: -7, arpVolume: -13, melodyVolume: -8,
+      kickVolume: -8, snareVolume: -16, hatVolume: -60,
+      padOsc: 'sawtooth', padHarm: 2, padMod: 2.0, padAttack: 2.0, padRelease: 5.0,
+      arpOsc: 'triangle', arpAttack: 0.2, arpDecay: 0.8, arpSustain: 0.4, arpRelease: 2.0,
+      melOsc: 'sine', melAttack: 0.3, melDecay: 0.4, melSustain: 0.8, melRelease: 1.6,
+      arpPattern: 'up-down', rhythmPattern: 5, swing: 0,
+      reverbDecay: 6.0, delayFeedback: 0.4,
+      padReverb: 0.65, padDelay: 0.35, arpReverb: 0.55, arpDelay: 0.4,
+    },
+    {
+      name: 'Synthwave',
+      bpm: 100,
+      rootOffset: 9, // A — retro neon
+      padVolume: -13, arpVolume: -7, melodyVolume: -6,
+      kickVolume: -5, snareVolume: -8, hatVolume: -15,
+      padOsc: 'sawtooth', padHarm: 2, padMod: 2.5, padAttack: 0.4, padRelease: 1.8,
+      arpOsc: 'sawtooth', arpAttack: 0.01, arpDecay: 0.2, arpSustain: 0.6, arpRelease: 0.4,
+      melOsc: 'sawtooth', melAttack: 0.02, melDecay: 0.2, melSustain: 0.7, melRelease: 0.35,
+      arpPattern: 'up', rhythmPattern: 0, swing: 0,
+      reverbDecay: 2.8, delayFeedback: 0.4,
+      padReverb: 0.4, padDelay: 0.4, arpReverb: 0.3, arpDelay: 0.45,
+    },
+    {
+      name: 'Vaporwave',
+      bpm: 62,
+      rootOffset: 5, // F — woozy, slow
+      padVolume: -9, arpVolume: -11, melodyVolume: -8,
+      kickVolume: -7, snareVolume: -12, hatVolume: -20,
+      padOsc: 'triangle', padHarm: 3, padMod: 1.0, padAttack: 1.8, padRelease: 4.0,
+      arpOsc: 'sine', arpAttack: 0.1, arpDecay: 0.6, arpSustain: 0.5, arpRelease: 1.4,
+      melOsc: 'triangle', melAttack: 0.15, melDecay: 0.4, melSustain: 0.7, melRelease: 1.0,
+      arpPattern: 'up-down', rhythmPattern: 5, swing: 35,
+      reverbDecay: 4.5, delayFeedback: 0.5,
+      padReverb: 0.6, padDelay: 0.45, arpReverb: 0.5, arpDelay: 0.4,
+    },
+    {
+      name: 'Liquid DnB',
+      bpm: 170,
+      rootOffset: 2, // D — rolling, melodic
+      padVolume: -12, arpVolume: -8, melodyVolume: -6,
+      kickVolume: -5, snareVolume: -7, hatVolume: -16,
+      padOsc: 'sine', padHarm: 2, padMod: 1.8, padAttack: 1.2, padRelease: 2.5,
+      arpOsc: 'triangle', arpAttack: 0.005, arpDecay: 0.18, arpSustain: 0.4, arpRelease: 0.3,
+      melOsc: 'sawtooth', melAttack: 0.01, melDecay: 0.15, melSustain: 0.5, melRelease: 0.3,
+      arpPattern: 'up-up-down', rhythmPattern: 8, swing: 0,
+      reverbDecay: 2.5, delayFeedback: 0.35,
+      padReverb: 0.45, padDelay: 0.3, arpReverb: 0.35, arpDelay: 0.3,
+    },
+    {
+      name: 'Meditation',
+      bpm: 50,
+      rootOffset: 0, // C — still, drone
+      padVolume: -6, arpVolume: -18, melodyVolume: -12,
+      kickVolume: -60, snareVolume: -60, hatVolume: -60,
+      padOsc: 'sine', padHarm: 4, padMod: 1.5, padAttack: 4.0, padRelease: 8.0,
+      arpOsc: 'sine', arpAttack: 1.0, arpDecay: 2.0, arpSustain: 0.3, arpRelease: 4.0,
+      melOsc: 'sine', melAttack: 1.0, melDecay: 0.6, melSustain: 0.6, melRelease: 3.0,
+      arpPattern: 'random', rhythmPattern: 3, swing: 0,
+      reverbDecay: 9.0, delayFeedback: 0.6,
+      padReverb: 0.85, padDelay: 0.55, arpReverb: 0.75, arpDelay: 0.5,
+    },
+    {
+      name: 'Trap Soul',
+      bpm: 72,
+      rootOffset: 1, // C# — moody halftime
+      padVolume: -11, arpVolume: -10, melodyVolume: -7,
+      kickVolume: -3, snareVolume: -7, hatVolume: -13,
+      padOsc: 'triangle', padHarm: 2, padMod: 1.5, padAttack: 0.6, padRelease: 2.2,
+      arpOsc: 'triangle', arpAttack: 0.02, arpDecay: 0.3, arpSustain: 0.4, arpRelease: 0.6,
+      melOsc: 'sine', melAttack: 0.04, melDecay: 0.25, melSustain: 0.6, melRelease: 0.6,
+      arpPattern: 'down', rhythmPattern: 4, swing: 8,
+      reverbDecay: 3.2, delayFeedback: 0.3,
+      padReverb: 0.4, padDelay: 0.3, arpReverb: 0.35, arpDelay: 0.25,
     },
   ],
 

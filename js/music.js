@@ -15,6 +15,12 @@ MUZE.Music = {
     'melodic minor': [0,2,3,5,7,9,11],
     'phrygian dom':  [0,1,4,5,7,8,10],
     'hirajoshi':     [0,2,3,7,8],
+    'in-sen':        [0,1,5,7,10],
+    'iwato':         [0,1,5,6,10],
+    'egyptian':      [0,2,5,7,10],
+    'hungarian min': [0,2,3,6,7,8,11],
+    'double harm':   [0,1,4,5,7,8,11],
+    'ukrainian':     [0,2,3,6,7,9,10],
   },
 
   selectScale(lipCorner) {
@@ -184,6 +190,12 @@ MUZE.PresetExtensions = {
   'Deep Space':    { arpRate: '4n',  padChorusDepth: 0.6, delayTime: '4n.',  reverbDecay: 8.0 },
   'Minimal':       { arpRate: '16n', padChorusDepth: 0.1, delayTime: '16n',  reverbDecay: 2.0 },
   'Future Bass':   { arpRate: '8n',  padChorusDepth: 0.5, delayTime: '8n.',  reverbDecay: 1.8 },
+  'Cinematic':     { arpRate: '4n',  padChorusDepth: 0.5, delayTime: '4n.',  reverbDecay: 6.0 },
+  'Synthwave':     { arpRate: '8n',  padChorusDepth: 0.4, delayTime: '8n.',  reverbDecay: 2.8 },
+  'Vaporwave':     { arpRate: '4n',  padChorusDepth: 0.6, delayTime: '4n.',  reverbDecay: 4.5 },
+  'Liquid DnB':    { arpRate: '16n', padChorusDepth: 0.3, delayTime: '8n.',  reverbDecay: 2.5 },
+  'Meditation':    { arpRate: '2n',  padChorusDepth: 0.6, delayTime: '4n.',  reverbDecay: 9.0 },
+  'Trap Soul':     { arpRate: '8n.', padChorusDepth: 0.3, delayTime: '8n.',  reverbDecay: 3.2 },
 
   /**
    * Apply extended parameters for a given preset.
