@@ -28,15 +28,23 @@ Grant camera + microphone permission when prompted.
 - **Hand height** → melody pitch; **open palm** glides (legato), **fist** re-triggers (staccato)
 - **Chord bar** (bottom) → pick the chord; or turn on an auto **progression**
 - **Instrument toggles** (right) → Pad, Arp 1/2, Melody, Beat, Binaural
-- **⚙ → Perform** → Vibes, Surprise, presets, key/scale, tempo, palettes, visuals, scenes, loop recorder
+- **✨ (toolbar)** → tap for the next Vibe, hold for a 🎲 Surprise
+- **⚙ → Perform** → Vibes, Surprise, Share link, presets, key/scale, tempo, palettes, visuals, scenes, loop recorder
+- **? (toolbar)** → guided tutorials + a Quick Reference gesture cheat-sheet
 - **MIX** → per-channel mixer (volume, pan, EQ, reverb/delay sends)
 
 ## Quick start (the fast path)
 
-Open **⚙ → Perform → Vibe** and tap it — each tap loads a complete combo
-(synth preset + scale + key + drum groove + chord progression) **and turns on a
-full arrangement so you hear it instantly**. Hit **🎲 Surprise** for an endless
-stream of random combos. Pick a **Palette** to recolor every visual.
+Tap **✨** in the toolbar (or **⚙ → Perform → Vibe**) — each tap loads a complete
+combo (synth preset + scale + key + drum groove + chord progression) **and turns
+on a full arrangement so you hear it instantly**. **Hold ✨** (or **🎲 Surprise**)
+for an endless stream of random combos. Pick a **Palette** to recolor every
+visual, and **Copy link** to share the exact sound as a URL.
+
+## Install
+
+It's a PWA: open it in mobile Chrome/Safari and use **Add to Home Screen** to run
+it full-screen as a standalone app (Jammerman icon, no browser chrome).
 
 ## Architecture
 
