@@ -5,7 +5,7 @@
 window.MUZE = {};
 
 // Single source of truth for the displayed app version (shown in #build-version).
-MUZE.VERSION = 'v5.3.0';
+MUZE.VERSION = 'v5.4.0';
 
 const SAMPLE_BASE = 'https://ffwbirepsanifejscguz.supabase.co/storage/v1/object/public/Samples/';
 
@@ -64,6 +64,21 @@ MUZE.Config = Object.freeze({
   // Arpeggio pattern types and note values
   ARP_PATTERNS: ['up-down', 'up', 'down', 'random', 'up-up-down', 'played'],
   ARP_NOTE_VALUES: ['4n', '8n', '8n.', '16n', '16n.', '32n'],
+
+  // Curated chord progressions for auto-advance. Each value is a scale degree
+  // 0-5 mapping to the chord buttons I, ii, iii, IV, V, vi. One chord per bar.
+  PROGRESSIONS: [
+    { name: 'Pop',        degrees: [0, 4, 5, 3] },          // I–V–vi–IV
+    { name: 'Ballad',     degrees: [5, 3, 0, 4] },          // vi–IV–I–V
+    { name: 'Doo-Wop',    degrees: [0, 5, 3, 4] },          // I–vi–IV–V
+    { name: 'Jazz',       degrees: [1, 4, 0, 0] },          // ii–V–I
+    { name: 'Canon',      degrees: [0, 4, 5, 2, 3, 0, 3, 4] }, // Pachelbel
+    { name: 'Andalusian', degrees: [5, 4, 3, 2] },          // descending drama
+    { name: 'Epic',       degrees: [5, 3, 4, 0] },          // vi–IV–V–I
+    { name: 'Dreamy',     degrees: [0, 2, 3, 3] },          // I–iii–IV
+    { name: 'Tension',    degrees: [1, 3, 4, 4] },          // ii–IV–V
+    { name: 'Wander',     degrees: [0, 3, 1, 4] },          // I–IV–ii–V
+  ],
 
   // Mode -> color mapping
   MODE_COLORS: {

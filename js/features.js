@@ -742,12 +742,14 @@ MUZE.BeatRepeat = {
 
 // ============================================================
 // CHORD PROGRESSION AUTO-ADVANCE
-// Cycles I -> ii -> iii -> IV -> V -> vi on each bar
+// Steps through a curated, musical progression (one chord per bar)
+// instead of a flat I->ii->iii cycle. Progression is selectable.
 // ============================================================
 MUZE.ChordAdvance = {
   _active: false,
   _loop: null,
-  _chordIdx: 0,
+  _progIdx: 0,   // which progression in Config.PROGRESSIONS
+  _step: 0,      // position within the current progression
 
   init() {
     const btn = document.getElementById('auto-chord-btn');
@@ -756,7 +758,8 @@ MUZE.ChordAdvance = {
     btn.addEventListener('click', () => {
       this._active = !this._active;
       btn.classList.toggle('active', this._active);
-      document.getElementById('auto-chord-val').textContent = this._active ? 'AUTO' : 'OFF';
+      document.getElementById('auto-chord-val').textContent =
+        this._active ? this.getProgressionName() : 'OFF';
 
       if (this._active) {
         this._start();
@@ -766,25 +769,56 @@ MUZE.ChordAdvance = {
     });
   },
 
-  _start() {
-    this._chordIdx = MUZE.State.chordIndex;
-    // Advance chord every bar (4 beats)
-    this._loop = new Tone.Loop((time) => {
-      this._chordIdx = (this._chordIdx + 1) % 6;
-      // Schedule chord change
-      Tone.Draw.schedule(() => {
-        MUZE.State.chordIndex = this._chordIdx;
-        document.querySelectorAll('.chord-btn').forEach((b, i) => {
-          b.classList.toggle('active', i === this._chordIdx);
-        });
-        // Show next chord indicator
-        this._updateNextIndicator();
-        // Force pad retrigger
-        MUZE.Loop._currentPadKey = null;
-      }, time);
-    }, '1m');
-    this._loop.start(0);
+  _progression() {
+    const list = MUZE.Config.PROGRESSIONS;
+    if (list && list.length) return list[this._progIdx % list.length];
+    // Fallback: flat I..vi cycle if no library present
+    return { name: 'AUTO', degrees: [0, 1, 2, 3, 4, 5] };
+  },
+
+  getProgressionName() {
+    return this._progression().name;
+  },
+
+  // Cycle the selected progression (used by the perform UI). Restarts the
+  // loop in-place if currently active so the change is heard immediately.
+  cycleProgression() {
+    const list = MUZE.Config.PROGRESSIONS;
+    const n = (list && list.length) ? list.length : 1;
+    this._progIdx = (this._progIdx + 1) % n;
+    if (this._active) { this._stop(); this._start(); }
+    return this.getProgressionName();
+  },
+
+  setProgression(idx) {
+    const list = MUZE.Config.PROGRESSIONS;
+    const n = (list && list.length) ? list.length : 1;
+    this._progIdx = ((idx % n) + n) % n;
+    if (this._active) { this._stop(); this._start(); }
+  },
+
+  // Apply the chord at the current step (visual + audio retrigger)
+  _applyStep() {
+    const prog = this._progression();
+    const degree = prog.degrees[this._step % prog.degrees.length];
+    MUZE.State.chordIndex = degree;
+    document.querySelectorAll('.chord-btn').forEach((b, i) => {
+      b.classList.toggle('active', i === degree);
+    });
     this._updateNextIndicator();
+    MUZE.Loop._currentPadKey = null; // force pad retrigger
+  },
+
+  _start() {
+    this._step = 0;
+    // Play the first chord of the progression immediately
+    Tone.Draw.schedule(() => this._applyStep(), Tone.now());
+    // Then advance one chord per bar
+    this._loop = new Tone.Loop((time) => {
+      this._step++;
+      Tone.Draw.schedule(() => this._applyStep(), time);
+    }, '1m');
+    this._loop.start('+1m'); // first advance after one bar
   },
 
   _stop() {
@@ -793,15 +827,15 @@ MUZE.ChordAdvance = {
       this._loop.dispose();
       this._loop = null;
     }
-    // Remove next indicators
     document.querySelectorAll('.chord-btn.next-chord').forEach(b => b.classList.remove('next-chord'));
   },
 
   _updateNextIndicator() {
     document.querySelectorAll('.chord-btn.next-chord').forEach(b => b.classList.remove('next-chord'));
     if (!this._active) return;
-    const nextIdx = (this._chordIdx + 1) % 6;
-    const nextBtn = document.querySelector(`.chord-btn[data-chord="${nextIdx}"]`);
+    const prog = this._progression();
+    const nextDegree = prog.degrees[(this._step + 1) % prog.degrees.length];
+    const nextBtn = document.querySelector(`.chord-btn[data-chord="${nextDegree}"]`);
     if (nextBtn) nextBtn.classList.add('next-chord');
   }
 };

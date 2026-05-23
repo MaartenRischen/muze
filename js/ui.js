@@ -628,20 +628,30 @@ MUZE.PerformTab = {
     const chordsBtn = document.getElementById('perf-chords-btn');
     if (chordsBtn) {
       chordsBtn.addEventListener('click', () => {
-        if (!MUZE.ChordAdvance) return;
-        MUZE.ChordAdvance._active = !MUZE.ChordAdvance._active;
-        if (MUZE.ChordAdvance._active) {
-          MUZE.ChordAdvance._start();
-          chordsBtn.textContent = 'AUTO';
+        const CA = MUZE.ChordAdvance;
+        if (!CA) return;
+        const n = (MUZE.Config.PROGRESSIONS && MUZE.Config.PROGRESSIONS.length) || 1;
+        if (!CA._active) {
+          // OFF -> first progression
+          CA._progIdx = 0;
+          CA._active = true;
+          CA._start();
+        } else if (CA._progIdx >= n - 1) {
+          // last progression -> OFF (and reset so next cycle starts fresh)
+          CA._active = false;
+          CA._stop();
+          CA._progIdx = 0;
         } else {
-          MUZE.ChordAdvance._stop();
-          chordsBtn.textContent = 'OFF';
+          // advance to the next progression
+          CA.cycleProgression();
         }
+        const label = CA._active ? CA.getProgressionName() : 'OFF';
+        chordsBtn.textContent = label;
         // Sync hidden auto-chord display
         const acBtn = document.getElementById('auto-chord-btn');
-        if (acBtn) acBtn.classList.toggle('active', MUZE.ChordAdvance._active);
+        if (acBtn) acBtn.classList.toggle('active', CA._active);
         const acVal = document.getElementById('auto-chord-val');
-        if (acVal) acVal.textContent = MUZE.ChordAdvance._active ? 'AUTO' : 'OFF';
+        if (acVal) acVal.textContent = label;
       });
     }
 
