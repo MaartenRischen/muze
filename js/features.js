@@ -869,15 +869,45 @@ MUZE.Vibes = {
 
   init() {
     const btn = document.getElementById('perf-vibe-btn');
-    if (btn) {
-      btn.addEventListener('click', () => {
-        this._idx = (this._idx + 1) % this.LIST.length;
-        this.apply(this._idx);
-        btn.textContent = this.LIST[this._idx].name;
-      });
-    }
+    if (btn) btn.addEventListener('click', () => this.cycle());
+    // Prominent toolbar shortcut so the one-tap-great-sound path is discoverable
+    const tb = document.getElementById('vibe-toolbar-btn');
+    if (tb) tb.addEventListener('click', () => this.cycle());
     const surprise = document.getElementById('perf-surprise-btn');
     if (surprise) surprise.addEventListener('click', () => this.surprise());
+  },
+
+  // Advance to the next curated vibe and announce it
+  cycle() {
+    this._idx = (this._idx + 1) % this.LIST.length;
+    this.apply(this._idx);
+    const name = this.LIST[this._idx].name;
+    const btn = document.getElementById('perf-vibe-btn');
+    if (btn) btn.textContent = name;
+    this._toast('✨ ' + name);
+    return name;
+  },
+
+  // Lightweight self-contained toast (inline styles, no CSS dependency)
+  _toast(text) {
+    let el = document.getElementById('vibe-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'vibe-toast';
+      Object.assign(el.style, {
+        position: 'fixed', left: '50%', top: '16%', zIndex: 60, pointerEvents: 'none',
+        font: "600 15px/1 var(--font-ui, system-ui, sans-serif)", letterSpacing: '1px',
+        color: '#fff', padding: '10px 18px', borderRadius: '999px',
+        background: 'rgba(18,18,24,0.72)', border: '1px solid rgba(255,255,255,0.14)',
+        boxShadow: '0 6px 24px rgba(0,0,0,0.45)', transition: 'opacity .3s ease, transform .3s ease',
+        opacity: '0', transform: 'translateX(-50%) translateY(-6px)'
+      });
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+    clearTimeout(this._toastT);
+    requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateX(-50%) translateY(0)'; });
+    this._toastT = setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(-50%) translateY(-6px)'; }, 1500);
   },
 
   // Build and apply a fully random combo — endless variety beyond the
@@ -898,6 +928,7 @@ MUZE.Vibes = {
     this._idx = -1; // not a list item
     const btn = document.getElementById('perf-vibe-btn');
     if (btn) btn.textContent = '\u{1F3B2} ' + v.preset;
+    this._toast('\u{1F3B2} ' + v.preset + (v.scale ? ' · ' + v.scale : ''));
   },
 
   apply(idx) {
