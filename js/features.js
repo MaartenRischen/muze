@@ -327,6 +327,13 @@ MUZE.SceneManager = {
       chordIndex: S.chordIndex,
       presetIdx: S.presetIdx,
       chordAutoAdvance: MUZE.ChordAdvance ? MUZE.ChordAdvance._active : false,
+      // Full look + groove + progression so a scene restores the whole vibe
+      chordProgIdx: MUZE.ChordAdvance ? MUZE.ChordAdvance._progIdx : 0,
+      grooveIdx: MUZE.AutoRhythm ? MUZE.AutoRhythm._patIdx : 0,
+      paletteIdx: S.paletteIdx || 0,
+      auroraEnabled: S.auroraEnabled !== false,
+      faceGlowEnabled: S.faceGlowEnabled !== false,
+      liteMode: S.liteMode === true,
       // Mixer volumes
       volumes: {},
       pans: {},
@@ -444,22 +451,45 @@ MUZE.SceneManager = {
       MUZE.Mixer.master.volume = scene.masterVolume;
     }
 
-    // Chord auto-advance
+    // Drum groove (restore before any chord-advance restart)
+    if (scene.grooveIdx != null && MUZE.AutoRhythm &&
+        scene.grooveIdx < MUZE.Config.RHYTHM_PATTERNS.length) {
+      MUZE.AutoRhythm._patIdx = scene.grooveIdx;
+      MUZE.AutoRhythm._useCustom = false;
+      if (MUZE.AutoRhythm._active) MUZE.AutoRhythm._restart();
+    }
+
+    // Chord auto-advance (+ which progression)
     if (MUZE.ChordAdvance) {
-      if (scene.chordAutoAdvance && !MUZE.ChordAdvance._active) {
+      if (scene.chordProgIdx != null) MUZE.ChordAdvance._progIdx = scene.chordProgIdx;
+      const acBtn = document.getElementById('auto-chord-btn');
+      const acVal = document.getElementById('auto-chord-val');
+      if (scene.chordAutoAdvance) {
+        MUZE.ChordAdvance._stop();
         MUZE.ChordAdvance._active = true;
         MUZE.ChordAdvance._start();
-        const acBtn = document.getElementById('auto-chord-btn');
         if (acBtn) acBtn.classList.add('active');
-        const acVal = document.getElementById('auto-chord-val');
-        if (acVal) acVal.textContent = 'AUTO';
-      } else if (!scene.chordAutoAdvance && MUZE.ChordAdvance._active) {
+        if (acVal) acVal.textContent = MUZE.ChordAdvance.getProgressionName();
+      } else if (MUZE.ChordAdvance._active) {
         MUZE.ChordAdvance._active = false;
         MUZE.ChordAdvance._stop();
-        const acBtn = document.getElementById('auto-chord-btn');
         if (acBtn) acBtn.classList.remove('active');
-        const acVal = document.getElementById('auto-chord-val');
         if (acVal) acVal.textContent = 'OFF';
+      }
+      const perfChords = document.getElementById('perf-chords-btn');
+      if (perfChords) perfChords.textContent = MUZE.ChordAdvance._active ? MUZE.ChordAdvance.getProgressionName() : 'OFF';
+    }
+
+    // Visual look: palette + visual toggles
+    if (scene.paletteIdx != null && MUZE.Theme) MUZE.Theme.apply(scene.paletteIdx);
+    if (MUZE.VisualSettings) {
+      if (scene.liteMode) {
+        MUZE.VisualSettings.setLite(true);
+      } else {
+        MUZE.VisualSettings.setLite(false);
+        if (scene.auroraEnabled !== undefined) MUZE.State.auroraEnabled = scene.auroraEnabled;
+        if (scene.faceGlowEnabled !== undefined) MUZE.State.faceGlowEnabled = scene.faceGlowEnabled;
+        MUZE.VisualSettings.refreshLabels();
       }
     }
 

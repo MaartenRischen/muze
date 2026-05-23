@@ -1,5 +1,10 @@
 # Changelog
 
+## v6.4.0 — Scenes capture the whole vibe
+- Scene snapshots now save + restore the color palette, drum groove, chord
+  progression, and visual toggles (aurora/face-glow/lite) in addition to the
+  sound. Recall a scene and the full look + groove come back. Old scenes still load.
+
 ## v6.3.0 — More content
 - +3 drum grooves (Bossa, Drill, Breakbeat) and +4 vibes (Rio, Night Drill,
   Jungle, Sakura). Surprise now draws from all grooves (Euclidean included).
