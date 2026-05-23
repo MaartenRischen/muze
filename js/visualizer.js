@@ -361,7 +361,7 @@ MUZE.Visualizer = {
     this._drawBurstParticles(ctx);
 
     // 8. Face mesh AR effects (contour glow, iris, particles, aura, trails)
-    if (hasFace) {
+    if (hasFace && MUZE.State.faceGlowEnabled !== false) {
       const ml = this._mirroredLandmarks;
 
       // 8a. Head rotation ghost trails (drawn first, behind everything)

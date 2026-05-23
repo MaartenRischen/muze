@@ -939,6 +939,71 @@ MUZE.Vibes = {
 };
 
 // ============================================================
+// VISUAL SETTINGS — customize / tune the graphics for taste + perf.
+// Aurora and Face-glow are independent toggles; Lite mode is a one-tap
+// performance bundle that drops the ambient layers and caps particles.
+// ============================================================
+MUZE.VisualSettings = {
+  _capsDefault: null,
+
+  init() {
+    this._toggle('vis-aurora-btn', 'auroraEnabled');
+    this._toggle('vis-faceglow-btn', 'faceGlowEnabled');
+    const liteBtn = document.getElementById('vis-lite-btn');
+    if (liteBtn) liteBtn.addEventListener('click', () => this.setLite(!MUZE.State.liteMode));
+    this.refreshLabels();
+  },
+
+  _toggle(id, flag) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      MUZE.State[flag] = MUZE.State[flag] === false;  // flip (default-true)
+      // Manual changes drop us out of lite mode's "all off" assumption
+      if (MUZE.State[flag] && MUZE.State.liteMode) MUZE.State.liteMode = false;
+      this.refreshLabels();
+    });
+  },
+
+  // Lite mode: bundle aurora + face glow off and cap particle systems so
+  // the app stays smooth on lower-end phones. Toggling off restores defaults.
+  setLite(on) {
+    MUZE.State.liteMode = on;
+    const V = MUZE.Visualizer;
+    if (!this._capsDefault) {
+      this._capsDefault = {
+        p: V._maxParticles, b: V._maxBurstParticles,
+        f: V._maxFaceParticles, c: V._maxConstellationNotes
+      };
+    }
+    if (on) {
+      MUZE.State.auroraEnabled = false;
+      MUZE.State.faceGlowEnabled = false;
+      V._maxParticles = 8; V._maxBurstParticles = 16;
+      V._maxFaceParticles = 12; V._maxConstellationNotes = 16;
+    } else {
+      MUZE.State.auroraEnabled = true;
+      MUZE.State.faceGlowEnabled = true;
+      const d = this._capsDefault;
+      V._maxParticles = d.p; V._maxBurstParticles = d.b;
+      V._maxFaceParticles = d.f; V._maxConstellationNotes = d.c;
+    }
+    this.refreshLabels();
+  },
+
+  refreshLabels() {
+    const set = (id, on) => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = on ? 'ON' : 'OFF'; el.classList.toggle('active', on); }
+    };
+    set('vis-aurora-btn', MUZE.State.auroraEnabled !== false);
+    set('vis-faceglow-btn', MUZE.State.faceGlowEnabled !== false);
+    const lite = document.getElementById('vis-lite-btn');
+    if (lite) { lite.textContent = MUZE.State.liteMode ? 'ON' : 'OFF'; lite.classList.toggle('active', !!MUZE.State.liteMode); }
+  }
+};
+
+// ============================================================
 // SIDECHAIN PUMPING — Kick ducks pad volume
 // ============================================================
 MUZE.Sidechain = {

@@ -30,6 +30,11 @@ MUZE.Storage = {
     // Save chord auto-advance state
     data['chordAutoAdvance'] = MUZE.ChordAdvance ? MUZE.ChordAdvance._active : false;
 
+    // Save visual settings
+    data['auroraEnabled'] = MUZE.State.auroraEnabled !== false;
+    data['faceGlowEnabled'] = MUZE.State.faceGlowEnabled !== false;
+    data['liteMode'] = MUZE.State.liteMode === true;
+
     // Save extended preset parameters (arpRate, padChorusDepth, delayTime, reverbDecay)
     if (MUZE.State.arpRate) data['arpRate'] = MUZE.State.arpRate;
     if (MUZE.State.padChorusDepth !== undefined) data['padChorusDepth'] = MUZE.State.padChorusDepth;
@@ -149,6 +154,16 @@ MUZE.Storage = {
         if (btn) btn.classList.add('active');
         const val = document.getElementById('auto-chord-val');
         if (val) val.textContent = 'AUTO';
+      }
+
+      // Restore visual settings
+      const asBool = (v) => v === true || v === 'true';
+      if (data['liteMode'] === true && MUZE.VisualSettings) {
+        MUZE.VisualSettings.setLite(true);
+      } else {
+        if (data['auroraEnabled'] !== undefined) MUZE.State.auroraEnabled = asBool(data['auroraEnabled']);
+        if (data['faceGlowEnabled'] !== undefined) MUZE.State.faceGlowEnabled = asBool(data['faceGlowEnabled']);
+        if (MUZE.VisualSettings) MUZE.VisualSettings.refreshLabels();
       }
 
       // Restore scenes
