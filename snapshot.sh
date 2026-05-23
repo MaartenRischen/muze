@@ -10,7 +10,7 @@ DEST="versions/$NAME"
 
 mkdir -p "$DEST"
 # Self-contained copy of the runnable web app
-cp -R index.html guide.html errors.html "$DEST/" 2>/dev/null || true
+cp -R index.html guide.html errors.html manifest.json icon.svg "$DEST/" 2>/dev/null || true
 cp -R js css "$DEST/"
 
 # Syntax-check the snapshot's JS so we never freeze a broken build

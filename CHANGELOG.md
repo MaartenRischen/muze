@@ -1,5 +1,10 @@
 # Changelog
 
+## v6.9.0 — Installable app + icon
+- Added a PWA manifest + a real app icon (glowing aura orb over an equalizer),
+  so Jammerman can be installed to the home screen as a standalone app
+  (Add to Home Screen on iOS). Replaces the emoji favicon.
+
 ## v6.8.0 — Shareable sounds
 - 'Copy link' (⚙ → Perform) encodes your preset, key, scale, groove, chord
   progression and palette into a URL. Open the link and the sound loads

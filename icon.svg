@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="orb" cx="50%" cy="42%" r="60%">
+      <stop offset="0%" stop-color="#c4b5fd"/>
+      <stop offset="45%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </radialGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#15151b"/>
+      <stop offset="100%" stop-color="#0a0a0d"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- Maskable-safe rounded background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Glowing aura orb -->
+  <circle cx="256" cy="222" r="120" fill="url(#orb)" opacity="0.92" filter="url(#glow)"/>
+  <circle cx="256" cy="222" r="120" fill="none" stroke="#ffffff" stroke-opacity="0.25" stroke-width="3"/>
+  <!-- Equalizer bars (the "instrument") -->
+  <g fill="#ffffff" opacity="0.95">
+    <rect x="170" y="330" width="26" height="60" rx="13"/>
+    <rect x="212" y="300" width="26" height="120" rx="13"/>
+    <rect x="254" y="276" width="26" height="168" rx="13"/>
+    <rect x="296" y="300" width="26" height="120" rx="13"/>
+    <rect x="338" y="330" width="26" height="60" rx="13"/>
+  </g>
+</svg>
