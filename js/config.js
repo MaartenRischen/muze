@@ -5,7 +5,7 @@
 window.MUZE = {};
 
 // Single source of truth for the displayed app version (shown in #build-version).
-MUZE.VERSION = 'v5.2.0';
+MUZE.VERSION = 'v5.3.0';
 
 const SAMPLE_BASE = 'https://ffwbirepsanifejscguz.supabase.co/storage/v1/object/public/Samples/';
 
@@ -313,6 +313,7 @@ MUZE.State = {
   presetIdx: 0,           // current preset index
   extraScaleMode: null,   // null = face-controlled modal, or string name of extra scale
   latencyMode: 'balanced', // 'low' (fast phone), 'balanced' (default), 'safe' (slow phone)
+  auroraEnabled: true,     // ambient nebula backdrop behind the user
 };
 
 // ---- Smoothing Filter (legacy, kept for reference) ----

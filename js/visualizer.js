@@ -124,6 +124,11 @@ MUZE.Visualizer = {
   _arp1LastIdx: -1, _arp1Flash: 0, _arp1Sparks: [],
   _arp2LastIdx: -1, _arp2Flash: 0, _arp2Sparks: [],
 
+  // ---- Aurora / nebula backdrop (behind-canvas, behind the user) ----
+  _auroraTime: 0,
+  _stars: null,            // lazily-built starfield [{x,y,z,phase}]
+  _starDrift: 0,
+
   init() {
     this._canvas = document.getElementById('overlay');
     this._ctx = this._canvas.getContext('2d');
@@ -321,6 +326,11 @@ MUZE.Visualizer = {
 
     if (this._behindCtx) {
       this._behindCtx.clearRect(0, 0, w, h);
+      // Ambient backdrop drawn first (furthest back), behind the user
+      if (MUZE.State.auroraEnabled !== false) {
+        this._drawAurora(this._behindCtx, w, h, energy, bass, mid, accentRgb);
+        this._drawStarfield(this._behindCtx, w, h, high, energy);
+      }
       this._drawWaveformRing(this._behindCtx, waveform, cx, cy, radius, energy, accentRgb);
       this._drawBeatHalo(this._behindCtx, w, h, bass, energy, accentRgb);
     } else {
@@ -377,6 +387,95 @@ MUZE.Visualizer = {
 
     // 9. Riser drop explosion particles
     this._updateAndDrawExplosion(ctx);
+  },
+
+  // ============================================================
+  // 0. AURORA / NEBULA BACKDROP
+  //    Slow-drifting soft light clouds behind the user. Tinted by
+  //    the current mode accent + a cool complementary variant.
+  //    Energy/bass make it bloom and breathe. Additive, low alpha,
+  //    only 4 radial gradients per frame — cheap on mobile.
+  // ============================================================
+  _drawAurora(ctx, w, h, energy, bass, mid, accentRgb) {
+    this._auroraTime += 0.0042 + bass * 0.004;
+    const t = this._auroraTime;
+    const rgb = accentRgb.split(',').map(Number);
+    // Cool complementary variant: pull toward deep blue/cyan for nebula contrast
+    const cool = [
+      Math.round(rgb[0] * 0.35),
+      Math.round(Math.min(255, rgb[1] * 0.6 + 70)),
+      Math.round(Math.min(255, rgb[2] * 0.5 + 140))
+    ];
+    // Static blob descriptors (cx,cy = home position 0-1; drift radii; phase; color; weight)
+    const blobs = this._auroraBlobs || (this._auroraBlobs = [
+      { cx: 0.28, cy: 0.32, dx: 0.06, dy: 0.08, ph: 0.0, col: rgb,  wt: 0.58 },
+      { cx: 0.74, cy: 0.40, dx: 0.07, dy: 0.05, ph: 2.1, col: cool, wt: 0.52 },
+      { cx: 0.52, cy: 0.72, dx: 0.05, dy: 0.07, ph: 4.2, col: rgb,  wt: 0.46 },
+      { cx: 0.18, cy: 0.78, dx: 0.08, dy: 0.06, ph: 1.0, col: cool, wt: 0.42 },
+    ]);
+    // Refresh dynamic colors each frame (accent changes with mode)
+    blobs[0].col = rgb; blobs[1].col = cool; blobs[2].col = rgb; blobs[3].col = cool;
+
+    const minWH = Math.min(w, h);
+    const baseAlpha = 0.06 + energy * 0.13 + bass * 0.07;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const b of blobs) {
+      const x = (b.cx + Math.sin(t * 0.7 + b.ph) * b.dx) * w;
+      const y = (b.cy + Math.cos(t * 0.5 + b.ph * 1.3) * b.dy) * h;
+      const r = minWH * (b.wt + Math.sin(t + b.ph) * 0.07 + energy * 0.16);
+      const a = baseAlpha * b.wt * 1.6;
+      if (a < 0.004 || r <= 0) continue;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      const c = b.col;
+      g.addColorStop(0,   `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`);
+      g.addColorStop(0.45,`rgba(${c[0]},${c[1]},${c[2]},${(a * 0.32).toFixed(3)})`);
+      g.addColorStop(1,   `rgba(${c[0]},${c[1]},${c[2]},0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    ctx.restore();
+  },
+
+  // ============================================================
+  // 0b. STARFIELD — tiny drifting points of light for depth.
+  //     Slow upward drift + per-star twinkle, brightened by treble.
+  // ============================================================
+  _drawStarfield(ctx, w, h, high, energy) {
+    if (!this._stars) {
+      this._stars = [];
+      for (let i = 0; i < 56; i++) {
+        this._stars.push({
+          x: Math.random(),
+          y: Math.random(),
+          z: 0.3 + Math.random() * 0.7,        // depth → size + speed
+          ph: Math.random() * Math.PI * 2,      // twinkle phase
+          tw: 0.6 + Math.random() * 1.8         // twinkle speed
+        });
+      }
+    }
+    this._starDrift += 0.00018;
+    const t = this._auroraTime;
+    const twBoost = Math.min(0.5, (high || 0) * 0.4 + energy * 0.2);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const s of this._stars) {
+      let sy = (s.y - this._starDrift * s.z) % 1;
+      if (sy < 0) sy += 1;
+      const px = s.x * w;
+      const py = sy * h;
+      const twinkle = 0.5 + 0.5 * Math.sin(t * s.tw + s.ph);
+      const alpha = (0.10 + twinkle * 0.32 + twBoost) * s.z;
+      if (alpha < 0.02) continue;
+      const size = s.z * (0.7 + twinkle * 0.8);
+      ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(px, py, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   },
 
   // ============================================================
