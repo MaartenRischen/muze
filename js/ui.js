@@ -603,10 +603,13 @@ MUZE.PerformTab = {
     const scaleBtn = document.getElementById('perf-scale-btn');
     if (scaleBtn) {
       const scaleNames = ['modal', ...Object.keys(MUZE.Music.EXTRA_SCALES)];
-      let scaleIdx = 0;
       scaleBtn.addEventListener('click', () => {
-        scaleIdx = (scaleIdx + 1) % scaleNames.length;
-        const name = scaleNames[scaleIdx];
+        // Derive current index from state so vibes/scenes that change the
+        // scale don't desync this control (no stale closure counter).
+        const cur = MUZE.State.extraScaleMode;
+        let curIdx = cur ? scaleNames.indexOf(cur) : 0;
+        if (curIdx < 0) curIdx = 0;
+        const name = scaleNames[(curIdx + 1) % scaleNames.length];
         if (name === 'modal') {
           MUZE.State.extraScaleMode = null;
           MUZE.State.modeFrozen = false;

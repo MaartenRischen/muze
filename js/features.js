@@ -861,6 +861,10 @@ MUZE.Vibes = {
     { name: 'Cosmic Drift', preset: 'Deep Space',   scale: 'whole tone',   key: 3,  groove: 3,  progression: 9 },
     { name: 'Liquid Flow',  preset: 'Liquid DnB',   scale: 'pent. minor',  key: 2,  groove: 8,  progression: 6 },
     { name: 'Dark Ritual',  preset: 'Cinematic',    scale: 'hungarian min',key: 8,  groove: 5,  progression: 5 },
+    { name: 'Tokyo',        preset: 'Vaporwave',    scale: 'in-sen',       key: 7,  groove: 5,  progression: 7 },
+    { name: 'Desert',       preset: 'Dark Techno',  scale: 'double harm',  key: 4,  groove: 10, progression: 5 },
+    { name: 'Bollywood',    preset: 'Bright Pop',   scale: 'egyptian',     key: 2,  groove: 9,  progression: 0 },
+    { name: 'Aurora',       preset: 'Deep Space',   scale: 'ukrainian',    key: 0,  groove: 3,  progression: 9 },
   ],
 
   init() {

@@ -279,25 +279,13 @@ MUZE.PresetExtensions = {
 // ============================================================
 MUZE.EuclideanPatterns = (function() {
   const E = MUZE.Music.euclidean.bind(MUZE.Music);
+  // Single 16-step bars — the AutoRhythm sequencer is 16 steps, so 32-step
+  // patterns previously only ever played their first bar. These are exactly
+  // that audible first bar, now consistent with every other pattern.
   const patterns = [
-    {
-      name: 'Eucl 3/8',
-      kick:  E(3, 16).concat(E(3, 16)),
-      snare: E(2, 16).concat(E(2, 16)),
-      hat:   E(5, 16).concat(E(5, 16))
-    },
-    {
-      name: 'Eucl 5/16',
-      kick:  E(5, 16).concat(E(5, 16)),
-      snare: E(3, 16).concat(E(3, 16)),
-      hat:   E(7, 16).concat(E(7, 16))
-    },
-    {
-      name: 'Eucl 7/16',
-      kick:  E(4, 16).concat(E(4, 16)),
-      snare: E(2, 16).concat(E(2, 16)),
-      hat:   E(9, 16).concat(E(9, 16))
-    }
+    { name: 'Eucl 3/8',  kick: E(3, 16), snare: E(2, 16), hat: E(5, 16) },
+    { name: 'Eucl 5/16', kick: E(5, 16), snare: E(3, 16), hat: E(7, 16) },
+    { name: 'Eucl 7/16', kick: E(4, 16), snare: E(2, 16), hat: E(9, 16) }
   ];
 
   // Attempt to append to RHYTHM_PATTERNS if the array is mutable
