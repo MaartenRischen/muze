@@ -5,7 +5,7 @@
 window.MUZE = {};
 
 // Single source of truth for the displayed app version (shown in #build-version).
-MUZE.VERSION = 'v5.7.0';
+MUZE.VERSION = 'v5.8.0';
 
 const SAMPLE_BASE = 'https://ffwbirepsanifejscguz.supabase.co/storage/v1/object/public/Samples/';
 
@@ -103,6 +103,18 @@ MUZE.Config = Object.freeze({
     'double harm':    { accent: '#db2777', rgb: '219,39,119' },
     'ukrainian':      { accent: '#14b8a6', rgb: '20,184,166' },
   },
+
+  // Color palettes — override the auto mode-driven accent with a fixed
+  // global color. 'Auto' (accent null) restores mode-following behavior.
+  PALETTES: [
+    { name: 'Auto',    accent: null,      rgb: null },
+    { name: 'Sunset',  accent: '#fb923c', rgb: '251,146,60' },
+    { name: 'Ocean',   accent: '#38bdf8', rgb: '56,189,248' },
+    { name: 'Magenta', accent: '#e879f9', rgb: '232,121,249' },
+    { name: 'Mint',    accent: '#34d399', rgb: '52,211,153' },
+    { name: 'Gold',    accent: '#fbbf24', rgb: '251,191,36' },
+    { name: 'Mono',    accent: '#e5e7eb', rgb: '229,231,235' },
+  ],
 
   // Root note names for selector
   ROOT_NAMES: ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'],
@@ -331,6 +343,8 @@ MUZE.State = {
   auroraEnabled: true,     // ambient nebula backdrop behind the user
   faceGlowEnabled: true,   // face-mesh AR glow (contour, iris, particles, aura)
   liteMode: false,         // performance mode: drops ambient layers + caps particles
+  palette: null,           // {accent,rgb} fixed color override, or null = follow mode
+  paletteIdx: 0,           // index into Config.PALETTES (0 = Auto)
 };
 
 // ---- Smoothing Filter (legacy, kept for reference) ----

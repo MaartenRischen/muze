@@ -196,14 +196,21 @@ MUZE.Visualizer = {
     }
     energy = energy / waveform.length;
 
-    // ---- Cache accent color (only on mode change) ----
+    // ---- Cache accent color (palette override wins, else mode-driven) ----
+    const pal = MUZE.State.palette;
     const currentMode = MUZE.State.currentModeName;
-    if (currentMode !== this._cachedModeName) {
-      this._cachedModeName = currentMode;
-      const colors = MUZE.Config.MODE_COLORS[currentMode];
-      if (colors) {
-        this._cachedAccent = colors.accent;
-        this._cachedAccentRgb = colors.rgb;
+    const accentToken = pal ? ('pal:' + pal.rgb) : currentMode;
+    if (accentToken !== this._cachedModeName) {
+      this._cachedModeName = accentToken;
+      if (pal) {
+        this._cachedAccent = pal.accent;
+        this._cachedAccentRgb = pal.rgb;
+      } else {
+        const colors = MUZE.Config.MODE_COLORS[currentMode];
+        if (colors) {
+          this._cachedAccent = colors.accent;
+          this._cachedAccentRgb = colors.rgb;
+        }
       }
     }
     const accent = this._cachedAccent;

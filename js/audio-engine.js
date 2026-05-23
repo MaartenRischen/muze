@@ -419,15 +419,17 @@ MUZE.Audio = {
       }
     }
 
-    // Mode color update
+    // Mode color update — skipped while a fixed palette override is active
     const modeName = MUZE.Music.getScaleName(state.currentScale);
     if (modeName !== state.currentModeName) {
       state.currentModeName = modeName;
-      const colors = C.MODE_COLORS[modeName];
-      if (colors) {
-        document.documentElement.style.setProperty('--muze-accent', colors.accent);
-        document.documentElement.style.setProperty('--muze-accent-rgb', colors.rgb);
-        document.documentElement.style.setProperty('--muze-accent-glow', `rgba(${colors.rgb}, 0.25)`);
+      if (!MUZE.State.palette) {
+        const colors = C.MODE_COLORS[modeName];
+        if (colors) {
+          document.documentElement.style.setProperty('--muze-accent', colors.accent);
+          document.documentElement.style.setProperty('--muze-accent-rgb', colors.rgb);
+          document.documentElement.style.setProperty('--muze-accent-glow', `rgba(${colors.rgb}, 0.25)`);
+        }
       }
     }
   },

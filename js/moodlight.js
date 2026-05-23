@@ -94,7 +94,7 @@ MUZE.MoodLight = {
     // 1. MODE COLOR SYNC + CROSSFADE TRANSITION
     // ================================================================
     const modeName = MUZE.State.currentModeName;
-    if (modeName !== this._prevModeName) {
+    if (!MUZE.State.palette && modeName !== this._prevModeName) {
       const colors = MUZE.Config.MODE_COLORS[modeName];
       if (colors) {
         // Start crossfade: capture old color, set new target

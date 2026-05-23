@@ -34,6 +34,7 @@ MUZE.Storage = {
     data['auroraEnabled'] = MUZE.State.auroraEnabled !== false;
     data['faceGlowEnabled'] = MUZE.State.faceGlowEnabled !== false;
     data['liteMode'] = MUZE.State.liteMode === true;
+    data['paletteIdx'] = MUZE.State.paletteIdx || 0;
 
     // Save extended preset parameters (arpRate, padChorusDepth, delayTime, reverbDecay)
     if (MUZE.State.arpRate) data['arpRate'] = MUZE.State.arpRate;
@@ -165,6 +166,7 @@ MUZE.Storage = {
         if (data['faceGlowEnabled'] !== undefined) MUZE.State.faceGlowEnabled = asBool(data['faceGlowEnabled']);
         if (MUZE.VisualSettings) MUZE.VisualSettings.refreshLabels();
       }
+      if (data['paletteIdx'] !== undefined && MUZE.Theme) MUZE.Theme.apply(+data['paletteIdx']);
 
       // Restore scenes
       if (data['scenes'] && MUZE.SceneManager) {

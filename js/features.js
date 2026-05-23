@@ -965,6 +965,55 @@ MUZE.Vibes = {
 };
 
 // ============================================================
+// THEME — global color palette override. 'Auto' follows the musical
+// mode; any other palette pins a fixed accent across every visual layer
+// (waveform ring, aurora, halo, face glow, mood lighting, CSS accents).
+// ============================================================
+MUZE.Theme = {
+  init() {
+    const btn = document.getElementById('perf-palette-btn');
+    if (btn) btn.addEventListener('click', () => this.cycle());
+    // Apply whatever was restored (default Auto)
+    this.apply(MUZE.State.paletteIdx || 0);
+  },
+
+  cycle() {
+    const n = MUZE.Config.PALETTES.length;
+    this.apply(((MUZE.State.paletteIdx || 0) + 1) % n);
+  },
+
+  apply(idx) {
+    const list = MUZE.Config.PALETTES;
+    const p = list[idx] || list[0];
+    MUZE.State.paletteIdx = idx;
+    MUZE.State.palette = p.accent ? { accent: p.accent, rgb: p.rgb } : null;
+    this._applyCSS();
+    // Force consumers to refresh their cached colors on next frame
+    if (MUZE.Visualizer) MUZE.Visualizer._cachedModeName = '__force__';
+    if (MUZE.MoodLight) MUZE.MoodLight._prevModeName = '';
+    const btn = document.getElementById('perf-palette-btn');
+    if (btn) btn.textContent = p.name;
+  },
+
+  // The accent color in effect right now (palette override or mode color)
+  current() {
+    if (MUZE.State.palette) return MUZE.State.palette;
+    return MUZE.Config.MODE_COLORS[MUZE.State.currentModeName] || { accent: '#e8a948', rgb: '232,169,72' };
+  },
+
+  _applyCSS() {
+    const a = this.current();
+    const root = document.documentElement.style;
+    root.setProperty('--muze-accent', a.accent);
+    root.setProperty('--muze-accent-rgb', a.rgb);
+    root.setProperty('--muze-accent-glow', `rgba(${a.rgb}, 0.25)`);
+    root.setProperty('--muze-accent-subtle', `rgba(${a.rgb}, 0.08)`);
+    // Mood lighting reads --mood-rgb; pin it too when a palette is active
+    if (MUZE.State.palette) root.setProperty('--mood-rgb', a.rgb);
+  }
+};
+
+// ============================================================
 // VISUAL SETTINGS — customize / tune the graphics for taste + perf.
 // Aurora and Face-glow are independent toggles; Lite mode is a one-tap
 // performance bundle that drops the ambient layers and caps particles.
