@@ -420,8 +420,21 @@ MUZE.Visualizer = {
       { cx: 0.52, cy: 0.72, dx: 0.05, dy: 0.07, ph: 4.2, col: rgb,  wt: 0.46 },
       { cx: 0.18, cy: 0.78, dx: 0.08, dy: 0.06, ph: 1.0, col: cool, wt: 0.42 },
     ]);
-    // Refresh dynamic colors each frame (accent changes with mode)
-    blobs[0].col = rgb; blobs[1].col = cool; blobs[2].col = rgb; blobs[3].col = cool;
+    // The warm blobs subtly echo the current melody note's color, so playing
+    // with your hand gently paints the backdrop. No melody → pure accent.
+    let warm = rgb;
+    const mn = MUZE.State.melodyNote;
+    if (mn != null) {
+      const nc = this._noteToRgb(mn);
+      const k = 0.30;
+      warm = [
+        Math.round(rgb[0] * (1 - k) + nc.r * k),
+        Math.round(rgb[1] * (1 - k) + nc.g * k),
+        Math.round(rgb[2] * (1 - k) + nc.b * k)
+      ];
+    }
+    // Refresh dynamic colors each frame (accent/mode/melody can all change)
+    blobs[0].col = warm; blobs[1].col = cool; blobs[2].col = warm; blobs[3].col = cool;
 
     const minWH = Math.min(w, h);
     const baseAlpha = 0.06 + energy * 0.13 + bass * 0.07;

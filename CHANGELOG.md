@@ -1,5 +1,10 @@
 # Changelog
 
+## v6.6.0 — Body paints the backdrop
+- The aurora's warm light clouds now subtly echo the current melody note's
+  color, so playing with your hand gently tints the backdrop. Degrades to pure
+  accent when no melody is playing.
+
 ## v6.5.0 — Quick Reference
 - Added a 'Quick Reference' card to the Help (?) menu: an at-a-glance gesture
   map (Face / Hand / One-tap magic / Touch) for when you don't want the full
