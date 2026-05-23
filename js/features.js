@@ -1061,6 +1061,98 @@ MUZE.Vibes = {
 };
 
 // ============================================================
+// SHARE — encode the current sound into a copyable URL so a vibe can be
+// shared or bookmarked. Format: #muze=p<preset>k<key>s<scale>g<groove>c<prog>a<palette>
+// (scale/prog = -1 means modal / off). Indices are clamped on decode.
+// ============================================================
+MUZE.Share = {
+  _scaleKeys() { return Object.keys(MUZE.Music.EXTRA_SCALES); },
+
+  encode() {
+    const S = MUZE.State;
+    const sIdx = S.extraScaleMode ? this._scaleKeys().indexOf(S.extraScaleMode) : -1;
+    const groove = MUZE.AutoRhythm ? MUZE.AutoRhythm._patIdx : 0;
+    const prog = (MUZE.ChordAdvance && MUZE.ChordAdvance._active) ? MUZE.ChordAdvance._progIdx : -1;
+    return `p${S.presetIdx || 0}k${S.rootOffset || 0}s${sIdx}g${groove}c${prog}a${S.paletteIdx || 0}`;
+  },
+
+  url() {
+    return location.origin + location.pathname + '#muze=' + this.encode();
+  },
+
+  // Parse a hash string and apply it. Returns true if anything was applied.
+  applyHash(hash) {
+    if (!hash) return false;
+    const m = /muze=p(-?\d+)k(-?\d+)s(-?\d+)g(-?\d+)c(-?\d+)a(-?\d+)/.exec(hash);
+    if (!m) return false;
+    const C = MUZE.Config, M = MUZE.Music;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const [, p, k, s, g, c, a] = m.map(Number);
+
+    // Preset
+    if (MUZE.Audio && MUZE.Audio.applyPreset) MUZE.Audio.applyPreset(clamp(p, 0, C.PRESETS.length - 1));
+    // Key
+    MUZE.State.rootOffset = ((k % 12) + 12) % 12;
+    // Scale
+    const keys = this._scaleKeys();
+    if (s >= 0 && s < keys.length) {
+      MUZE.State.extraScaleMode = keys[s];
+      MUZE.State.modeFrozen = true;
+      MUZE.State.currentScale = M.EXTRA_SCALES[keys[s]];
+    } else {
+      MUZE.State.extraScaleMode = null;
+      MUZE.State.modeFrozen = false;
+    }
+    // Groove
+    if (MUZE.AutoRhythm && g >= 0 && g < C.RHYTHM_PATTERNS.length) {
+      MUZE.AutoRhythm._patIdx = g;
+      MUZE.AutoRhythm._useCustom = false;
+      if (MUZE.AutoRhythm._active) MUZE.AutoRhythm._restart();
+    }
+    // Progression / auto-chord
+    if (MUZE.ChordAdvance) {
+      MUZE.ChordAdvance._stop();
+      if (c >= 0 && c < C.PROGRESSIONS.length) {
+        MUZE.ChordAdvance._progIdx = c;
+        MUZE.ChordAdvance._active = true;
+        MUZE.ChordAdvance._start();
+      } else {
+        MUZE.ChordAdvance._active = false;
+      }
+    }
+    // Palette
+    if (MUZE.Theme) MUZE.Theme.apply(clamp(a, 0, C.PALETTES.length - 1));
+
+    MUZE.Loop._currentPadKey = null; // force pad retrigger
+    // Refresh perform-tab labels
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    set('perf-preset-btn', C.PRESETS[MUZE.State.presetIdx].name);
+    set('perf-scale-btn', MUZE.State.extraScaleMode || 'Modal (face)');
+    set('scale-val', MUZE.State.extraScaleMode || 'modal');
+    if (MUZE.ChordAdvance) {
+      const lbl = MUZE.ChordAdvance._active ? MUZE.ChordAdvance.getProgressionName() : 'OFF';
+      set('perf-chords-btn', lbl); set('auto-chord-val', lbl);
+    }
+    if (MUZE.PerformTab && MUZE.PerformTab._syncDisplays) MUZE.PerformTab._syncDisplays();
+    return true;
+  },
+
+  // Copy the shareable URL to the clipboard, with a toast confirmation
+  async copy() {
+    const url = this.url();
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true; } catch (e) { ok = false; }
+    if (MUZE.Vibes && MUZE.Vibes._toast) MUZE.Vibes._toast(ok ? '🔗 Link copied' : '🔗 ' + url);
+    return ok;
+  },
+
+  init() {
+    const btn = document.getElementById('perf-share-btn');
+    if (btn) btn.addEventListener('click', () => this.copy());
+  }
+};
+
+// ============================================================
 // THEME — global color palette override. 'Auto' follows the musical
 // mode; any other palette pins a fixed accent across every visual layer
 // (waveform ring, aurora, halo, face glow, mood lighting, CSS accents).

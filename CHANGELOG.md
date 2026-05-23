@@ -1,5 +1,10 @@
 # Changelog
 
+## v6.8.0 — Shareable sounds
+- 'Copy link' (⚙ → Perform) encodes your preset, key, scale, groove, chord
+  progression and palette into a URL. Open the link and the sound loads
+  automatically (#muze=...), so you can share or bookmark a vibe.
+
 ## v6.7.0 — Toolbar tap/hold
 - The ✨ toolbar button: tap for the next vibe, hold (~0.5s) for a 🎲 Surprise
   random combo. Both announce via the on-screen toast.
