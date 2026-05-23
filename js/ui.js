@@ -1599,6 +1599,14 @@ MUZE.SampleUI = {
 MUZE.Tutorial = {
   _steps: [], _idx: 0, _active: false,
 
+  // At-a-glance gesture map (not a step-by-step walkthrough)
+  QUICK_REF: [
+    { title: '😊 Face', desc: 'Smile / frown → musical mode (bright ↔ dark). Eyebrows up → octave up. Open mouth → brighter arp filter. Tilt your head → chorus + stereo width.' },
+    { title: '✋ Hand', desc: 'Raise your free hand — the melody pitch follows its height. Open palm = smooth glide (legato). Fist = re-trigger each note (staccato).' },
+    { title: '✨ One-tap magic', desc: 'Tap ✨ (top toolbar) to load a full Vibe instantly — preset, scale, groove, chords and instruments all set so it sounds great immediately. ⚙ → Perform also has 🎲 Surprise, color palettes and more.' },
+    { title: '🎛 Touch', desc: 'Right edge = instruments on/off (hold a button to set its volume). Bottom bar = chords I–vi. Toolbar = ↑ riser, ● record, MIX mixer, ? guides, ⚙ settings.' },
+  ],
+
   FIRST_TOUCH: [
     { title: 'Press Play', desc: 'Hit the play button (top right). Music starts immediately \u2014 a pad and arpeggio respond to your face.' },
     { title: 'Smile & Frown', desc: 'Smile \u2014 the music gets brighter. Frown \u2014 it gets darker. Your expression chooses the musical mode in real-time. Watch the mode name change in the top-left corner.' },
@@ -1650,6 +1658,8 @@ MUZE.Tutorial = {
     document.getElementById('tut-close-pick').addEventListener('click', () => {
       document.getElementById('tut-picker').classList.remove('open');
     });
+    const quickRefBtn = document.getElementById('tut-quickref');
+    if (quickRefBtn) quickRefBtn.addEventListener('click', () => this._start(this.QUICK_REF));
     document.getElementById('tut-first').addEventListener('click', () => this._start(this.FIRST_TOUCH));
     document.getElementById('tut-explore').addEventListener('click', () => this._start(this.EXPLORING));
     document.getElementById('tut-design').addEventListener('click', () => this._start(this.SOUND_DESIGN));

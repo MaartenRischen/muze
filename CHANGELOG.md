@@ -1,5 +1,10 @@
 # Changelog
 
+## v6.5.0 — Quick Reference
+- Added a 'Quick Reference' card to the Help (?) menu: an at-a-glance gesture
+  map (Face / Hand / One-tap magic / Touch) for when you don't want the full
+  step-by-step tutorial. Reuses the tutorial card UI.
+
 ## v6.4.0 — Scenes capture the whole vibe
 - Scene snapshots now save + restore the color palette, drum groove, chord
   progression, and visual toggles (aurora/face-glow/lite) in addition to the

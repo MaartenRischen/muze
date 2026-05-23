@@ -10,8 +10,8 @@
 <meta name="description" content="Your body is the instrument. Create music with gestures.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
 <title>Jammerman</title>
-<link rel="stylesheet" href="css/style.css?v=1779542400">
-<link rel="stylesheet" href="css/mixer.css?v=1779542400">
+<link rel="stylesheet" href="css/style.css?v=1779543742">
+<link rel="stylesheet" href="css/mixer.css?v=1779543742">
 <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
 </head>
 <body>
@@ -44,7 +44,7 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
 
 <!-- Audio-reactive beat flash -->
 <div id="beat-flash-overlay"></div>
-<div id="build-version">v6.4.0</div>
+<div id="build-version">v6.5.0</div>
 
 <!-- Instrument toggles — right side, vertical -->
 <div id="instrument-toggles">
@@ -136,6 +136,7 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
 <div id="tut-picker">
   <h2>Learn Jammerman</h2>
   <p>Step-by-step guides while you play</p>
+  <button class="tut-choice" id="tut-quickref">Quick Reference<small>All gestures at a glance</small></button>
   <button class="tut-choice" id="tut-first">First Touch<small>Make music in 30 seconds</small></button>
   <button class="tut-choice" id="tut-explore">Exploring<small>All face, hand & touch controls</small></button>
   <button class="tut-choice" id="tut-design">Sound Design<small>Synths, mixer, presets & scales</small></button>
@@ -401,19 +402,19 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
 </script>
 
 <!-- JS Modules -->
-<script src="js/config.js?v=1779542400"></script>
-<script src="js/tracking.js?v=1779542400"></script>
-<script src="js/bgblur.js?v=1779542400"></script><!-- DO NOT REMOVE -->
-<script src="js/music.js?v=1779542400"></script>
-<script src="js/mixer.js?v=1779542400"></script>
-<script src="js/audio-engine.js?v=1779542400"></script>
-<script src="js/visualizer.js?v=1779542400"></script>
-<script src="js/moodlight.js?v=1779542400"></script>
-<script src="js/drumfx.js?v=1779542400"></script>
-<script src="js/storage.js?v=1779542400"></script>
-<script src="js/ui.js?v=1779542400"></script>
-<script src="js/features.js?v=1779542400"></script>
-<script src="js/app.js?v=1779542400"></script>
+<script src="js/config.js?v=1779543742"></script>
+<script src="js/tracking.js?v=1779543742"></script>
+<script src="js/bgblur.js?v=1779543742"></script><!-- DO NOT REMOVE -->
+<script src="js/music.js?v=1779543742"></script>
+<script src="js/mixer.js?v=1779543742"></script>
+<script src="js/audio-engine.js?v=1779543742"></script>
+<script src="js/visualizer.js?v=1779543742"></script>
+<script src="js/moodlight.js?v=1779543742"></script>
+<script src="js/drumfx.js?v=1779543742"></script>
+<script src="js/storage.js?v=1779543742"></script>
+<script src="js/ui.js?v=1779543742"></script>
+<script src="js/features.js?v=1779543742"></script>
+<script src="js/app.js?v=1779543742"></script>
 
 <!-- Stamp the live version from the single source of truth (MUZE.VERSION) -->
 <script>
