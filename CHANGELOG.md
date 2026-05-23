@@ -1,5 +1,15 @@
 # Changelog
 
+## v6.2.0 — Accessibility
+- Respect the OS **prefers-reduced-motion** setting: on first run (before any
+  customization), default to Lite mode for users who've asked for reduced motion.
+  A saved preference always wins.
+
+## v6.1.0 — Discoverability
+- Prominent **✨ Vibe** button in the top toolbar that cycles vibes with an
+  on-screen toast, so the one-tap-great-sound path is findable without opening
+  the settings panel.
+
 ## v6.0.0 — Instant arrangements (capstone)
 - **Vibes now play a full arrangement instantly**: tapping a vibe (or Surprise)
   auto-enables Pad + Arp + Melody, plus Beat when the preset has live drums, so
