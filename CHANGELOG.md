@@ -1,5 +1,9 @@
 # Changelog
 
+## v6.7.0 — Toolbar tap/hold
+- The ✨ toolbar button: tap for the next vibe, hold (~0.5s) for a 🎲 Surprise
+  random combo. Both announce via the on-screen toast.
+
 ## v6.6.0 — Body paints the backdrop
 - The aurora's warm light clouds now subtly echo the current melody note's
   color, so playing with your hand gently tints the backdrop. Degrades to pure

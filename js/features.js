@@ -904,9 +904,25 @@ MUZE.Vibes = {
   init() {
     const btn = document.getElementById('perf-vibe-btn');
     if (btn) btn.addEventListener('click', () => this.cycle());
-    // Prominent toolbar shortcut so the one-tap-great-sound path is discoverable
+    // Prominent toolbar shortcut: tap = next vibe, hold = Surprise (random combo)
     const tb = document.getElementById('vibe-toolbar-btn');
-    if (tb) tb.addEventListener('click', () => this.cycle());
+    if (tb) {
+      let timer = null, held = false;
+      tb.addEventListener('pointerdown', (e) => {
+        held = false;
+        try { tb.setPointerCapture(e.pointerId); } catch (_) {}
+        timer = setTimeout(() => { held = true; this.surprise(); }, 450);
+      });
+      tb.addEventListener('pointerup', () => {
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (!held) this.cycle();
+        held = false;
+      });
+      tb.addEventListener('pointercancel', () => {
+        if (timer) { clearTimeout(timer); timer = null; }
+        held = false;
+      });
+    }
     const surprise = document.getElementById('perf-surprise-btn');
     if (surprise) surprise.addEventListener('click', () => this.surprise());
   },
