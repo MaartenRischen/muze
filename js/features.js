@@ -946,6 +946,17 @@ MUZE.Vibes = {
       }
     }
 
+    // 6. Auto-enable a full arrangement so the vibe is instantly audible
+    //    (pad + arp + melody always; beat only if the preset has live drums).
+    if (MUZE.InstrumentToggles && MUZE.InstrumentToggles.setActive) {
+      const IT = MUZE.InstrumentToggles;
+      IT.setActive('pad', true);
+      IT.setActive('arp', true);
+      IT.setActive('melody', true);
+      const preset = pIdx >= 0 ? MUZE.Config.PRESETS[pIdx] : null;
+      IT.setActive('beat', preset ? preset.kickVolume > -40 : true);
+    }
+
     MUZE.Loop._currentPadKey = null; // force pad retrigger
     this._syncLabels(v);
   },

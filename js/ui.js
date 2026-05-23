@@ -195,6 +195,17 @@ MUZE.InstrumentToggles = {
     // Sync synth panel toggle
     const panelBtn = document.getElementById('bin-toggle');
     if (panelBtn) panelBtn.textContent = on ? 'ON' : 'OFF';
+  },
+
+  // Programmatically set an instrument on/off (used by Vibes to play a full
+  // arrangement instantly). No-op if already in the desired state, so the
+  // button + audio stay in sync via the existing toggle paths.
+  _stateKey: { pad: '_padActive', arp: '_arpActive', arp2: '_arp2Active', melody: '_melodyActive', beat: '_beatActive', bin: '_binActive' },
+  _toggleFn: { pad: '_togglePad', arp: '_toggleArp', arp2: '_toggleArp2', melody: '_toggleMelody', beat: '_toggleBeat', bin: '_toggleBin' },
+  setActive(inst, on) {
+    const key = this._stateKey[inst], fn = this._toggleFn[inst];
+    if (!key || !fn) return;
+    if (!!this[key] !== !!on) this[fn]();
   }
 };
 
