@@ -5,7 +5,7 @@
 window.MUZE = {};
 
 // Single source of truth for the displayed app version (shown in #build-version).
-MUZE.VERSION = 'v6.2.0';
+MUZE.VERSION = 'v6.3.0';
 
 const SAMPLE_BASE = 'https://ffwbirepsanifejscguz.supabase.co/storage/v1/object/public/Samples/';
 
@@ -59,6 +59,9 @@ MUZE.Config = Object.freeze({
     { name: 'Dembow',    kick:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], snare:[0,0,0,1,0,0,1,0,0,0,0,1,0,0,1,0], hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
     { name: 'Afrobeat',  kick:[1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0], snare:[0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0], hat:[1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1] },
     { name: 'UK Garage', kick:[1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0], snare:[0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0], hat:[1,0,1,1,0,1,1,0,1,0,1,1,0,1,1,0] },
+    { name: 'Bossa',     kick:[1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0], snare:[0,0,1,0,0,1,0,0,0,1,0,0,1,0,0,0], hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
+    { name: 'Drill',     kick:[1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0], snare:[0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], hat:[1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1] },
+    { name: 'Breakbeat', kick:[1,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0], snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1], hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
   ],
 
   // Arpeggio pattern types and note values

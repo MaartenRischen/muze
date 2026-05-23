@@ -1,5 +1,9 @@
 # Changelog
 
+## v6.3.0 — More content
+- +3 drum grooves (Bossa, Drill, Breakbeat) and +4 vibes (Rio, Night Drill,
+  Jungle, Sakura). Surprise now draws from all grooves (Euclidean included).
+
 ## v6.2.0 — Accessibility
 - Respect the OS **prefers-reduced-motion** setting: on first run (before any
   customization), default to Lite mode for users who've asked for reduced motion.

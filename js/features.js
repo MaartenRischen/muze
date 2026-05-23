@@ -865,6 +865,10 @@ MUZE.Vibes = {
     { name: 'Desert',       preset: 'Dark Techno',  scale: 'double harm',  key: 4,  groove: 10, progression: 5 },
     { name: 'Bollywood',    preset: 'Bright Pop',   scale: 'egyptian',     key: 2,  groove: 9,  progression: 0 },
     { name: 'Aurora',       preset: 'Deep Space',   scale: 'ukrainian',    key: 0,  groove: 3,  progression: 9 },
+    { name: 'Rio',          preset: 'Bright Pop',   scale: 'pent. major',  key: 7,  groove: 12, progression: 2 },
+    { name: 'Night Drill',  preset: 'Trap Soul',    scale: 'pent. minor',  key: 1,  groove: 13, progression: 8 },
+    { name: 'Jungle',       preset: 'Liquid DnB',   scale: 'pent. minor',  key: 9,  groove: 14, progression: 6 },
+    { name: 'Sakura',       preset: 'Ambient Dream',scale: 'iwato',        key: 4,  groove: 3,  progression: 7 },
   ],
 
   init() {
@@ -921,7 +925,7 @@ MUZE.Vibes = {
       preset: pick(C.PRESETS).name,
       scale: Math.random() < 0.85 ? pick(scaleKeys) : null,
       key: Math.floor(Math.random() * 12),
-      groove: Math.floor(Math.random() * Math.min(12, C.RHYTHM_PATTERNS.length)),
+      groove: Math.floor(Math.random() * C.RHYTHM_PATTERNS.length),
       progression: Math.random() < 0.7 ? Math.floor(Math.random() * C.PROGRESSIONS.length) : -1,
     };
     this._applyVibeObject(v);
