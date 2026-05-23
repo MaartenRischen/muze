@@ -5,7 +5,7 @@
 window.MUZE = {};
 
 // Single source of truth for the displayed app version (shown in #build-version).
-MUZE.VERSION = 'v5.4.0';
+MUZE.VERSION = 'v5.5.0';
 
 const SAMPLE_BASE = 'https://ffwbirepsanifejscguz.supabase.co/storage/v1/object/public/Samples/';
 

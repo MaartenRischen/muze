@@ -841,6 +841,104 @@ MUZE.ChordAdvance = {
 };
 
 // ============================================================
+// VIBES — one-tap curated combos (preset + scale + key + groove +
+// progression). The fastest path to "this already sounds good".
+// Each vibe layers a fixed scale + drum groove + chord progression on
+// top of a base preset, so a single tap reconfigures the whole instrument.
+// ============================================================
+MUZE.Vibes = {
+  _idx: -1,
+
+  // groove = index into Config.RHYTHM_PATTERNS; progression = index into
+  // Config.PROGRESSIONS (or -1 for off); scale = key in Music.EXTRA_SCALES
+  // (or null for face-controlled modal); key = rootOffset 0-11.
+  LIST: [
+    { name: 'Lofi Sunset',  preset: 'Lo-Fi Chill', scale: 'pent. minor',  key: 5,  groove: 7,  progression: 1 },
+    { name: 'Neon Drive',   preset: 'Synthwave',    scale: 'pent. minor',  key: 9,  groove: 0,  progression: 0 },
+    { name: 'Deep Calm',    preset: 'Meditation',   scale: 'in-sen',       key: 0,  groove: 3,  progression: 7 },
+    { name: 'Midnight Jazz',preset: 'Trap Soul',    scale: 'blues',        key: 1,  groove: 7,  progression: 3 },
+    { name: 'Festival',     preset: 'Future Bass',  scale: 'pent. major',  key: 10, groove: 4,  progression: 0 },
+    { name: 'Cosmic Drift', preset: 'Deep Space',   scale: 'whole tone',   key: 3,  groove: 3,  progression: 9 },
+    { name: 'Liquid Flow',  preset: 'Liquid DnB',   scale: 'pent. minor',  key: 2,  groove: 8,  progression: 6 },
+    { name: 'Dark Ritual',  preset: 'Cinematic',    scale: 'hungarian min',key: 8,  groove: 5,  progression: 5 },
+  ],
+
+  init() {
+    const btn = document.getElementById('perf-vibe-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      this._idx = (this._idx + 1) % this.LIST.length;
+      this.apply(this._idx);
+      btn.textContent = this.LIST[this._idx].name;
+    });
+  },
+
+  apply(idx) {
+    const v = this.LIST[idx];
+    if (!v) return;
+
+    // 1. Base preset (bpm, key, synths, volumes, sends, swing, arp pattern)
+    const pIdx = MUZE.Config.PRESETS.findIndex(p => p.name === v.preset);
+    if (pIdx >= 0) MUZE.Audio.applyPreset(pIdx);
+
+    // 2. Fixed scale (so the vibe sounds consistent without needing a smile)
+    if (v.scale && MUZE.Music.EXTRA_SCALES[v.scale]) {
+      MUZE.State.extraScaleMode = v.scale;
+      MUZE.State.modeFrozen = true;
+      MUZE.State.currentScale = MUZE.Music.EXTRA_SCALES[v.scale];
+    } else {
+      MUZE.State.extraScaleMode = null;
+      MUZE.State.modeFrozen = false;
+    }
+
+    // 3. Key override (after preset, which also sets a key)
+    if (v.key != null) MUZE.State.rootOffset = ((v.key % 12) + 12) % 12;
+
+    // 4. Drum groove
+    if (v.groove != null && MUZE.AutoRhythm &&
+        v.groove < MUZE.Config.RHYTHM_PATTERNS.length) {
+      MUZE.AutoRhythm._patIdx = v.groove;
+      MUZE.AutoRhythm._useCustom = false;
+      if (MUZE.AutoRhythm._active) MUZE.AutoRhythm._restart();
+    }
+
+    // 5. Chord progression
+    if (MUZE.ChordAdvance) {
+      if (v.progression != null && v.progression >= 0) {
+        MUZE.ChordAdvance._stop();
+        MUZE.ChordAdvance._progIdx = v.progression;
+        MUZE.ChordAdvance._active = true;
+        MUZE.ChordAdvance._start();
+      } else {
+        MUZE.ChordAdvance._active = false;
+        MUZE.ChordAdvance._stop();
+      }
+    }
+
+    MUZE.Loop._currentPadKey = null; // force pad retrigger
+    this._idx = idx;
+    this._syncLabels(v);
+  },
+
+  // Reflect the new state across the Perform tab controls
+  _syncLabels(v) {
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    set('perf-vibe-btn', v.name);
+    set('perf-preset-btn', v.preset);
+    set('perf-scale-btn', v.scale || 'Modal (face)');
+    set('scale-val', v.scale || 'modal');
+    if (MUZE.ChordAdvance) {
+      const label = MUZE.ChordAdvance._active ? MUZE.ChordAdvance.getProgressionName() : 'OFF';
+      set('perf-chords-btn', label);
+      set('auto-chord-val', label);
+      const acBtn = document.getElementById('auto-chord-btn');
+      if (acBtn) acBtn.classList.toggle('active', MUZE.ChordAdvance._active);
+    }
+    if (MUZE.PerformTab && MUZE.PerformTab._syncDisplays) MUZE.PerformTab._syncDisplays();
+  }
+};
+
+// ============================================================
 // SIDECHAIN PUMPING — Kick ducks pad volume
 // ============================================================
 MUZE.Sidechain = {
