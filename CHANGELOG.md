@@ -1,5 +1,24 @@
 # Changelog
 
+## v7.0.0 — Magenta RealTime 2 AI core
+- New **🧠 AI** instrument toggle: streams Google **Magenta RealTime 2** (the
+  June 2026 open-weights live music model) as a generative layer, steered live by
+  the same controls you already play — your active Vibe/preset + mode + key + tempo
+  become a MusicCoCa style prompt, your chord voicing becomes Magenta's note
+  pianoroll, the BEAT toggle drives its drums, and gestures map to its CFG /
+  temperature (hand height → note adherence, mouth → style strength, brows → drum
+  punch, hand-X → temperature). Long-press the AI chip for "free harmony" (let
+  Magenta improvise around the chord).
+- The model runs in a small **local MLX server** (`server/`) — it's a C++/MLX model
+  and can't run in the browser — and streams 48 kHz stereo audio back over a
+  WebSocket. Muze plays it **through the existing master chain** (EQ, saturation,
+  limiter, visualizer), gapless, with a jitter buffer + auto-reconnect.
+- Magenta is **additive and optional**: with no server reachable, Muze runs exactly
+  as before on the Tone.js engine (the AI chip just shows a grey status dot). On
+  iPhone, point the app at your Mac with `?mag=ws://<mac-ip>:8010/ws`.
+- See `server/README.md` for the one-command setup. Measured ~1.3× real-time with
+  `mrt2_small` on an M4 Max.
+
 ## v6.9.0 — Installable app + icon
 - Added a PWA manifest + a real app icon (glowing aura orb over an equalizer),
   so Jammerman can be installed to the home screen as a standalone app

@@ -46,7 +46,7 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
 
 <!-- Audio-reactive beat flash -->
 <div id="beat-flash-overlay"></div>
-<div id="build-version">v6.9.0</div>
+<div id="build-version">v7.0.0</div>
 
 <!-- Instrument toggles — right side, vertical -->
 <div id="instrument-toggles">
@@ -56,6 +56,7 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
   <button class="inst-toggle" id="toggle-melody" data-inst="melody"><span class="inst-icon">🎵</span><span class="inst-label">MEL</span></button>
   <button class="inst-toggle" id="toggle-beat" data-inst="beat"><span class="inst-icon">◉</span><span class="inst-label">BEAT</span></button>
   <button class="inst-toggle" id="toggle-bin" data-inst="bin"><span class="inst-icon">∿</span><span class="inst-label">BIN</span></button>
+  <button class="inst-toggle" id="toggle-magenta" data-inst="magenta" title="Magenta AI core — tap: on/off, hold: free harmony"><span class="inst-icon">🧠</span><span class="inst-label">AI</span></button>
 </div>
 <!-- Volume bar (shown on long-press drag) -->
 <div id="vol-slider-popup">
@@ -411,6 +412,7 @@ var _origWarn=console.warn;console.warn=function(){var m=Array.from(arguments).j
 <script src="js/music.js?v=1779544128"></script>
 <script src="js/mixer.js?v=1779544128"></script>
 <script src="js/audio-engine.js?v=1779544128"></script>
+<script src="js/magenta-rt.js?v=1779544128"></script>
 <script src="js/visualizer.js?v=1779544128"></script>
 <script src="js/moodlight.js?v=1779544128"></script>
 <script src="js/drumfx.js?v=1779544128"></script>
@@ -479,6 +481,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     if (MUZE.Tutorial) MUZE.Tutorial.init();
     if (MUZE.PerformTab) MUZE.PerformTab.init();
     if (MUZE.Vibes) MUZE.Vibes.init();
+    if (MUZE.MagentaRT) MUZE.MagentaRT.init();
     if (MUZE.VisualSettings) MUZE.VisualSettings.init();
     if (MUZE.Theme) MUZE.Theme.init();
     if (MUZE.Share) MUZE.Share.init();

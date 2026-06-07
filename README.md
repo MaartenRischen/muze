@@ -19,6 +19,22 @@ python3 -m http.server 8123
 
 Grant camera + microphone permission when prompted.
 
+## AI core (Magenta RealTime 2) — optional
+
+Muze can use Google's **Magenta RealTime 2** (June 2026 open-weights live music model)
+as a generative core. It's a C++/MLX model, so it can't run in the browser — instead a
+small **local server** (`server/`) runs the model on Apple Silicon and streams 48 kHz
+audio that Muze plays through its own effects + visualizer. Your gestures, vibe, chord
+and key steer the generation in real time.
+
+```bash
+cd server && ./run.sh          # serves the app + AI on http://localhost:8010
+```
+
+Then open http://localhost:8010/, tap **Start**, and tap the **🧠 AI** chip. No server?
+Muze runs exactly as before on its built-in Tone.js engine (AI is additive + optional).
+Full setup, models and the honest architecture: **[server/README.md](server/README.md)**.
+
 ## How you play
 
 - **Smile / frown** → musical mode (valence): bright Lydian → dark Phrygian
@@ -27,7 +43,9 @@ Grant camera + microphone permission when prompted.
 - **Head tilt / roll** → chorus + expression
 - **Hand height** → melody pitch; **open palm** glides (legato), **fist** re-triggers (staccato)
 - **Chord bar** (bottom) → pick the chord; or turn on an auto **progression**
-- **Instrument toggles** (right) → Pad, Arp 1/2, Melody, Beat, Binaural
+- **Instrument toggles** (right) → Pad, Arp 1/2, Melody, Beat, Binaural, **🧠 AI**
+- **🧠 AI** → layers **Magenta RealTime 2** generative audio on top, steered live by your
+  vibe/chord/gestures (needs the local server — see below). Tap = on/off, hold = free harmony
 - **✨ (toolbar)** → tap for the next Vibe, hold for a 🎲 Surprise
 - **⚙ → Perform** → Vibes, Surprise, Share link, presets, key/scale, tempo, palettes, visuals, scenes, loop recorder
 - **? (toolbar)** → guided tutorials + a Quick Reference gesture cheat-sheet

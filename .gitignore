@@ -9,3 +9,9 @@ ios/Jammerman/Resources/MuseScore_General.sf2
 
 # Local version snapshots (for manual inspection)
 versions/
+
+# Magenta server: local venv, caches, logs (weights live in ~/Documents/Magenta)
+server/.venv/
+server/__pycache__/
+server/*.log
+server/.pytest_cache/

@@ -2681,3 +2681,20 @@ body::after {
   letter-spacing: 1px; text-transform: uppercase;
   background: rgba(0,0,0,0.3);
 }
+
+/* ============================================================
+   Magenta AI core toggle — live connection status dot
+   (status colour is set inline via --mag-status by js/magenta-rt.js)
+   ============================================================ */
+#toggle-magenta { position: relative; }
+#toggle-magenta::after {
+  content: ''; position: absolute; top: 5px; right: 5px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--mag-status, rgba(255,255,255,0.25));
+  box-shadow: 0 0 6px var(--mag-status, transparent);
+  transition: background .25s ease, box-shadow .25s ease;
+}
+#toggle-magenta[data-mag="connecting"]::after,
+#toggle-magenta[data-mag="reconnecting"]::after,
+#toggle-magenta[data-mag="buffering"]::after { animation: mag-pulse 1s ease-in-out infinite; }
+@keyframes mag-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }

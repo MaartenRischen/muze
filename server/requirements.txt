@@ -1,0 +1,13 @@
+# Muze · Magenta RT2 streaming server
+#
+# Apple Silicon (real-time, recommended): installs the MLX backend + the model.
+magenta-rt[mlx]>=2.0.2
+
+# Web server / transport
+fastapi>=0.115
+uvicorn[standard]>=0.34
+websockets>=15
+
+# Audio / math (magenta-rt already pulls numpy+soundfile, listed for the mock-only path)
+numpy>=1.26
+soundfile>=0.12
